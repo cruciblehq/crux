@@ -1,0 +1,192 @@
+name: Build
+
+on:
+  push:
+    branches: [dev, preview, staging, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # --- Set Version ---
+  set-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.setver.outputs.version }}
+      stage: ${{ steps.setver.outputs.stage }}
+      commit: ${{ steps.setver.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Version
+        id: setver
+        uses: ./.github/actions/set-version
+
+  # --- Validate ---
+  validate-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - name: Download and verify modules
+        uses: ./.github/actions/download-and-verify-modules
+      - name: Run Test and Coverage Action
+        uses: ./.github/actions/test-and-coverage
+
+  # --- Publish Coverage ---
+  publish-coverage:
+    needs: validate-source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+          path: badges
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+      - name: Prepare gh-pages
+        run: |
+          mkdir public
+          cp -r coverage badges public/
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+
+  # --- Build ---
+  build:
+    needs: [set-version, validate-source]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ext: ""
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - os: ubuntu-latest
+            goos: windows
+            goarch: arm64
+            ext: ".exe"
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            ext: ""
+    runs-on: ${{ matrix.os }}
+    env:
+      MAC_SIGN_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: ./.github/actions/download-and-verify-modules
+
+      - name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -v -ldflags "\
+            -X github.com/cruciblehq/crux/internal.version=${{ needs.set-version.outputs.version }} \
+            -X github.com/cruciblehq/crux/internal.stage=${{ needs.set-version.outputs.stage }} \
+            -X github.com/cruciblehq/crux/internal.gitCommit=${{ needs.set-version.outputs.commit }}" \
+          -o dist/crux-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/crux
+
+      - name: Import signing certificate
+        if: matrix.goos == 'darwin'
+        id: import-cert
+        uses: ./.github/actions/import-mac-cert
+        with:
+          mac_cert_p12: ${{ secrets.MAC_CERT_P12 }}
+          mac_cert_pwd: ${{ secrets.MAC_CERT_PWD }}
+
+      - name: Sign binary
+        if: matrix.goos == 'darwin'
+        run: |
+          codesign --force --timestamp --options runtime \
+            --sign "$MAC_SIGN_IDENTITY" \
+            dist/crux-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Cleanup keychain
+        if: matrix.goos == 'darwin' && always()
+        run: security delete-keychain "${{ steps.import-cert.outputs.keychain }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crux-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
+  # --- macOS Universal + Notarization ---
+  notarize-macos:
+    runs-on: macos-latest
+    needs: build
+    env:
+      MAC_SIGN_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PWD: ${{ secrets.APPLE_APP_PWD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: crux-darwin-amd64
+          path: dist/amd64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: crux-darwin-arm64
+          path: dist/arm64
+
+      - name: Import signing certificate
+        id: import-cert
+        uses: ./.github/actions/import-mac-cert
+        with:
+          mac_cert_p12: ${{ secrets.MAC_CERT_P12 }}
+          mac_cert_pwd: ${{ secrets.MAC_CERT_PWD }}
+
+      - name: Create universal binary
+        run: |
+          lipo -create -output dist/crux-darwin-universal \
+            dist/arm64/crux-darwin-arm64 \
+            dist/amd64/crux-darwin-amd64
+
+      - name: Sign and notarize
+        run: |
+          codesign --force --timestamp --options runtime \
+            --sign "$MAC_SIGN_IDENTITY" dist/crux-darwin-universal
+
+          zip -r dist/crux-darwin-universal.zip dist/crux-darwin-universal
+
+          xcrun notarytool submit dist/crux-darwin-universal.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PWD" \
+            --wait
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "${{ steps.import-cert.outputs.keychain }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crux-darwin-universal
+          path: dist/crux-darwin-universal
