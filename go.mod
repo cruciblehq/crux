@@ -7,6 +7,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/klauspost/compress v1.18.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
