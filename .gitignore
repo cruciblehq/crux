@@ -19,7 +19,6 @@ go.work.sum
 /crux
 /crux.exe
 dist/
-build/
 
 # IDE files
 .vscode/
