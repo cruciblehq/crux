@@ -20,6 +20,5 @@ type Widget struct {
 	// Holds build-related configuration for widget resources.
 	Build struct {
 		Main string `field:"main"` // Build entry point.
-		Dist string `field:"dist"` // Build output directory.
 	} `field:"build"`
 }

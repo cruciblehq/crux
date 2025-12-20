@@ -7,9 +7,9 @@ package manifest
 // unique to service resources, such as container image references.
 type Service struct {
 
-	// Holds container image information for the service. Crux uses this to
-	// locate the service's container image, which will later be deployed.
-	Image struct {
-		Ref string `key:"ref"` // Container image reference
-	} `key:"image"`
+	// Holds build-related configuration for service resources.
+	Build struct {
+		Main string            `field:"main"` // Build entry point (e.g., Dockerfile).
+		Args map[string]string `field:"args"` // Build arguments (ARG in Dockerfile).
+	} `field:"build"`
 }

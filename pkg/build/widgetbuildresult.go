@@ -30,16 +30,15 @@ type esbuildResultSortHelper struct {
 //
 // It normalizes the messages, sorts them, and logs them. If there are errors,
 // it returns an indicating a general failure of the build.
-func processBuildResult(result es.BuildResult) error {
+func processEsBuildResult(result es.BuildResult) error {
 
 	// Clean build
 	if len(result.Errors) == 0 && len(result.Warnings) == 0 {
-		slog.Debug("build completed successfully")
 		return nil
 	}
 
 	// Normalize and sort
-	helpers := normalizeAndSortEsbuildResult(result)
+	helpers := normalizeAndSortEsBuildResult(result)
 
 	// Log everything
 	for _, h := range helpers {
@@ -67,17 +66,17 @@ func processBuildResult(result es.BuildResult) error {
 // It processes both errors and warnings, normalizing their messages and
 // location information. The resulting helpers are sorted by line and column
 // number to provide a coherent order for reporting.
-func normalizeAndSortEsbuildResult(result es.BuildResult) []esbuildResultSortHelper {
+func normalizeAndSortEsBuildResult(result es.BuildResult) []esbuildResultSortHelper {
 	var helpers []esbuildResultSortHelper
 
 	// Process errors
 	for _, err := range result.Errors {
-		helpers = append(helpers, normalizeEsbuildMessage(err, esbuildSeverityError))
+		helpers = append(helpers, normalizeEsBuildMessage(err, esbuildSeverityError))
 	}
 
 	// Process warnings
 	for _, warn := range result.Warnings {
-		helpers = append(helpers, normalizeEsbuildMessage(warn, esbuildSeverityWarning))
+		helpers = append(helpers, normalizeEsBuildMessage(warn, esbuildSeverityWarning))
 	}
 
 	// Sort reports by line and column if location info is available
@@ -96,7 +95,7 @@ func normalizeAndSortEsbuildResult(result es.BuildResult) []esbuildResultSortHel
 // It uses the provided severity level to create either error or warning
 // messages. If location information is available, it includes it in the helper
 // and keeps track of line and column for sorting purposes.
-func normalizeEsbuildMessage(msg es.Message, severity esbuildSeverity) esbuildResultSortHelper {
+func normalizeEsBuildMessage(msg es.Message, severity esbuildSeverity) esbuildResultSortHelper {
 
 	helper := esbuildResultSortHelper{
 		severity: severity,
@@ -105,7 +104,7 @@ func normalizeEsbuildMessage(msg es.Message, severity esbuildSeverity) esbuildRe
 
 	if msg.Location != nil {
 		helper.message = fmt.Sprintf("%s: %s",
-			normalizeEsbuildLocation(*msg.Location),
+			normalizeEsBuildLocation(*msg.Location),
 			lowerFirst(msg.Text))
 		helper.line = msg.Location.Line
 		helper.column = msg.Location.Column
@@ -115,7 +114,7 @@ func normalizeEsbuildMessage(msg es.Message, severity esbuildSeverity) esbuildRe
 }
 
 // Formats an esbuild location as "file:line:column".
-func normalizeEsbuildLocation(loc es.Location) string {
+func normalizeEsBuildLocation(loc es.Location) string {
 	if loc.File != "" {
 		return fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column)
 	}

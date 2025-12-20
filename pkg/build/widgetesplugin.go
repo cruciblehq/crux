@@ -14,29 +14,31 @@ import (
 const (
 
 	// Name of the internal esbuild plugin
-	EsPluginName = "crux-internal-es-plugin"
+	ESPluginName = "crux-internal-es-plugin"
 
 	// Name of the dependencies directory
-	DependenciesDirName = "node_modules"
+	ESDependenciesDirName = "node_modules"
 )
 
-// [esplugin] is an internal esbuild plugin that handles module resolution
-// logic via [resolveModule]. Most dependencies are resolved from the local
-// 'node_modules' directory (or whatever is set by DependenciesDirName), except
-// for modules used by the Crucible stack, like react, react-reconciler,
-// @cruciblehq/ui, and @cruciblehq/ui-web. These are treated as externals to
-// avoid bundling them, since they are expected to be provided by the Crucible
-// runtime environment.
+// Internal esbuild plugin that handles module resolution logic via [resolveModule].
+//
+// Most dependencies are resolved from the local 'node_modules' directory (or
+// whatever is set by DependenciesDirName), except for modules used by the
+// Crucible stack, like react, react-reconciler, @cruciblehq/ui, and
+// @cruciblehq/ui-web. These are treated as externals to avoid bundling them,
+// since they are expected to be provided by the Crucible runtime.
 var esplugin = es.Plugin{
-	Name: EsPluginName,
+	Name: ESPluginName,
 	Setup: func(build es.PluginBuild) {
+		type buildState struct {
+			startTime time.Time
+		}
 
-		var timer time.Time
+		state := &buildState{}
 
 		// Log build start time
 		build.OnStart(func() (es.OnStartResult, error) {
-
-			timer = time.Now()
+			state.startTime = time.Now()
 
 			slog.Info("build started")
 
@@ -45,8 +47,7 @@ var esplugin = es.Plugin{
 
 		// Log build end
 		build.OnEnd(func(result *es.BuildResult) (es.OnEndResult, error) {
-
-			duration := time.Since(timer)
+			duration := time.Since(state.startTime)
 
 			slog.Info(fmt.Sprintf("build finished in %s with %d error(s) and %d warning(s)",
 				duration, len(result.Errors), len(result.Warnings)))
@@ -60,26 +61,28 @@ var esplugin = es.Plugin{
 			slog.Debug(fmt.Sprintf("resolving module '%s' in '%s'",
 				args.Path, args.ResolveDir))
 
-			return resolveModule(args)
+			return resolveEsModule(*build.InitialOptions, args)
 		})
 	},
 }
 
 // Delegates the resolution logic based on the kind of import.
-func resolveModule(args es.OnResolveArgs) (es.OnResolveResult, error) {
+func resolveEsModule(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolveResult, error) {
 
 	// Entry point
 	if args.Kind == es.ResolveEntryPoint {
-		return resolveEntryPoint(args)
+		return resolveEsEntryPoint(options, args)
 	}
 
 	// Everything else (import)
-	return resolveImport(args)
+	return resolveEsImport(options, args)
 }
 
 // Handles the resolution of the build's entry point.
-func resolveEntryPoint(_ es.OnResolveArgs) (es.OnResolveResult, error) {
-	return es.OnResolveResult{}, nil
+func resolveEsEntryPoint(_ es.BuildOptions, args es.OnResolveArgs) (es.OnResolveResult, error) {
+	return es.OnResolveResult{
+		Path: args.Path,
+	}, nil
 }
 
 // Handles the resolution of imports.
@@ -89,18 +92,10 @@ func resolveEntryPoint(_ es.OnResolveArgs) (es.OnResolveResult, error) {
 // imports appropriately. External modules are marked to avoid bundling, while
 // other modules are resolved to their actual file paths. Those modules are
 // react, react-reconciler, @cruciblehq/ui, and @cruciblehq/ui-web.
-func resolveImport(args es.OnResolveArgs) (es.OnResolveResult, error) {
-
-	// Skip externals
-	externals := []string{
-		"react",
-		"react-reconciler",
-		"@cruciblehq/ui",
-		"@cruciblehq/ui-web",
-	}
+func resolveEsImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolveResult, error) {
 
 	// Check if the import matches any external
-	for _, e := range externals {
+	for _, e := range options.External {
 		if args.Path == e || strings.HasPrefix(args.Path, e+"/") {
 			return es.OnResolveResult{
 				Path:        args.Path,
@@ -119,17 +114,22 @@ func resolveImport(args es.OnResolveArgs) (es.OnResolveResult, error) {
 	} else {
 
 		// Non-relative imports are resolved from the dependencies directory
-		wd, err := os.Getwd()
-		if err != nil {
-			return es.OnResolveResult{}, err
+		// Get project root from AbsWorkingDir (set by esbuild)
+		projectRoot := options.AbsWorkingDir
+		if projectRoot == "" {
+			projectRoot, _ = os.Getwd()
 		}
-		widgetNodeModules := filepath.Join(wd, DependenciesDirName)
+		widgetNodeModules := filepath.Join(projectRoot, ESDependenciesDirName)
 		path = filepath.Join(widgetNodeModules, args.Path)
 	}
 
 	// Check if path exists; if not, try adding .js or index.js
 	if info, err := os.Lstat(path); err != nil {
-		path = path + ".js"
+		jsPath := path + ".js"
+		if _, err := os.Lstat(jsPath); err == nil {
+			path = jsPath
+		}
+		// If still doesn't exist, esbuild will handle the error
 	} else if info.IsDir() {
 		path = filepath.Join(path, "index.js")
 	}

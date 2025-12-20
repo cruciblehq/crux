@@ -1,29 +1,54 @@
 package build
 
 import (
+	"context"
 	"path/filepath"
 
+	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/manifest"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
-// Builds the widget specified in the given options.
+// Builder for Crucible widgets.
+type WidgetBuilder struct{}
+
+// Creates a new instance of [WidgetBuilder].
+func NewWidgetBuilder() *WidgetBuilder {
+	return &WidgetBuilder{}
+}
+
+// Builds a Crucible widget based on the provided manifest.
 //
-// It converts the build options to esbuild options, and invokes esbuild to
-// perform the build process.
-func BuildWidget(options *manifest.Widget) error {
+// It converts the manifest options into esbuild build options, invokes
+// esbuild to perform the build, and processes the build result to log
+// messages and handle errors.
+func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest) error {
+
+	// Correct manifest type?
+	widget, ok := m.Config.(*manifest.Widget)
+	if !ok {
+		return crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
+			Fallback("Please report this issue to the Crucible team.").
+			Err()
+	}
 
 	// Convert to esbuild options
-	esOptions, err := esBuildOptionsFromManifest(options)
+	esOptions, err := esBuildOptionsFromManifest(widget)
 	if err != nil {
 		return err
+	}
+
+	// esbuild doesn't support context cancellation, so this is the last chance
+	// to abort the build.
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 
 	// Build with esbuild
 	result := es.Build(esOptions)
 
 	// Process build result
-	return processBuildResult(result)
+	return processEsBuildResult(result)
 }
 
 // Converts [manifest.Widget] options into esbuild's [es.BuildOptions].
@@ -53,12 +78,19 @@ func BuildWidget(options *manifest.Widget) error {
 // introduced, the build process must run separately for each platform target.
 func esBuildOptionsFromManifest(options *manifest.Widget) (es.BuildOptions, error) {
 
+	// Determine project root
+	projectRoot, err := filepath.Abs(filepath.Dir(options.Build.Main))
+	if err != nil {
+		return es.BuildOptions{}, err
+	}
+
 	esOptions := es.BuildOptions{
 
 		// We handle logging ourselves
 		LogLevel: es.LogLevelSilent,
 
 		// Input
+		AbsWorkingDir:     projectRoot,
 		EntryPoints:       []string{options.Build.Main},
 		ResolveExtensions: []string{".tsx", ".ts", ".jsx", ".js"},
 		Loader: map[string]es.Loader{
@@ -77,7 +109,7 @@ func esBuildOptionsFromManifest(options *manifest.Widget) (es.BuildOptions, erro
 			"react",
 			"react-reconciler",
 		},
-		Outdir:    filepath.Dir(options.Build.Dist),
+		Outdir:    Dist,
 		Platform:  es.PlatformBrowser,
 		Target:    es.ES2015,
 		Format:    es.FormatESModule,
