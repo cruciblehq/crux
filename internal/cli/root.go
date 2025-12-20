@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/alecthomas/kong"
@@ -15,7 +16,7 @@ var RootCmd struct {
 
 	// Subcommands
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
-	// Build    BuildCmd    `cmd:"" help:"Build and bundle Crucible resources."`
+	Build BuildCmd `cmd:"" help:"Build and bundle Crucible resources."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 
 	// Version flag
@@ -34,8 +35,8 @@ func Execute() error {
 		},
 	)
 
-	if err := ctx.Run(); err != nil {
-		slog.Error("could not parse CLI arguments", "error", err)
+	if err := ctx.Run(context.Background()); err != nil {
+		slog.Error("command failed", "error", err)
 		return err
 	}
 

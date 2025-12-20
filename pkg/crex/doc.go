@@ -69,8 +69,6 @@
 //
 //	slog.Error(crexErr.Description(), "error", crexErr)
 //
-// # Formatters
-//
 // Two formatters are provided:
 //
 //   - [PrettyFormatter]: Human-readable output with optional color

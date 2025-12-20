@@ -25,7 +25,7 @@ const (
 	// external intervention to resolve.
 	ErrorClassSystem ErrorClass = "system"
 
-	// Indicates a report likely caused by a bug in the code. These issues
+	// Indicates an error likely caused by a bug in the code. These issues
 	// should be addressed by Crucible developers and are not expected to be
 	// resolved by end-users. They may warrant reporting to a remote error
 	// tracking service for further investigation.

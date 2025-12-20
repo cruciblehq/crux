@@ -110,7 +110,7 @@ func NewHandler() Handler {
 	return NewHandlerWithLevel(slog.LevelInfo)
 }
 
-// Creates a new [Handler] with the specified report level.
+// Creates a new [Handler] with the specified log level.
 //
 // The handler starts with an empty buffer and no formatter. The default log
 // level is [slog.LevelInfo]. The default output stream is [os.Stderr], but it

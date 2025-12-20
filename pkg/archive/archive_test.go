@@ -1,11 +1,14 @@
 package archive
 
 import (
+	"archive/tar"
 	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 func TestCreateAndExtract(t *testing.T) {
@@ -27,7 +30,7 @@ func TestCreateAndExtract(t *testing.T) {
 	assertDirExists(t, filepath.Join(destDir, "emptydir"))
 }
 
-func TestExtractReader(t *testing.T) {
+func TestExtractFromReader(t *testing.T) {
 	srcDir := t.TempDir()
 	createTestFiles(t, srcDir)
 
@@ -42,8 +45,8 @@ func TestExtractReader(t *testing.T) {
 	}
 
 	destDir := filepath.Join(t.TempDir(), "extracted")
-	if err := ExtractReader(bytes.NewReader(data), destDir); err != nil {
-		t.Fatalf("ExtractReader failed: %v", err)
+	if err := ExtractFromReader(bytes.NewReader(data), destDir); err != nil {
+		t.Fatalf("ExtractFromReader failed: %v", err)
 	}
 
 	assertFileContent(t, filepath.Join(destDir, "file.txt"), "hello")
@@ -51,7 +54,7 @@ func TestExtractReader(t *testing.T) {
 	assertDirExists(t, filepath.Join(destDir, "emptydir"))
 }
 
-func TestExtractReaderDestinationExists(t *testing.T) {
+func TestExtractFromReaderDestinationExists(t *testing.T) {
 	srcDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(srcDir, "file.txt"), []byte("hello"), 0644); err != nil {
 		t.Fatal(err)
@@ -68,7 +71,7 @@ func TestExtractReaderDestinationExists(t *testing.T) {
 	}
 
 	destDir := t.TempDir()
-	err = ExtractReader(bytes.NewReader(data), destDir)
+	err = ExtractFromReader(bytes.NewReader(data), destDir)
 
 	if err == nil {
 		t.Fatal("expected error for existing destination")
@@ -79,10 +82,10 @@ func TestExtractReaderDestinationExists(t *testing.T) {
 	}
 }
 
-func TestExtractReaderInvalidData(t *testing.T) {
+func TestExtractFromReaderInvalidData(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "extracted")
 
-	err := ExtractReader(bytes.NewReader([]byte("not a valid archive")), destDir)
+	err := ExtractFromReader(bytes.NewReader([]byte("not a valid archive")), destDir)
 	if err == nil {
 		t.Fatal("expected error for invalid data")
 	}
@@ -112,8 +115,8 @@ func TestCreateSymlinkError(t *testing.T) {
 		t.Fatal("expected error for symlink")
 	}
 
-	if !errors.Is(err, ErrSymlink) {
-		t.Fatalf("expected ErrSymlink, got: %v", err)
+	if !errors.Is(err, ErrUnsupportedFileType) {
+		t.Fatalf("expected ErrUnsupportedFileType, got: %v", err)
 	}
 
 	if _, statErr := os.Stat(archivePath); statErr == nil {
@@ -144,23 +147,34 @@ func TestExtractDestinationExists(t *testing.T) {
 	}
 }
 
-func TestExtractInvalidPath(t *testing.T) {
-	srcDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(srcDir, "file.txt"), []byte("hello"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	archivePath := filepath.Join(t.TempDir(), "test.tar.zst")
-	if err := Create(srcDir, archivePath); err != nil {
-		t.Fatal(err)
-	}
-
+func TestExtractPathTraversal(t *testing.T) {
+	// Manually craft a malicious archive with path traversal
 	destDir := filepath.Join(t.TempDir(), "extracted")
-	if err := Extract(archivePath, destDir); err != nil {
-		t.Fatal(err)
+	maliciousArchive := createMaliciousArchive(t, "../etc/passwd")
+
+	err := ExtractFromReader(maliciousArchive, destDir)
+	if err == nil {
+		t.Fatal("expected error for path traversal attempt")
 	}
 
-	assertFileContent(t, filepath.Join(destDir, "file.txt"), "hello")
+	if !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got: %v", err)
+	}
+}
+
+func TestExtractAbsolutePath(t *testing.T) {
+	// Manually craft an archive with absolute path
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	maliciousArchive := createMaliciousArchive(t, "/etc/passwd")
+
+	err := ExtractFromReader(maliciousArchive, destDir)
+	if err == nil {
+		t.Fatal("expected error for absolute path")
+	}
+
+	if !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got: %v", err)
+	}
 }
 
 func TestExtractCleansUpOnFailure(t *testing.T) {
@@ -264,4 +278,42 @@ func assertDirExists(t *testing.T, path string) {
 	if !info.IsDir() {
 		t.Fatalf("%s is not a directory", path)
 	}
+}
+
+func createMaliciousArchive(t *testing.T, maliciousPath string) *bytes.Reader {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zw, err := zstd.NewWriter(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tw := tar.NewWriter(zw)
+
+	// Create a tar entry with malicious path
+	header := &tar.Header{
+		Name:     maliciousPath,
+		Mode:     0644,
+		Size:     5,
+		Typeflag: tar.TypeReg,
+	}
+
+	if err := tw.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tw.Write([]byte("pwned")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return bytes.NewReader(buf.Bytes())
 }

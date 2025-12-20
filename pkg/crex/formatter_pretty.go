@@ -35,12 +35,12 @@ type PrettyFormatter struct {
 //
 // If useColor is true, log levels are colored using ANSI escape codes.
 // Verbose mode is disabled by default.
-func NewPrettyFormatter(useColor bool) Formatter {
+func NewPrettyFormatter(useColor bool) *PrettyFormatter {
 	return &PrettyFormatter{UseColor: useColor}
 }
 
 // SetVerbose enables or disables verbose output.
-func (f *PrettyFormatter) SetVerbose(verbose bool) Formatter {
+func (f *PrettyFormatter) SetVerbose(verbose bool) *PrettyFormatter {
 	f.verbose = verbose
 	return f
 }
@@ -83,10 +83,13 @@ func (f *PrettyFormatter) Write(w io.Writer, rctx *RecordContext) error {
 func (f *PrettyFormatter) writeMessage(sb *strings.Builder, rctx *RecordContext) {
 	sb.WriteString(rctx.Record.Message)
 
+	// Single pass through attributes
 	rctx.Record.Attrs(func(attr slog.Attr) bool {
 		if errMap, ok := asCrexError(attr.Value); ok {
 			f.writeCrexError(sb, errMap)
-		} else if f.verbose {
+			return true
+		}
+		if f.verbose {
 			f.writeInlineAttr(sb, attr)
 		}
 		return true

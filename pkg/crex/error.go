@@ -60,11 +60,17 @@ func (r *Error) Class() ErrorClass {
 	return r.class
 }
 
-// Returns the context associated with the error.
+// IsValid checks whether the error has non-empty description and reason.
+//
+// This method is primarily useful for testing or validating programmatically
+// constructed errors. Errors created through the standard factory functions
+// are always valid.
+func (r *Error) IsValid() bool {
+	return r.description != "" && r.reason != ""
+}
+
+// Returns the context associated with the error, or nil if none was set.
 func (r *Error) Context() context.Context {
-	if r.context == nil {
-		return context.Background()
-	}
 	return r.context
 }
 
@@ -143,7 +149,7 @@ func (r *Error) Format(f fmt.State, verb rune) {
 	case 'q':
 		fmt.Fprintf(f, "%q", r.String())
 	default:
-		fmt.Fprint(f, r.String())
+		fmt.Fprint(f, r.String()) // Unknown verbs are treated as %v
 	}
 }
 

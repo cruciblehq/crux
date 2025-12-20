@@ -8,11 +8,17 @@ import (
 )
 
 // Panics if the condition is false.
+//
+// This function is only active when built with the 'debug' build tag. In
+// release builds (without the tag), this is a no-op.
 func Assert(condition bool, message string) {
 	assert(condition, message)
 }
 
 // Panics if the condition is false.
+//
+// This function is only active when built with the 'debug' build tag. In
+// release builds (without the tag), this is a no-op.
 func Assertf(condition bool, format string, args ...any) {
 	assert(condition, fmt.Sprintf(format, args...))
 }

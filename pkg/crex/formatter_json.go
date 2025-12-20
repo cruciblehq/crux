@@ -16,28 +16,28 @@ import (
 // When verbose mode is disabled (default), only the message is included.
 // When enabled, additional attributes are included as top-level fields, and
 // group values are recursively resolved into nested objects.
-func NewJSONFormatter() Formatter {
-	return &jsonFormatter{}
+func NewJSONFormatter() *JSONFormatter {
+	return &JSONFormatter{}
 }
 
 // JSON formatter implementation.
-type jsonFormatter struct {
+type JSONFormatter struct {
 	verbose bool
 }
 
 // SetVerbose enables or disables verbose output.
-func (f *jsonFormatter) SetVerbose(verbose bool) Formatter {
+func (f *JSONFormatter) SetVerbose(verbose bool) *JSONFormatter {
 	f.verbose = verbose
 	return f
 }
 
 // Verbose returns whether verbose output is enabled.
-func (f *jsonFormatter) Verbose() bool {
+func (f *JSONFormatter) Verbose() bool {
 	return f.verbose
 }
 
 // Writes a log record as a JSON line.
-func (f *jsonFormatter) Write(w io.Writer, rctx *RecordContext) error {
+func (f *JSONFormatter) Write(w io.Writer, rctx *RecordContext) error {
 	entry := map[string]any{
 		"level":   strings.ToLower(rctx.Record.Level.String()),
 		"message": rctx.Record.Message,

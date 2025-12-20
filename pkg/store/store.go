@@ -153,7 +153,7 @@ func (s *Store) fetchAndExtract(ctx context.Context, id reference.Identifier, v 
 
 	extractPath := s.versionPath(id, v)
 
-	if err := archive.ExtractReader(bytes.NewReader(resp.Data), extractPath); err != nil {
+	if err := archive.ExtractFromReader(bytes.NewReader(resp.Data), extractPath); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrExtractFailed, err)
 	}
 

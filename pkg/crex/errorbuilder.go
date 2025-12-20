@@ -70,12 +70,24 @@ func Bugf(description string, reasonFormat string, args ...any) *ErrorBuilder {
 // Creates a new ErrorBuilder with the specified class, description, and reason.
 //
 // This is the internal factory method used by the public factory methods.
+// Panics if description or reason are empty after trimming whitespace in order
+// to enforce error construction conventions.
 func newError(class ErrorClass, description, reason string) *ErrorBuilder {
+	description = strings.TrimSpace(description)
+	reason = strings.TrimSpace(reason)
+
+	if description == "" {
+		panic("crex: error description cannot be empty")
+	}
+	if reason == "" {
+		panic("crex: error reason cannot be empty")
+	}
+
 	return &ErrorBuilder{
 		err: Error{
 			class:       class,
-			description: strings.TrimSpace(description),
-			reason:      strings.TrimSpace(reason),
+			description: description,
+			reason:      reason,
 		},
 	}
 }
@@ -110,6 +122,20 @@ func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 func (b *ErrorBuilder) Context(ctx context.Context) *ErrorBuilder {
 	b.err.context = ctx
 	return b
+}
+
+// Validate checks whether the error being built is valid.
+//
+// Returns an error if description or reason are empty. This is primarily
+// useful for validating programmatically constructed errors before calling Err.
+func (b *ErrorBuilder) Validate() error {
+	if b.err.description == "" {
+		return fmt.Errorf("crex: error description is empty")
+	}
+	if b.err.reason == "" {
+		return fmt.Errorf("crex: error reason is empty")
+	}
+	return nil
 }
 
 // Builds and returns the constructed [Error] instance.
