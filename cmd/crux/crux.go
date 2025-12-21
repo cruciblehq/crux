@@ -30,7 +30,6 @@ func main() {
 
 	// Run (CLI configures and flushes the handler)
 	if err := cli.Execute(); err != nil {
-		slog.Error("crux exited with error", "error", err)
 		os.Exit(1)
 	}
 }
