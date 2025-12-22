@@ -1,5 +1,8 @@
 package manifest
 
-const (
-	ErrUnknownResourceType = "unknown resource type"
+import "errors"
+
+var (
+	ErrManifestReadFailed  = errors.New("failed to read manifest")
+	ErrUnknownResourceType = errors.New("unknown resource type")
 )

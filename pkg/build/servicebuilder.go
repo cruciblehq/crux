@@ -50,7 +50,7 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error 
 	// Correct manifest type?
 	service, ok := m.Config.(*manifest.Service)
 	if !ok {
-		return crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
+		return crex.ProgrammingError("an internal configuration type mismatch occurred", "unexpected manifest type").
 			Fallback("Please report this issue to the Crucible team.").
 			Err()
 	}
@@ -58,11 +58,11 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error 
 	// Connect to Buildkit
 	socketPath := buildkitSocketPath()
 	socketAddr := "unix://" + socketPath
-
 	socketClient, err := client.New(ctx, socketAddr)
 	if err != nil {
-		return crex.UserError("build failed", "buildkitd is not running").
-			Fallback("Install BuildKit with 'brew install buildkit' and start it with 'buildkitd --rootless &'").
+		return crex.UserError("build failed", "could not connect to buildkitd").
+			Cause(err).
+			Fallback("ensure BuildKit is installed and running with 'buildkitd --rootless &'").
 			Err()
 	}
 	defer socketClient.Close()

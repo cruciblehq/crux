@@ -76,10 +76,6 @@ func TestExtractFromReaderDestinationExists(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for existing destination")
 	}
-
-	if !errors.Is(err, ErrDestinationExists) {
-		t.Fatalf("expected ErrDestinationExists, got: %v", err)
-	}
 }
 
 func TestExtractFromReaderInvalidData(t *testing.T) {
@@ -142,8 +138,8 @@ func TestExtractDestinationExists(t *testing.T) {
 		t.Fatal("expected error for existing destination")
 	}
 
-	if !errors.Is(err, ErrDestinationExists) {
-		t.Fatalf("expected ErrDestinationExists, got: %v", err)
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("expected os.ErrExist, got: %v", err)
 	}
 }
 

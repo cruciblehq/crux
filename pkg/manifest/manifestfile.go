@@ -1,10 +1,10 @@
 package manifest
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 )
@@ -29,7 +29,7 @@ func Read() (*Manifest, error) {
 	// Locate the manifest within the current working directory
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrManifestReadFailed, err)
 	}
 
 	// Full path to manifest file
@@ -38,19 +38,19 @@ func Read() (*Manifest, error) {
 	// Read file
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrManifestReadFailed, err)
 	}
 
 	// Unmarshal raw YAML into a map
 	var raw map[string]any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrManifestReadFailed, err)
 	}
 
 	// Decode into Manifest struct
 	var m Manifest
 	if err := decodeManifest(raw, &m); err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrManifestReadFailed, err)
 	}
 
 	return &m, nil
@@ -77,7 +77,7 @@ func decodeManifest(raw map[string]any, manifest *Manifest) error {
 
 	target, ok := configs[manifest.Resource.Type]
 	if !ok {
-		return fmt.Errorf("%s: %w", manifest.Resource.Type, ErrUnknownResourceType)
+		return ErrUnknownResourceType
 	}
 
 	// Decode type-specific config
@@ -101,7 +101,7 @@ func decodeAny(raw map[string]any, target any) error {
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:  target,
-		TagName: "key", // <--------
+		TagName: "field",
 	})
 
 	if err != nil {

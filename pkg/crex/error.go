@@ -26,12 +26,12 @@ import (
 // Errors can carry additional details as key-value pairs for more context,
 // wrap an underlying cause error, and include a context.
 type Error struct {
-	description string          // Description of what failed
-	reason      string          // Reason why it failed
-	fallback    string          // Fallback suggestion or compromise
-	cause       error           // Underlying cause error
-	class       ErrorClass      // Classification of the error
-	details     map[string]any  // Additional details about the error
+	description string         // Description of what failed
+	reason      string         // Reason why it failed
+	fallback    string         // Fallback suggestion or compromise
+	cause       error          // Underlying cause error
+	class       ErrorClass     // Classification of the error
+	details     map[string]any // Additional details about the error
 	context     context.Context // Context associated with the error
 }
 

@@ -75,7 +75,7 @@
 //   - [JSONFormatter]: Machine-readable JSON output
 //
 // The [PrettyFormatter] automatically detects crex errors and formats them
-// as "message: reason. fallback". The [JSONFormatter] outputs all attributes
+// as "description: reason. fallback". The [JSONFormatter] outputs all attributes
 // as nested JSON objects.
 //
 // Crex provides [Assert] and [Assertf] for debug-only assertions that are

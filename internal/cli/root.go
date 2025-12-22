@@ -23,7 +23,7 @@ var RootCmd struct {
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
 
-// Parses arguments and runs the CLI
+// Parses arguments and runs the CLI.
 func Execute() error {
 
 	ctx := context.Background()
@@ -38,17 +38,17 @@ func Execute() error {
 		kong.BindTo(ctx, (*context.Context)(nil)),
 	)
 
-	// Configure logger based on parsed flags
 	configureLogger()
 
 	if err := kongCtx.Run(); err != nil {
-		slog.Error("command failed", "error", err)
 		return err
 	}
 
 	return nil
 }
 
+// Configures the global logger based on CLI flags, setting the log level,
+// output stream, and formatter.
 func configureLogger() {
 
 	// Get the handler from the default logger
@@ -57,12 +57,11 @@ func configureLogger() {
 		return // Not a crex.Handler, nothing to configure
 	}
 
-	// Formatter
+	// Configure formatter
 	formatter := crex.NewPrettyFormatter(isatty(os.Stderr))
 	formatter.SetVerbose(RootCmd.Verbose)
-	handler.SetFormatter(formatter)
 
-	// Set log level based on flags
+	// Configure handler
 	if RootCmd.Debug {
 		handler.SetLevel(slog.LevelDebug)
 	} else if RootCmd.Verbose {
@@ -71,12 +70,13 @@ func configureLogger() {
 		handler.SetLevel(slog.LevelWarn)
 	}
 
-	// Output stream
+	// Commit
+	handler.SetFormatter(formatter)
 	handler.SetStream(os.Stderr)
 	handler.Flush()
 }
 
-// Whehther the given file is an interactive terminal.
+// Whether the given file is an interactive terminal.
 func isatty(f *os.File) bool {
 	fileInfo, err := f.Stat()
 	if err != nil {

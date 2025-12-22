@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/pkg/build"
-	"github.com/cruciblehq/crux/pkg/manifest"
 	"github.com/cruciblehq/crux/pkg/watch"
 )
 
@@ -17,14 +16,8 @@ type BuildCmd struct {
 // Executes the build command
 func (c *BuildCmd) Run(ctx context.Context) error {
 
-	// Load manifest options
-	man, err := manifest.Read()
-	if err != nil {
-		return err
-	}
-
 	// Build first (don't wait for changes)
-	if err := build.Build(ctx, *man); err != nil {
+	if err := build.Build(ctx); err != nil {
 		return err
 	}
 
@@ -33,14 +26,15 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	// Watch mode
 	if c.Watch {
 		slog.Info("watching for changes...")
-		return c.watchAndRebuild(ctx, *man)
+		return c.watchAndRebuild(ctx)
 	}
 
 	return nil
 }
 
-func (c *BuildCmd) watchAndRebuild(ctx context.Context, man manifest.Manifest) error {
+func (c *BuildCmd) watchAndRebuild(ctx context.Context) error {
 	callback := func(we *watch.WatchEvent) error {
+
 		// Check for cancellation
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -48,9 +42,8 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, man manifest.Manifest) e
 
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
-		if err := build.Build(ctx, man); err != nil {
-			slog.Error("rebuild failed", "error", err)
-			// Continue watching despite errors
+		if err := build.Build(ctx); err != nil {
+			slog.Error(err.Error())
 			return nil
 		}
 

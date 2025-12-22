@@ -56,7 +56,7 @@ func (f *PrettyFormatter) Write(w io.Writer, rctx *RecordContext) error {
 
 	// Groups prefix
 	if len(rctx.Groups) > 0 {
-		sb.WriteString(strings.Join(rctx.Groups, " "))
+		sb.WriteString(strings.Join(rctx.Groups, "."))
 		sb.WriteString(" ")
 	}
 

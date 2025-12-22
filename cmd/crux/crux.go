@@ -16,7 +16,7 @@ import (
 func main() {
 
 	// Set up buffering handler
-	handler := crex.NewHandler()
+	handler := crex.NewHandler().WithGroup("crux")
 	slog.SetDefault(slog.New(handler))
 
 	// Log startup info (buffered until configured)
@@ -30,6 +30,7 @@ func main() {
 
 	// Run (CLI configures and flushes the handler)
 	if err := cli.Execute(); err != nil {
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 }

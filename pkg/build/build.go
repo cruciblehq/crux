@@ -2,11 +2,18 @@ package build
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/manifest"
 	"github.com/cruciblehq/crux/pkg/paths"
+)
+
+var (
+	ErrBuildFailed         = errors.New("build failed")
+	ErrInvalidResourceType = errors.New("invalid resource type")
+	ErrInvalidPath         = errors.New("invalid path")
 )
 
 const (
@@ -15,31 +22,29 @@ const (
 	Dist = "dist"
 )
 
-// Builds the provided manifest using the appropriate builder based on
-// the resource type.
-//
-// It selects the appropriate builder and delegates the build process.
-func Build(ctx context.Context, m manifest.Manifest) error {
+func Build(ctx context.Context) error {
+
+	// Load manifest options
+	man, err := manifest.Read()
+	if err != nil {
+		return err
+	}
 
 	// Ensure output directory exists (same for all builders)
 	if err := os.MkdirAll(Dist, paths.DefaultDirMode); err != nil {
-		return crex.ProgrammingError("build failed", "failed to create output directory").
-			Cause(err).
-			Err()
+		return crex.Wrap(ErrBuildFailed, err)
 	}
 
 	var builder Builder
 
-	switch m.Resource.Type {
+	switch man.Resource.Type {
 	case "widget":
 		builder = NewWidgetBuilder()
 	case "service":
 		builder = NewServiceBuilder()
 	default:
-		return crex.UserErrorf("build failed", "invalid resource type '%s'", m.Resource.Type).
-			Fallback("Change your manifest to use a supported resource type.").
-			Err()
+		return ErrInvalidResourceType
 	}
 
-	return builder.Build(ctx, m)
+	return builder.Build(ctx, *man)
 }

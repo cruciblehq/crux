@@ -81,7 +81,7 @@ func esBuildOptionsFromManifest(options *manifest.Widget) (es.BuildOptions, erro
 	// Determine project root
 	projectRoot, err := filepath.Abs(filepath.Dir(options.Build.Main))
 	if err != nil {
-		return es.BuildOptions{}, err
+		return es.BuildOptions{}, crex.Wrap(ErrInvalidPath, err)
 	}
 
 	esOptions := es.BuildOptions{

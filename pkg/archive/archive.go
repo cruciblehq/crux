@@ -3,12 +3,12 @@ package archive
 import (
 	"archive/tar"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 
+	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/klauspost/compress/zstd"
 )
@@ -18,7 +18,6 @@ var (
 	ErrExtractFailed       = errors.New("extraction failed")
 	ErrInvalidPath         = errors.New("invalid path")
 	ErrUnsupportedFileType = errors.New("unsupported file type")
-	ErrDestinationExists   = errors.New("destination already exists")
 )
 
 // Creates a zstd-compressed tar archive from a directory.
@@ -35,14 +34,14 @@ var (
 func Create(src, dest string) (err error) {
 	file, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrCreateFailed, err)
+		return crex.Wrap(ErrCreateFailed, err)
 	}
 	defer file.Close()
 
 	zw, err := zstd.NewWriter(file)
 	if err != nil {
 		os.Remove(dest)
-		return fmt.Errorf("%w: %w", ErrCreateFailed, err)
+		return crex.Wrap(ErrCreateFailed, err)
 	}
 	defer func() {
 		zw.Close()
@@ -55,7 +54,7 @@ func Create(src, dest string) (err error) {
 	defer tw.Close()
 
 	if err = writeTar(tw, src); err != nil {
-		return fmt.Errorf("%w: %w", ErrCreateFailed, err)
+		return crex.Wrap(ErrCreateFailed, err)
 	}
 
 	return nil
@@ -74,7 +73,7 @@ func Create(src, dest string) (err error) {
 func Extract(src, dest string) error {
 	file, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrExtractFailed, err)
+		return crex.Wrap(ErrExtractFailed, err)
 	}
 	defer file.Close()
 
@@ -86,16 +85,21 @@ func Extract(src, dest string) error {
 // Same behavior as [Extract] but reads from an [io.Reader] instead of a file.
 func ExtractFromReader(r io.Reader, dest string) error {
 	if _, statErr := os.Stat(dest); statErr == nil {
-		return fmt.Errorf("%w: %s", ErrDestinationExists, dest)
+		return crex.Wrap(ErrExtractFailed, os.ErrExist)
 	}
 
 	zr, err := zstd.NewReader(r)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrExtractFailed, err)
+		return crex.Wrap(ErrExtractFailed, err)
 	}
 	defer zr.Close()
 
-	return extractToDirectory(tar.NewReader(zr), dest)
+	err = extractToDirectory(tar.NewReader(zr), dest)
+	if err != nil {
+		return crex.Wrap(ErrExtractFailed, err)
+	}
+
+	return nil
 }
 
 // Extracts tar contents to a directory with proper cleanup on failure.
@@ -104,7 +108,7 @@ func ExtractFromReader(r io.Reader, dest string) error {
 // dest and all extracted contents are removed.
 func extractToDirectory(tr *tar.Reader, dest string) (err error) {
 	if err = os.MkdirAll(dest, paths.DefaultDirMode); err != nil {
-		return fmt.Errorf("%w: %w", ErrExtractFailed, err)
+		return err
 	}
 	defer func() {
 		if err != nil {
@@ -113,7 +117,7 @@ func extractToDirectory(tr *tar.Reader, dest string) (err error) {
 	}()
 
 	if err = readTar(tr, dest); err != nil {
-		return fmt.Errorf("%w: %w", ErrExtractFailed, err)
+		return err
 	}
 
 	return nil
@@ -157,7 +161,7 @@ func writeEntry(tw *tar.Writer, path, relPath string, d fs.DirEntry) error {
 	mode := info.Mode()
 
 	if mode&os.ModeSymlink != 0 || (!mode.IsRegular() && !mode.IsDir()) {
-		return fmt.Errorf("%w: %s", ErrUnsupportedFileType, relPath)
+		return ErrUnsupportedFileType
 	}
 
 	header, err := tar.FileInfoHeader(info, "")
@@ -230,12 +234,12 @@ func validateAndJoinPath(dest, name string) (string, error) {
 
 	localName, err := filepath.Localize(name)
 	if err != nil {
-		return "", fmt.Errorf("%w: %q", ErrInvalidPath, name)
+		return "", ErrInvalidPath
 	}
 
 	// Not empty, not absolute path, no ".." traversal, no reserved names on Windows
 	if !filepath.IsLocal(localName) {
-		return "", fmt.Errorf("%w: %q", ErrInvalidPath, name)
+		return "", ErrInvalidPath
 	}
 
 	return filepath.Join(dest, localName), nil
@@ -254,7 +258,7 @@ func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 		return extractFile(tr, target)
 
 	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedFileType, header.Name)
+		return ErrUnsupportedFileType
 	}
 }
 
@@ -263,7 +267,7 @@ func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 // Creates all parent directories as needed.
 func extractDirectory(target string) error {
 	if err := os.MkdirAll(target, paths.DefaultDirMode); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return err
 	}
 	return nil
 }
@@ -282,12 +286,12 @@ func extractFile(r io.Reader, target string) error {
 	// Create file
 	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, paths.DefaultFileMode)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
+		return err
 	}
 	defer f.Close()
 
 	if _, err = io.Copy(f, r); err != nil {
-		return fmt.Errorf("failed to write file contents: %w", err)
+		return err
 	}
 
 	return nil
