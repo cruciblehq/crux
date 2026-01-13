@@ -90,7 +90,7 @@ func TestPrettyFormatter_Write_WithGroups(t *testing.T) {
 	}
 
 	got := buf.String()
-	if !strings.Contains(got, "group1 group2") {
+	if !strings.HasPrefix(got, "group1.group2") {
 		t.Errorf("output missing groups: %q", got)
 	}
 }
@@ -138,10 +138,80 @@ func TestPrettyFormatter_Write_WithAttributes_Verbose(t *testing.T) {
 }
 
 func TestPrettyFormatter_Write_CrexError(t *testing.T) {
-	// This test verifies that crex errors work with the formatter
-	// The actual crex error special formatting may not be triggered if the
-	// LogValuer interface isn't being called properly by slog
-	t.Skip("Crex error detection in formatter needs investigation - LogValuer may not be called")
+	f := NewPrettyFormatter(false)
+	var buf bytes.Buffer
+
+	// Create a crex error and add its LogValue directly
+	crexErr := UserError("operation failed", "invalid input").Err().(*Error)
+	record := slog.NewRecord(time.Now(), slog.LevelError, "task failed", 0)
+	record.AddAttrs(slog.Any("error", crexErr))
+	rctx := &RecordContext{Record: record}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "task failed") {
+		t.Errorf("output missing message: %q", got)
+	}
+	if !strings.Contains(got, ": invalid input") {
+		t.Errorf("output missing reason: %q", got)
+	}
+}
+
+func TestPrettyFormatter_Write_CrexError_WithFallback(t *testing.T) {
+	f := NewPrettyFormatter(false)
+	var buf bytes.Buffer
+
+	crexErr := UserError("operation failed", "invalid type").
+		Fallback("Use widget or service").
+		Err().(*Error)
+
+	record := slog.NewRecord(time.Now(), slog.LevelError, "build failed", 0)
+	record.AddAttrs(slog.Any("error", crexErr))
+	rctx := &RecordContext{Record: record}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, ": invalid type") {
+		t.Errorf("output missing reason: %q", got)
+	}
+	if !strings.Contains(got, ". Use widget or service") {
+		t.Errorf("output missing fallback: %q", got)
+	}
+}
+
+func TestPrettyFormatter_Write_CrexError_Verbose(t *testing.T) {
+	f := NewPrettyFormatter(false).SetVerbose(true)
+	var buf bytes.Buffer
+
+	crexErr := SystemError("network error", "connection timeout").
+		Detail("host", "example.com").
+		Err().(*Error)
+
+	record := slog.NewRecord(time.Now(), slog.LevelError, "request failed", 0)
+	record.AddAttrs(slog.Any("error", crexErr))
+	rctx := &RecordContext{Record: record}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	got := buf.String()
+	// Verbose should include error details
+	if !strings.Contains(got, "class=system") {
+		t.Errorf("verbose output missing class: %q", got)
+	}
+	if !strings.Contains(got, "host=example.com") {
+		t.Errorf("verbose output missing details: %q", got)
+	}
 }
 
 func TestFormatValue(t *testing.T) {

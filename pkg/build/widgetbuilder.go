@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/pkg/crex"
-	"github.com/cruciblehq/crux/pkg/manifest"
+	"github.com/cruciblehq/protocol/pkg/manifest"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 

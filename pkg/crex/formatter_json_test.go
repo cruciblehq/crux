@@ -209,6 +209,141 @@ func TestResolveValue(t *testing.T) {
 	}
 }
 
+func TestJSONFormatter_SetVerbose(t *testing.T) {
+	f := NewJSONFormatter()
+
+	// Default should be non-verbose
+	if f.Verbose() {
+		t.Error("default verbose = true, want false")
+	}
+
+	// Test setting verbose
+	f.SetVerbose(true)
+	if !f.Verbose() {
+		t.Error("after SetVerbose(true), Verbose() = false")
+	}
+
+	// Test chaining
+	result := f.SetVerbose(false)
+	if result != f {
+		t.Error("SetVerbose() did not return formatter for chaining")
+	}
+	if f.Verbose() {
+		t.Error("after SetVerbose(false), Verbose() = true")
+	}
+}
+
+func TestJSONFormatter_Write_Verbose(t *testing.T) {
+	f := NewJSONFormatter().SetVerbose(true)
+	var buf bytes.Buffer
+
+	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
+	record.AddAttrs(
+		slog.String("key1", "value1"),
+		slog.Int("key2", 42),
+		slog.Bool("key3", true),
+	)
+	rctx := &RecordContext{Record: record}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	// Verbose should include attributes
+	if result["key1"] != "value1" {
+		t.Errorf("key1 = %v, want value1", result["key1"])
+	}
+	if result["key2"] != float64(42) {
+		t.Errorf("key2 = %v, want 42", result["key2"])
+	}
+	if result["key3"] != true {
+		t.Errorf("key3 = %v, want true", result["key3"])
+	}
+}
+
+func TestJSONFormatter_Write_VerboseWithGroups(t *testing.T) {
+	f := NewJSONFormatter().SetVerbose(true)
+	var buf bytes.Buffer
+
+	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
+	rctx := &RecordContext{
+		Record: record,
+		Groups: []string{"group1", "group2"},
+	}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	// Verbose should include groups
+	groups, ok := result["groups"].([]any)
+	if !ok {
+		t.Fatal("groups field missing or not an array")
+	}
+	if len(groups) != 2 {
+		t.Errorf("groups length = %d, want 2", len(groups))
+	}
+	if groups[0] != "group1" || groups[1] != "group2" {
+		t.Errorf("groups = %v, want [group1 group2]", groups)
+	}
+}
+
+func TestJSONFormatter_Write_VerboseWithNestedGroups(t *testing.T) {
+	f := NewJSONFormatter().SetVerbose(true)
+	var buf bytes.Buffer
+
+	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
+	record.AddAttrs(
+		slog.String("key", "value"),
+		slog.Group("outer",
+			slog.String("a", "1"),
+			slog.Group("inner",
+				slog.String("b", "2"),
+			),
+		),
+	)
+	rctx := &RecordContext{Record: record}
+
+	err := f.Write(&buf, rctx)
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	// Check nested structure
+	outer, ok := result["outer"].(map[string]any)
+	if !ok {
+		t.Fatal("outer is not a map")
+	}
+	if outer["a"] != "1" {
+		t.Errorf("outer[a] = %v, want 1", outer["a"])
+	}
+
+	inner, ok := outer["inner"].(map[string]any)
+	if !ok {
+		t.Fatal("inner is not a map")
+	}
+	if inner["b"] != "2" {
+		t.Errorf("inner[b] = %v, want 2", inner["b"])
+	}
+}
+
 func TestJSONFormatter_Write_InvalidJSON(t *testing.T) {
 	f := NewJSONFormatter()
 	var buf bytes.Buffer

@@ -1,1 +1,0 @@
-SELECT type, description, etag FROM resources WHERE namespace = ? AND name = ?;

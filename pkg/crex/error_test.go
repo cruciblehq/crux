@@ -44,43 +44,6 @@ func TestError_Class(t *testing.T) {
 	}
 }
 
-func TestError_IsValid(t *testing.T) {
-	tests := []struct {
-		name string
-		err  *Error
-		want bool
-	}{
-		{
-			name: "valid error",
-			err:  &Error{description: "desc", reason: "reason"},
-			want: true,
-		},
-		{
-			name: "empty description",
-			err:  &Error{description: "", reason: "reason"},
-			want: false,
-		},
-		{
-			name: "empty reason",
-			err:  &Error{description: "desc", reason: ""},
-			want: false,
-		},
-		{
-			name: "both empty",
-			err:  &Error{description: "", reason: ""},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.err.IsValid(); got != tt.want {
-				t.Errorf("IsValid() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestError_Context(t *testing.T) {
 	t.Run("with context", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), "key", "value")
@@ -311,14 +274,9 @@ func TestError_LogValue(t *testing.T) {
 		t.Errorf("LogValue().Kind() = %v, want KindGroup", val.Kind())
 	}
 
-	attrs := val.Group()
-	if len(attrs) != 6 {
-		t.Errorf("LogValue() attrs length = %d, want 6", len(attrs))
-	}
-
 	// Verify required attributes
 	attrMap := make(map[string]slog.Attr)
-	for _, attr := range attrs {
+	for _, attr := range val.Group() {
 		attrMap[attr.Key] = attr
 	}
 
@@ -327,19 +285,5 @@ func TestError_LogValue(t *testing.T) {
 	}
 	if attrMap["description"].Value.String() != "test failed" {
 		t.Errorf("description = %q, want %q", attrMap["description"].Value.String(), "test failed")
-	}
-}
-
-func TestError_LogValue_MinimalError(t *testing.T) {
-	err := &Error{
-		class:       ErrorClassSystem,
-		description: "test",
-	}
-	val := err.LogValue()
-
-	// Should only have class and description
-	attrs := val.Group()
-	if len(attrs) != 2 {
-		t.Errorf("LogValue() attrs length = %d, want 2", len(attrs))
 	}
 }

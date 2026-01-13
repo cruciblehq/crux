@@ -2,34 +2,21 @@ package build
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/cruciblehq/crux/pkg/crex"
-	"github.com/cruciblehq/crux/pkg/manifest"
-	"github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/util/progress/progresswriter"
+	"github.com/cruciblehq/protocol/pkg/manifest"
+	"github.com/cruciblehq/protocol/pkg/oci"
 )
 
 const (
 
-	// Dockerfile syntax identifier for Buildkit
-	DockerfileFrontend = "dockerfile.v0"
-
-	// File name for the exported service image tarball
-	ServiceImageFileName = "image.tar"
+	// Relative path to the standardized service image location within dist/
+	ServiceImagePath = "image.tar"
 )
-
-// Defines the target platforms for Crucible service deployments. Services are
-// built as multi-platform images to support the Crucible infrastructure.
-var RuntimePlatforms = []string{
-	"linux/amd64",
-	"linux/arm64",
-}
 
 // Builder for Crucible services.
 type ServiceBuilder struct{}
@@ -39,12 +26,11 @@ func NewServiceBuilder() *ServiceBuilder {
 	return &ServiceBuilder{}
 }
 
-// Builds a Crucible service based on the provided manifest.
+// Builds a Crucible service resource based on the provided manifest.
 //
-// It connects to Buildkit, prepares the build options based on the service's
-// build configuration, invokes the build process, and streams the build
-// progress to the console. The resulting container image is exported as an OCI
-// tarball in the 'dist' directory.
+// Service resources reference pre-built container images. This method validates
+// that the specified image exists and prepares it for packaging by copying it
+// to the standardized dist/ output location (dist/image.tar).
 func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error {
 
 	// Correct manifest type?
@@ -55,68 +41,74 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error 
 			Err()
 	}
 
-	// Connect to Buildkit
-	socketPath := buildkitSocketPath()
-	socketAddr := "unix://" + socketPath
-	socketClient, err := client.New(ctx, socketAddr)
-	if err != nil {
-		return crex.UserError("build failed", "could not connect to buildkitd").
-			Cause(err).
-			Fallback("ensure BuildKit is installed and running with 'buildkitd --rootless &'").
-			Err()
-	}
-	defer socketClient.Close()
-
-	// Prepare build options
-	solveOpt := client.SolveOpt{
-		Frontend: DockerfileFrontend,
-		FrontendAttrs: map[string]string{
-			"filename": service.Build.Main, // Defaults to "Dockerfile" if empty
-			"platform": strings.Join(RuntimePlatforms, ","),
-		},
-		Exports: []client.ExportEntry{
-			{
-				Type: client.ExporterOCI,
-				Output: func(map[string]string) (io.WriteCloser, error) {
-					return os.Create(filepath.Join(Dist, ServiceImageFileName))
-				},
-			},
-		},
-	}
-
-	// Add build args
-	for k, v := range service.Build.Args {
-		solveOpt.FrontendAttrs["build-arg:"+k] = v
-	}
-
-	// Build and stream progress
-	pw, _ := progresswriter.NewPrinter(ctx, os.Stderr, "auto")
-	res, err := socketClient.Solve(ctx, nil, solveOpt, pw.Status())
-
-	<-pw.Done()
-
-	if err != nil {
-		return crex.UserError("build failed", "an error occurred during the build process").
-			Cause(err).
+	// Check if image path is specified
+	if service.Build.Image == "" {
+		return crex.UserError("service image not specified", "no image path in manifest").
+			Fallback("Add a build image to your manifest.").
 			Err()
 	}
 
-	if err := pw.Err(); err != nil {
-		slog.Warn("progress display error", "error", err)
+	// Validate image exists
+	imagePath := service.Build.Image
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return crex.UserError("service image not found", "image does not exist at specified path").
+			Cause(err).
+			Fallback("Either the image path is incorrect or the image has not been built yet. Try building your service image first and make sure the image file exists at the specified path.").
+			Err()
+	} else if err != nil {
+		return crex.Wrap(ErrBuildFailed, err)
 	}
 
-	// TODO: Store build metadata (digest, platforms, etc.) in accompanying file
-	// Available: res.ExporterResponse["containerimage.digest"]
-	//           res.ExporterResponse["containerimage.config.digest"]
-	_ = res
+	// Validate it's a multi-platform OCI image
+	if err := validateOCIMultiPlatform(imagePath); err != nil {
+		return err
+	}
+
+	// Copy to standardized output location (always dist/image.tar)
+	destPath := filepath.Join(Dist, ServiceImagePath)
+	if err := copyFile(imagePath, destPath); err != nil {
+		return crex.Wrap(ErrBuildFailed, err)
+	}
 
 	return nil
 }
 
-// Returns the Buildkit socket path.
-//
-// Rootless socket path: /run/user/<uid>/buildkit/buildkitd.sock
-func buildkitSocketPath() string {
-	uid := os.Getuid()
-	return filepath.Join("/run/user", strconv.Itoa(uid), "buildkit", "buildkitd.sock")
+// Copies a file from src to dst.
+func copyFile(src, dst string) error {
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+
+// Validates that an OCI tarball contains required platforms.
+func validateOCIMultiPlatform(path string) error {
+	err := oci.ValidateMultiPlatform(path)
+	if err == nil {
+		return nil
+	}
+
+	if err == oci.ErrSinglePlatform {
+		return crex.UserError("incomplete platform support", err.Error()).
+			Fallback(fmt.Sprintf("Build a multi-platform image with required platforms %v", oci.RequiredPlatforms())).
+			Err()
+	}
+
+	if err == oci.ErrInvalidImage {
+		return crex.UserError("invalid OCI image", err.Error()).
+			Fallback("The image file does not appear to be a valid OCI image. Make sure you're exporting with type=oci.").
+			Err()
+	}
+
+	return crex.Wrap(ErrBuildFailed, err)
 }

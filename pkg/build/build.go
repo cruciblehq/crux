@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/pkg/crex"
-	"github.com/cruciblehq/crux/pkg/manifest"
 	"github.com/cruciblehq/crux/pkg/paths"
+	"github.com/cruciblehq/protocol/pkg/manifest"
 )
 
 var (
@@ -20,12 +20,15 @@ const (
 
 	// Directory where built artifacts are placed
 	Dist = "dist"
+
+	// The path of the manifest file within a Crucible resource project.
+	Manifestfile = "crucible.yaml"
 )
 
 func Build(ctx context.Context) error {
 
 	// Load manifest options
-	man, err := manifest.Read()
+	man, err := manifest.Read(Manifestfile)
 	if err != nil {
 		return err
 	}

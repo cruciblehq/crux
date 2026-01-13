@@ -19,13 +19,13 @@ const colorReset = "\033[0m"
 //
 // Example output (non-verbose):
 //
-//	[info]: server started
-//	[error]: build failed: invalid type. Use widget or service.
+//	crux [info]: server started
+//	crux [error]: build failed: invalid type. Use widget or service.
 //
 // Example output (verbose):
 //
-//	[info]: server started port=8080 host=localhost
-//	[error]: build failed: invalid type. Use widget or service. class=user
+//	crux [info]: server started port=8080 host=localhost
+//	crux [error]: build failed: invalid type. Use widget or service. class=user
 type PrettyFormatter struct {
 	UseColor bool
 	verbose  bool
@@ -85,7 +85,10 @@ func (f *PrettyFormatter) writeMessage(sb *strings.Builder, rctx *RecordContext)
 
 	// Single pass through attributes
 	rctx.Record.Attrs(func(attr slog.Attr) bool {
-		if errMap, ok := asCrexError(attr.Value); ok {
+		// Resolve LogValuer if present
+		resolvedValue := attr.Value.Resolve()
+
+		if errMap, ok := asCrexError(resolvedValue); ok {
 			f.writeCrexError(sb, errMap)
 			return true
 		}
@@ -147,8 +150,7 @@ func (f *PrettyFormatter) writeCrexError(sb *strings.Builder, errMap map[string]
 	}
 }
 
-// Checks whether a value is a crex error group. Returns the error map if it
-// has both "class" and "description" keys.
+// Checks whether a value is a crex error group by looking for the sentinel marker.
 func asCrexError(val slog.Value) (map[string]slog.Value, bool) {
 	if val.Kind() != slog.KindGroup {
 		return nil, false
@@ -159,14 +161,12 @@ func asCrexError(val slog.Value) (map[string]slog.Value, bool) {
 		errMap[attr.Key] = attr.Value
 	}
 
-	_, hasClass := errMap["class"]
-	_, hasDesc := errMap["description"]
-
-	if hasClass && hasDesc {
-		return errMap, true
+	// Check for crex error sentinel marker
+	if marker, ok := errMap[crexErrorMarker]; !ok || !marker.Bool() {
+		return nil, false
 	}
 
-	return nil, false
+	return errMap, true
 }
 
 // Returns the ANSI color code for a log level.
@@ -181,6 +181,6 @@ func levelColor(level slog.Level) string {
 	case slog.LevelError:
 		return "\033[31m" // Red
 	default:
-		return "\033[0m"
+		return "\033[0m" // Reset
 	}
 }

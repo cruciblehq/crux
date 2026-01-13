@@ -14,9 +14,15 @@ const (
 	DefaultClientName = "crux"
 
 	// Default permission mode used when creating directories.
+	//
+	// This mode is required when handling resource extraction and storage and
+	// optional for other purposes.
 	DefaultDirMode os.FileMode = 0755
 
 	// Default permission mode used when creating files.
+	//
+	// This mode is required when handling resource extraction and storage and
+	// optional for other purposes.
 	DefaultFileMode os.FileMode = 0644
 )
 

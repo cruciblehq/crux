@@ -6,7 +6,6 @@ import (
 )
 
 func TestAssert_True(t *testing.T) {
-	// Should not panic with true condition
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Assert() panicked with true condition: %v", r)
@@ -17,7 +16,6 @@ func TestAssert_True(t *testing.T) {
 }
 
 func TestAssertf_True(t *testing.T) {
-	// Should not panic with true condition
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Assertf() panicked with true condition: %v", r)
@@ -31,11 +29,8 @@ func TestAssertf_True(t *testing.T) {
 // In release builds, assertions are no-ops and will not panic
 
 func TestAssert_False_Debug(t *testing.T) {
-	// This test verifies panic behavior in debug builds
 	defer func() {
 		r := recover()
-		// In debug builds, should panic with false condition
-		// In release builds, will not panic (no-op)
 		if r != nil {
 			msg, ok := r.(string)
 			if !ok {
@@ -65,11 +60,8 @@ func TestAssert_False_Debug(t *testing.T) {
 }
 
 func TestAssertf_False_Debug(t *testing.T) {
-	// This test verifies formatted panic behavior in debug builds
 	defer func() {
 		r := recover()
-		// In debug builds, should panic with false condition
-		// In release builds, will not panic (no-op)
 		if r != nil {
 			msg, ok := r.(string)
 			if !ok {

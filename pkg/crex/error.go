@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// Sentinel key used to identify crex errors in slog output.
+const crexErrorMarker = "!github.com/cruciblehq/protocol/pkg/crex.Error"
+
 // Represents an error with rich context.
 //
 // crex errors are composed of a description (what failed), a reason (why it
@@ -26,12 +29,12 @@ import (
 // Errors can carry additional details as key-value pairs for more context,
 // wrap an underlying cause error, and include a context.
 type Error struct {
-	description string         // Description of what failed
-	reason      string         // Reason why it failed
-	fallback    string         // Fallback suggestion or compromise
-	cause       error          // Underlying cause error
-	class       ErrorClass     // Classification of the error
-	details     map[string]any // Additional details about the error
+	description string          // Description of what failed
+	reason      string          // Reason why it failed
+	fallback    string          // Fallback suggestion or compromise
+	cause       error           // Underlying cause error
+	class       ErrorClass      // Classification of the error
+	details     map[string]any  // Additional details about the error
 	context     context.Context // Context associated with the error
 }
 
@@ -58,15 +61,6 @@ func (r *Error) Cause() error {
 // Returns the error classification.
 func (r *Error) Class() ErrorClass {
 	return r.class
-}
-
-// IsValid checks whether the error has non-empty description and reason.
-//
-// This method is primarily useful for testing or validating programmatically
-// constructed errors. Errors created through the standard factory functions
-// are always valid.
-func (r *Error) IsValid() bool {
-	return r.description != "" && r.reason != ""
 }
 
 // Returns the context associated with the error, or nil if none was set.
@@ -156,9 +150,11 @@ func (r *Error) Format(f fmt.State, verb rune) {
 // Implements [slog.LogValuer].
 //
 // Returns a grouped value containing the error's class, description, reason,
-// fallback, cause, and details (if present).
+// fallback, cause, and details (if present). Includes a sentinel marker for
+// reliable identification by formatters.
 func (r *Error) LogValue() slog.Value {
 	attrs := []slog.Attr{
+		slog.Bool(crexErrorMarker, true),
 		slog.String("class", string(r.class)),
 		slog.String("description", r.description),
 	}
