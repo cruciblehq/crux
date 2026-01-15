@@ -20,6 +20,7 @@ var RootCmd struct {
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
 	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
 	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
+	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
 	Plan    PlanCmd    `cmd:"" help:"Generate a deployment plan from a blueprint."`
 	Deploy  DeployCmd  `cmd:"" help:"Deploy a blueprint using a plan."`
 	Version VersionCmd `cmd:"" help:"Show version information."`

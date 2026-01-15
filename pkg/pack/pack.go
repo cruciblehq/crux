@@ -24,13 +24,16 @@ const (
 
 	// The path of the manifest file within a Crucible resource project.
 	Manifestfile = "crucible.yaml"
+
+	// Default output archive name
+	PackageOutput = "package.tar.zst"
 )
 
 // Packages a built resource into a distributable archive.
 //
 // Creates a zstd-compressed tar archive containing the manifest and build
-// artifacts from the dist/ directory. The output path can be customized.
-func Pack(ctx context.Context, outputPath string) error {
+// artifacts from the dist/ directory.
+func Pack(ctx context.Context) error {
 
 	// Check if dist/ exists
 	if _, err := os.Stat(Dist); os.IsNotExist(err) {
@@ -77,7 +80,7 @@ func Pack(ctx context.Context, outputPath string) error {
 	}
 
 	// Create archive
-	return createArchive(outputPath)
+	return createArchive(PackageOutput)
 }
 
 // Creates the archive with manifest and dist/ contents.

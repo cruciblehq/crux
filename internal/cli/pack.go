@@ -8,19 +8,17 @@ import (
 )
 
 // Represents the 'crux pack' command
-type PackCmd struct {
-	Output string `short:"o" help:"Output archive path." default:"package.tar.zst"`
-}
+type PackCmd struct{}
 
 // Executes the pack command
 func (c *PackCmd) Run(ctx context.Context) error {
 
 	// Package the built resource
-	if err := pack.Pack(ctx, c.Output); err != nil {
+	if err := pack.Pack(ctx); err != nil {
 		return err
 	}
 
-	slog.Info("package created successfully", "path", c.Output)
+	slog.Info("package created successfully", "path", pack.PackageOutput)
 
 	return nil
 }
