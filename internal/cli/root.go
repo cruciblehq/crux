@@ -18,12 +18,13 @@ var RootCmd struct {
 
 	// Subcommands
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
-	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
-	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
-	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
-	Plan    PlanCmd    `cmd:"" help:"Generate a deployment plan from a blueprint."`
-	Deploy  DeployCmd  `cmd:"" help:"Deploy a blueprint using a plan."`
-	Version VersionCmd `cmd:"" help:"Show version information."`
+	Build    BuildCmd    `cmd:"" help:"Build and bundle Crucible resources."`
+	Pack     PackCmd     `cmd:"" help:"Package a built resource for distribution."`
+	Push     PushCmd     `cmd:"" help:"Push a resource package to the Hub registry."`
+	Plan     PlanCmd     `cmd:"" help:"Generate a deployment plan from a blueprint."`
+	Deploy   DeployCmd   `cmd:"" help:"Deploy a blueprint using a plan."`
+	Provider ProviderCmd `cmd:"" help:"Manage cloud provider configurations."`
+	Version  VersionCmd  `cmd:"" help:"Show version information."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
 

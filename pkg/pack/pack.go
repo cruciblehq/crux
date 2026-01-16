@@ -35,17 +35,20 @@ const (
 // artifacts from the dist/ directory.
 func Pack(ctx context.Context) error {
 
-	// Check if dist/ exists
-	if _, err := os.Stat(Dist); os.IsNotExist(err) {
-		return crex.UserError("build artifacts not found", "dist/ directory does not exist").
-			Fallback("Run 'crux build' first to generate the distribution artifacts.").
-			Err()
-	}
-
 	// Load manifest to determine resource type
 	man, err := manifest.Read(Manifestfile)
 	if err != nil {
 		return err
+	}
+
+	// Check if dist/ exists by attempting to read it
+	if _, err := os.ReadDir(Dist); err != nil {
+		if os.IsNotExist(err) {
+			return crex.UserError("build artifacts not found", "dist/ directory does not exist").
+				Fallback("Run 'crux build' first to generate the distribution artifacts.").
+				Err()
+		}
+		return crex.Wrap(ErrPackFailed, err)
 	}
 
 	// Validate resource structure based on type

@@ -1,17 +1,17 @@
 package plan
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/cruciblehq/protocol/pkg/blueprint"
 )
 
-// Build generates a plan from a blueprint and target name.
-func Build(bp *blueprint.Blueprint, targetName string, blueprintPath string) (*Plan, error) {
+// Generates a plan from a blueprint.
+// If state is provided, generates an incremental plan based on current deployment state.
+func Build(ctx context.Context, bp *blueprint.Blueprint, blueprintPath string, state *State) (*Plan, error) {
 	p := &Plan{
-		Blueprint: blueprintPath,
-		Target:    targetName,
 		CreatedAt: time.Now(),
 		Services:  make([]ResolvedService, 0, len(bp.Services)),
 	}
@@ -26,7 +26,7 @@ func Build(bp *blueprint.Blueprint, targetName string, blueprintPath string) (*P
 		if containerName == "" {
 			containerName = "service"
 		}
-		
+
 		resolved := ResolvedService{
 			Reference: svc.Reference,
 			Resolved:  svc.Reference + " (unresolved)", // TODO: resolve version

@@ -6,17 +6,15 @@ import (
 	"github.com/cruciblehq/protocol/pkg/codec"
 )
 
-// Plan represents a resolved deployment plan.
+// Represents a resolved deployment plan.
 type Plan struct {
-	Blueprint string            `field:"blueprint"`
-	Target    string            `field:"target"`
 	CreatedAt time.Time         `field:"created_at"`
 	Services  []ResolvedService `field:"services"`
 	Widgets   []ResolvedWidget  `field:"widgets"`
 	Gateway   *Gateway          `field:"gateway"`
 }
 
-// ResolvedService is a service with all references resolved.
+// Represents a service with all references resolved.
 type ResolvedService struct {
 	Reference   string      `field:"reference"`
 	Resolved    string      `field:"resolved"`
@@ -60,7 +58,7 @@ type GatewayRoute struct {
 	Service  string `field:"service"`
 }
 
-// Write saves the plan to a file.
+// Saves the plan to a file.
 //
 // The file format is inferred from the path extension (.json, .yaml, .toml).
 func (p *Plan) Write(path string) error {

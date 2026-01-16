@@ -44,6 +44,15 @@ func Config() string {
 	return filepath.Join(xdg.ConfigHome, DefaultClientName)
 }
 
+// Path to the providers configuration file.
+//
+// Linux:   $XDG_CONFIG_HOME/crux/providers.yaml
+// macOS:   ~/Library/Application Support/crux/providers.yaml
+// Windows: %APPDATA%\crux\providers.yaml
+func Providers() string {
+	return filepath.Join(Config(), "providers.yaml")
+}
+
 // Path to the directory for non-essential cached data.
 //
 //	Linux:   $XDG_CACHE_HOME/crux or ~/.cache/crux
@@ -84,15 +93,6 @@ func Runtime() string {
 	}
 	// Fallback for macOS/Windows
 	return filepath.Join(Cache(), "run")
-}
-
-// Path to the server socket.
-//
-//	Linux:   $XDG_RUNTIME_DIR/crux/server.sock
-//	macOS:   ~/Library/Caches/crux/run/server.sock
-//	Windows: %LOCALAPPDATA%\crux\run\server.sock
-func ServerSocket() string {
-	return filepath.Join(Runtime(), "server.sock")
 }
 
 // Path to the directory for log files.

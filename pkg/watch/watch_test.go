@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/cruciblehq/crux/pkg/paths"
 )
 
 func TestWatch_Create(t *testing.T) {
@@ -25,7 +27,7 @@ func TestWatch_Create(t *testing.T) {
 	defer w.Close()
 
 	// Create file
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,7 +47,7 @@ func TestWatch_Write(t *testing.T) {
 	file := filepath.Join(dir, "testwatchwrite.txt")
 
 	// Create file first
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -62,7 +64,7 @@ func TestWatch_Write(t *testing.T) {
 	defer w.Close()
 
 	// Modify file
-	if err := os.WriteFile(file, []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("world"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +87,7 @@ func TestWatch_Remove(t *testing.T) {
 	file := filepath.Join(dir, "testwatchremove.txt")
 
 	// Create file first
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -125,7 +127,7 @@ func TestWatch_Rename(t *testing.T) {
 	renamed := filepath.Join(dir, "renamed.txt")
 
 	// Create file first
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,7 +184,7 @@ func TestWatch_CallbackError(t *testing.T) {
 	}
 
 	// Trigger event
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -250,7 +252,7 @@ func TestWatch_Wait(t *testing.T) {
 func TestWatchRecursive_Success(t *testing.T) {
 	dir := t.TempDir()
 	subdir := filepath.Join(dir, "subdir")
-	if err := os.Mkdir(subdir, 0755); err != nil {
+	if err := os.Mkdir(subdir, paths.DefaultDirMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -268,7 +270,7 @@ func TestWatchRecursive_Success(t *testing.T) {
 
 	// Create file in subdir
 	file := filepath.Join(subdir, "testwatchrecursive.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -300,7 +302,7 @@ func TestWatchAll_Success(t *testing.T) {
 
 	// Create file in first dir
 	file1 := filepath.Join(dir1, "test1.txt")
-	if err := os.WriteFile(file1, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file1, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -312,7 +314,7 @@ func TestWatchAll_Success(t *testing.T) {
 
 	// Create file in second dir
 	file2 := filepath.Join(dir2, "test2.txt")
-	if err := os.WriteFile(file2, []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(file2, []byte("world"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -356,7 +358,7 @@ func TestWatcher_Add(t *testing.T) {
 
 	// Create file in second dir
 	file := filepath.Join(dir2, "testwatchadd.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -373,7 +375,7 @@ func TestWatcher_Add(t *testing.T) {
 func TestWatcher_AddRecursive(t *testing.T) {
 	dir := t.TempDir()
 	subdir := filepath.Join(dir, "subdir")
-	if err := os.Mkdir(subdir, 0755); err != nil {
+	if err := os.Mkdir(subdir, paths.DefaultDirMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -397,7 +399,7 @@ func TestWatcher_AddRecursive(t *testing.T) {
 
 	// Create file in subdir
 	file := filepath.Join(subdir, "test.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -432,7 +434,7 @@ func TestWatcher_Remove(t *testing.T) {
 
 	// Create file - should not trigger event
 	file := filepath.Join(dir, "test.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -447,7 +449,7 @@ func TestWatcher_Remove(t *testing.T) {
 func TestWatcher_RemoveRecursive(t *testing.T) {
 	dir := t.TempDir()
 	subdir := filepath.Join(dir, "subdir")
-	if err := os.Mkdir(subdir, 0755); err != nil {
+	if err := os.Mkdir(subdir, paths.DefaultDirMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -469,7 +471,7 @@ func TestWatcher_RemoveRecursive(t *testing.T) {
 
 	// Create file in subdir - should not trigger event
 	file := filepath.Join(subdir, "test.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -502,10 +504,10 @@ func TestWatcher_RemoveAll(t *testing.T) {
 	}
 
 	// Create files - should not trigger events
-	if err := os.WriteFile(filepath.Join(dir1, "test.txt"), []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir1, "test.txt"), []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir2, "test.txt"), []byte("world"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir2, "test.txt"), []byte("world"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,13 +524,13 @@ func TestCollectDirs_Success(t *testing.T) {
 	sub1 := filepath.Join(dir, "sub1")
 	sub2 := filepath.Join(dir, "sub1", "sub2")
 
-	if err := os.MkdirAll(sub2, 0755); err != nil {
+	if err := os.MkdirAll(sub2, paths.DefaultDirMode); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a file (should not be collected)
 	file := filepath.Join(dir, "file.txt")
-	if err := os.WriteFile(file, []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("hello"), paths.DefaultFileMode); err != nil {
 		t.Fatal(err)
 	}
 

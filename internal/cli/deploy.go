@@ -1,62 +1,37 @@
 package cli
 
 import (
-	"fmt"
+	"context"
+	"log/slog"
 
-	"github.com/cruciblehq/crux/pkg/plan"
-	"github.com/cruciblehq/protocol/pkg/blueprint"
+	"github.com/cruciblehq/crux/pkg/deploy"
 )
 
-// Deploys a blueprint using a plan.
+// Executes a deployment plan.
 type DeployCmd struct {
-	Blueprint string `arg:"" help:"Path to blueprint file"`
-	Plan      string `optional:"" help:"Path to plan file (if omitted, will auto-generate plan)"`
-	Target    string `optional:"" help:"Target environment (required if --plan not provided)"`
+	Plan     string `arg:"" help:"Path to plan file"`
+	State    string `optional:"" help:"Path to existing state file for incremental deployment"`
+	Output   string `optional:"" help:"Output path for state file (default: dist/states/state-<timestamp>.json)"`
+	Provider string `optional:"" help:"Provider configuration name (uses default if not specified)"`
 }
 
 // Executes the deploy command.
-func (c *DeployCmd) Run() error {
-	var p *plan.Plan
-	var err error
-
-	// Load or generate plan
-	if c.Plan != "" {
-		// Use existing plan
-		p, err = plan.Read(c.Plan)
-		if err != nil {
-			return fmt.Errorf("failed to read plan: %w", err)
-		}
-		fmt.Printf("Using plan: %s\n", c.Plan)
-	} else {
-		// Auto-generate plan
-		if c.Target == "" {
-			return fmt.Errorf("--target is required when --plan is not provided")
-		}
-
-		bp, err := blueprint.Read(c.Blueprint)
-		if err != nil {
-			return fmt.Errorf("failed to read blueprint: %w", err)
-		}
-
-		p, err = plan.Build(bp, c.Target, c.Blueprint)
-		if err != nil {
-			return fmt.Errorf("failed to build plan: %w", err)
-		}
-
-		fmt.Printf("Auto-generated plan for target: %s\n", c.Target)
+func (c *DeployCmd) Run(ctx context.Context) error {
+	opts := deploy.DeployOptions{
+		PlanPath:     c.Plan,
+		StatePath:    c.State,
+		OutputPath:   c.Output,
+		ProviderName: c.Provider,
 	}
 
-	// Execute deployment
-	fmt.Printf("\nDeploying...\n")
-	fmt.Printf("Target: %s\n", p.Target)
-	fmt.Printf("Services to deploy: %d\n", len(p.Services))
+	slog.Info("starting deployment")
 
-	for _, svc := range p.Services {
-		fmt.Printf("  - %s at %s\n", svc.Reference, svc.Prefix)
+	result, err := deploy.Execute(ctx, opts)
+	if err != nil {
+		return err
 	}
 
-	// TODO: Actually deploy (load Docker images, start containers, configure gateway)
-	fmt.Println("\n⚠️  Deployment not yet implemented - plan validated successfully")
+	slog.Info("deployment completed successfully", "state", result.OutputPath)
 
 	return nil
 }
