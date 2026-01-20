@@ -92,7 +92,7 @@ func Execute(ctx context.Context, opts DeployOptions) (*DeployResult, error) {
 	}, nil
 }
 
-// loadProviderConfig loads the provider configuration.
+// Loads the provider configuration.
 func loadProviderConfig(providerName string) (config.Provider, error) {
 	cfg, err := config.LoadProviders()
 	if err != nil {
@@ -107,14 +107,12 @@ func loadProviderConfig(providerName string) (config.Provider, error) {
 	// Use default provider
 	provider, err := cfg.GetDefault()
 	if err != nil {
-		return config.Provider{}, crex.UserError("no provider configured", "no default provider is set").
-			Fallback("Run 'crux provider add <name>' to configure a provider.").
-			Cause(config.ErrNoProvider).Err()
+		return config.Provider{}, fmt.Errorf("%w: run 'crux provider add <name>' to configure a provider", config.ErrProviderNotFound)
 	}
 	return provider, nil
 }
 
-// createDeployer creates the appropriate deployer based on provider.
+// Creates the appropriate deployer based on provider.
 func createDeployer(provider config.Provider) (Deployer, error) {
 	switch provider.Type {
 	case "aws":

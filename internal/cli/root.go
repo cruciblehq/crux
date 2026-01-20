@@ -10,6 +10,7 @@ import (
 	"github.com/cruciblehq/crux/pkg/crex"
 )
 
+// Represents the root command for the Crux CLI.
 var RootCmd struct {
 
 	// Global flags
@@ -52,8 +53,7 @@ func Execute() error {
 	return nil
 }
 
-// Configures the global logger based on CLI flags, setting the log level,
-// output stream, and formatter.
+// Configures the global logger based on CLI flags.
 func configureLogger() {
 
 	// Get the handler from the default logger

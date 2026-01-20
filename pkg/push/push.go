@@ -13,18 +13,13 @@ import (
 	"github.com/cruciblehq/protocol/pkg/registry"
 )
 
-var (
-	ErrPushFailed      = errors.New("push failed")
-	ErrInvalidResource = errors.New("invalid resource format")
-)
-
 // Options for pushing a package to the Hub registry.
 type PushOptions struct {
 	HubURL   string // Hub registry URL
 	Resource string // Resource identifier (namespace/name)
 }
 
-// Push pushes a resource package to the Hub registry.
+// Pushes a resource package to the Hub registry.
 func Push(ctx context.Context, opts PushOptions) error {
 	// Validate package exists
 	if err := validatePackage(); err != nil {
@@ -65,7 +60,11 @@ func Push(ctx context.Context, opts PushOptions) error {
 	return uploadPackage(ctx, client, namespace, resourceName, man.Resource.Version)
 }
 
-// validatePackage validates that the package file exists.
+// Validates that the package file exists.
+//
+// The package file is expected to be at the default location. If not found, an
+// error is returned prompting the user to package the resource first. The
+// package's format and integrity are not validated.
 func validatePackage() error {
 	f, err := os.Open(pack.PackageOutput)
 	if err != nil {
@@ -80,7 +79,10 @@ func validatePackage() error {
 	return nil
 }
 
-// loadManifest loads and validates the manifest.
+// Loads and validates the manifest.
+//
+// Ensures that crucible.yaml exists and is valid. If not, an error is returned.
+// Returns the loaded manifest on success.
 func loadManifest() (*manifest.Manifest, error) {
 	man, err := manifest.Read(pack.Manifestfile)
 	if err != nil {
@@ -91,18 +93,25 @@ func loadManifest() (*manifest.Manifest, error) {
 	return man, nil
 }
 
-// parseResource parses namespace and resource name from the resource argument.
-func parseResource(resource string) (namespace, resourceName string, err error) {
+// Parses namespace and resource name from the resource argument.
+//
+// The expected format is "namespace/name". If the format is invalid, an error
+// is returned.
+func parseResource(resource string) (namespace, name string, err error) {
 	parts := strings.Split(resource, "/")
 	if len(parts) != 2 {
 		return "", "", crex.UserError("invalid resource format", "expected namespace/name").
-			Fallback("Use format: crux push namespace/name").
+			Fallback("Use the expected format namespace/name.").
 			Err()
 	}
 	return parts[0], parts[1], nil
 }
 
-// verifyNamespace verifies that the namespace exists.
+// Verifies that the namespace exists.
+//
+// Makes a call to the registry to check if the specified namespace exists. If
+// the namespace does not exist, an error is returned prompting the user to
+// create it first.
 func verifyNamespace(ctx context.Context, client *registry.Client, namespace string) error {
 	_, err := client.ReadNamespace(ctx, namespace)
 	if err == nil {
@@ -117,11 +126,14 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 	}
 
 	return crex.UserError("failed to check namespace", err.Error()).
-		Fallback("Check Hub connectivity.").
+		Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
 		Err()
 }
 
-// ensureResource ensures the resource exists, creating it if necessary.
+// Ensures the resource exists, creating it if necessary.
+//
+// Checks if the resource exists in the registry. If not, it creates the
+// resource using the information from the manifest.
 func ensureResource(ctx context.Context, client *registry.Client, namespace, resource string, man *manifest.Manifest) error {
 	_, err := client.ReadResource(ctx, namespace, resource)
 	if err == nil {
@@ -132,7 +144,7 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 	var regErr *registry.Error
 	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
 		return crex.UserError("failed to check resource", err.Error()).
-			Fallback("Check Hub connectivity.").
+			Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
 			Err()
 	}
 
@@ -152,7 +164,11 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 	return nil
 }
 
-// createVersion creates a new version in the registry.
+// Creates a new version in the registry.
+//
+// Attempts to create the specified version for the resource. If the version
+// already exists, an error is returned prompting the user to increment the
+// version in the manifest.
 func createVersion(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
 	versionInfo := registry.VersionInfo{
 		String: version,
@@ -174,11 +190,14 @@ func createVersion(ctx context.Context, client *registry.Client, namespace, reso
 	return nil
 }
 
-// uploadPackage uploads the package archive to the registry.
+// Uploads the package archive to the registry.
+//
+// Opens the package file and uploads it to the specified resource version in
+// the registry.
 func uploadPackage(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
 	archive, err := os.Open(pack.PackageOutput)
 	if err != nil {
-		return crex.Wrap(ErrPushFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 	defer archive.Close()
 

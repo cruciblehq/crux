@@ -63,7 +63,7 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error 
 	// Copy to standardized output location (always dist/image.tar)
 	destPath := filepath.Join(Dist, ServiceImagePath)
 	if err := copyFile(imagePath, destPath); err != nil {
-		return crex.Wrap(ErrBuildFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	return nil
@@ -106,5 +106,5 @@ func validateOCIMultiPlatform(path string) error {
 			Err()
 	}
 
-	return crex.Wrap(ErrBuildFailed, err)
+	return crex.Wrap(ErrFileSystemOperation, err)
 }

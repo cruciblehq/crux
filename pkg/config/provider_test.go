@@ -56,7 +56,7 @@ func TestProvidersConfig_AddProvider_SecondProviderDoesNotChangeDefault(t *testi
 	}
 }
 
-func TestProvidersConfig_AddProvider_UpdateExistingProvider(t *testing.T) {
+func TestProvidersConfig_AddProvider_DuplicateName(t *testing.T) {
 	config := &ProvidersConfig{
 		Providers: make(map[string]Provider),
 	}
@@ -65,20 +65,70 @@ func TestProvidersConfig_AddProvider_UpdateExistingProvider(t *testing.T) {
 		Type:   ProviderTypeAWS,
 		Config: &AWSProvider{Region: "us-east-1"},
 	}
-	config.AddProvider("aws-prod", provider1)
+	err := config.AddProvider("aws-prod", provider1)
+	if err != nil {
+		t.Fatalf("AddProvider() error = %v, want nil", err)
+	}
 
-	provider1Updated := Provider{
+	provider2 := Provider{
 		Type:   ProviderTypeAWS,
 		Config: &AWSProvider{Region: "eu-west-1"},
 	}
-	config.AddProvider("aws-prod", provider1Updated)
+	err = config.AddProvider("aws-prod", provider2)
+	if !errors.Is(err, ErrProviderAlreadyExists) {
+		t.Errorf("AddProvider() error = %v, want ErrProviderAlreadyExists", err)
+	}
 
+	// Verify original provider was not replaced
 	if len(config.Providers) != 1 {
-		t.Errorf("len(Providers) = %d, want 1 (no duplicate)", len(config.Providers))
+		t.Errorf("len(Providers) = %d, want 1", len(config.Providers))
 	}
 	awsProvider := config.Providers["aws-prod"].Config.(*AWSProvider)
-	if awsProvider.Region != "eu-west-1" {
-		t.Errorf("Updated provider region = %v, want eu-west-1", awsProvider.Region)
+	if awsProvider.Region != "us-east-1" {
+		t.Errorf("Provider region = %v, want us-east-1 (unchanged)", awsProvider.Region)
+	}
+}
+
+func TestValidateProviderName(t *testing.T) {
+	tests := []struct {
+		name      string
+		provider  string
+		wantError bool
+	}{
+		{"valid alphanumeric", "aws123", false},
+		{"valid with hyphen", "aws-prod", false},
+		{"valid with underscore", "aws_dev", false},
+		{"valid mixed", "aws-prod_1", false},
+		{"empty", "", true},
+		{"starts with hyphen", "-aws", true},
+		{"starts with underscore", "_aws", true},
+		{"contains space", "aws prod", true},
+		{"contains at symbol", "user@aws", true},
+		{"too long", "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff12345", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateProviderName(tt.provider)
+			if (err != nil) != tt.wantError {
+				t.Errorf("ValidateProviderName(%q) error = %v, wantError %v", tt.provider, err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestProvidersConfig_AddProvider_InvalidName(t *testing.T) {
+	config := &ProvidersConfig{
+		Providers: make(map[string]Provider),
+	}
+
+	provider := Provider{
+		Type:   ProviderTypeAWS,
+		Config: &AWSProvider{Region: "us-east-1"},
+	}
+	err := config.AddProvider("-invalid", provider)
+	if err == nil {
+		t.Error("AddProvider() with invalid name should return error")
 	}
 }
 

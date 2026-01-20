@@ -7,16 +7,18 @@ import (
 	"github.com/cruciblehq/crux/pkg/config"
 )
 
-// Set the default provider.
+// Represents the 'crux provider set-default' command.
 type ProviderSetDefaultCmd struct {
-	Name string `arg:"" help:"Name of the provider to set as default"` // Name of the provider
+	Name string `arg:"" help:"Name of the provider to set as default"`
 }
 
-// Run executes the set-default command.
+// Executes the set-default command.
 //
 // Sets the specified provider as the default provider. The provider must
 // already exist in the configuration, otherwise an error is returned.
 func (c *ProviderSetDefaultCmd) Run(ctx context.Context) error {
+	slog.Info("setting default provider...", "name", c.Name)
+
 	cfg, err := config.LoadProviders()
 	if err != nil {
 		return err

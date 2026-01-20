@@ -2,7 +2,6 @@ package pack
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,11 +9,6 @@ import (
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/archive"
 	"github.com/cruciblehq/protocol/pkg/manifest"
-)
-
-var (
-	ErrPackFailed          = errors.New("pack failed")
-	ErrInvalidResourceType = errors.New("invalid resource type")
 )
 
 const (
@@ -48,7 +42,7 @@ func Pack(ctx context.Context) error {
 				Fallback("Run 'crux build' first to generate the distribution artifacts.").
 				Err()
 		}
-		return crex.Wrap(ErrPackFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	// Validate resource structure based on type
@@ -92,20 +86,20 @@ func createArchive(outputPath string) error {
 	// Create temporary directory for packaging
 	tmpDir, err := os.MkdirTemp("", "crux-pack-*")
 	if err != nil {
-		return crex.Wrap(ErrPackFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	// Copy manifest
 	manifestDest := filepath.Join(tmpDir, Manifestfile)
 	if err := copyFile(Manifestfile, manifestDest); err != nil {
-		return crex.Wrap(ErrPackFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	// Copy dist/ directory
 	distDest := filepath.Join(tmpDir, Dist)
 	if err := copyDir(Dist, distDest); err != nil {
-		return crex.Wrap(ErrPackFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	// Create archive

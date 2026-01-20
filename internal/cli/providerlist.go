@@ -8,15 +8,17 @@ import (
 	"github.com/cruciblehq/crux/pkg/config"
 )
 
-// List configured providers.
+// Represents the 'crux provider list' command.
 type ProviderListCmd struct{}
 
-// Run executes the provider list command.
+// Executes the provider list command.
 //
 // Loads and displays all configured cloud provider details, including type,
 // region (for AWS), authentication method, and whether they are set as the
 // default provider.
 func (c *ProviderListCmd) Run(ctx context.Context) error {
+	slog.Info("listing configured providers...")
+
 	cfg, err := config.LoadProviders()
 	if err != nil {
 		return err
@@ -28,7 +30,14 @@ func (c *ProviderListCmd) Run(ctx context.Context) error {
 		return nil
 	}
 
+	changeLine := false
+
 	for _, provider := range providers {
+
+		if changeLine {
+			fmt.Println()
+		}
+
 		isDefault := cfg.Default == provider.Name
 		defaultMarker := ""
 		if isDefault {
@@ -53,7 +62,8 @@ func (c *ProviderListCmd) Run(ctx context.Context) error {
 		case *config.LocalProvider:
 			// No additional details for local provider
 		}
-		fmt.Println()
+
+		changeLine = true
 	}
 
 	return nil

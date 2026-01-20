@@ -4,21 +4,28 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/codec"
 )
 
-// ProviderType specifies the type of cloud provider.
+var (
+
+	// Provider names must be alphanumeric with hyphens or underscores
+	providerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+)
+
+// Specifies the type of cloud provider.
 type ProviderType string
 
 const (
 
-	// ProviderTypeAWS represents Amazon Web Services.
+	// Represents Amazon Web Services.
 	ProviderTypeAWS ProviderType = "aws"
 
-	// ProviderTypeLocal represents local Docker-based deployment.
+	// Represents local deployment.
 	ProviderTypeLocal ProviderType = "local"
 )
 
@@ -34,6 +41,35 @@ func ProviderTypeFromString(s string) (ProviderType, error) {
 	default:
 		return "", ErrInvalidProviderType
 	}
+}
+
+// Validates a provider name.
+//
+// Provider names must start with an alphanumeric character and may contain
+// alphanumeric characters, hyphens, or underscores. Empty names are not allowed.
+func ValidateProviderName(name string) error {
+
+	const invalidProviderNameErrMsg = "invalid provider name"
+
+	if name == "" {
+		return crex.UserError(invalidProviderNameErrMsg, "provider name cannot be empty").
+			Fallback("Please choose a non-empty name.").
+			Err()
+	}
+
+	if len(name) > 64 {
+		return crex.UserError(invalidProviderNameErrMsg, "provider name cannot exceed 64 characters").
+			Fallback("Please choose a shorter name.").
+			Err()
+	}
+
+	if !providerNamePattern.MatchString(name) {
+		return crex.UserError(invalidProviderNameErrMsg, "provider name must start with alphanumeric character and contain only alphanumeric, hyphens, or underscores").
+			Fallback("Please choose a different name.").
+			Err()
+	}
+
+	return nil
 }
 
 // Stores user's configured cloud providers.
@@ -112,12 +148,23 @@ func (c *ProvidersConfig) Save() error {
 	return nil
 }
 
-// Adds or updates a provider configuration.
+// Adds a new provider configuration.
 //
-// If a provider with the same name already exists, it is overwritten. If this
-// is the first provider being added, it is set as the default provider. The
-// changes are not persisted to disk until [Save] is called.
-func (c *ProvidersConfig) AddProvider(name string, provider Provider) {
+// Returns an error if a provider with the same name already exists or if the
+// name is invalid. If this is the first provider being added, it is set as the
+// default. Changes are not persisted until [Save] is called.
+func (c *ProvidersConfig) AddProvider(name string, provider Provider) error {
+	if err := ValidateProviderName(name); err != nil {
+		return err
+	}
+
+	if _, exists := c.Providers[name]; exists {
+		return crex.UserErrorf("invalid provider name", "a provider with the name %q already exists", name).
+			Fallbackf("Use a different name or remove the existing provider first with 'crux provider remove %s'", name).
+			Cause(ErrProviderAlreadyExists).
+			Err()
+	}
+
 	provider.Name = name
 	c.Providers[name] = provider
 
@@ -125,13 +172,15 @@ func (c *ProvidersConfig) AddProvider(name string, provider Provider) {
 	if c.Default == "" {
 		c.Default = name
 	}
+
+	return nil
 }
 
 // Removes a provider configuration.
 //
 // If the provider does not exist, an error is returned. If the removed provider
-// was the default, the default is cleared (no default). The changes are not
-// persisted to disk until [Save] is called.
+// was the default, the default is cleared (no default). Changes are not
+// persisted until [Save] is called.
 func (c *ProvidersConfig) RemoveProvider(name string) error {
 	if _, exists := c.Providers[name]; !exists {
 		return ErrProviderNotFound

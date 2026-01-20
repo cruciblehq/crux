@@ -7,24 +7,26 @@ import (
 	"github.com/cruciblehq/crux/pkg/push"
 )
 
-// Pushes a resource package to the Hub registry.
+// Represents the 'crux push' command.
 type PushCmd struct {
 	Hub      string `help:"Hub registry URL." default:"http://hub.cruciblehq.xyz:8080"`
 	Resource string `arg:"" help:"Resource to push (namespace/name)."`
 }
 
 // Executes the push command.
-func (cmd *PushCmd) Run(ctx context.Context) error {
+func (c *PushCmd) Run(ctx context.Context) error {
 	opts := push.PushOptions{
-		HubURL:   cmd.Hub,
-		Resource: cmd.Resource,
+		HubURL:   c.Hub,
+		Resource: c.Resource,
 	}
+
+	slog.Info("pushing package...", "resource", c.Resource, "hub", c.Hub)
 
 	if err := push.Push(ctx, opts); err != nil {
 		return err
 	}
 
-	slog.Info("package pushed successfully", "resource", cmd.Resource)
+	slog.Info("package pushed successfully", "resource", c.Resource)
 
 	return nil
 }

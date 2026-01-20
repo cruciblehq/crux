@@ -7,7 +7,7 @@ import (
 	"github.com/cruciblehq/crux/pkg/pack"
 )
 
-// Represents the 'crux pack' command
+// Represents the 'crux pack' command.
 type PackCmd struct{}
 
 // Executes the pack command.
@@ -17,6 +17,8 @@ type PackCmd struct{}
 // return an error. Upon successful packaging, it logs the output path of the
 // created package.
 func (c *PackCmd) Run(ctx context.Context) error {
+
+	slog.Info("packaging resource...", "output", pack.PackageOutput)
 
 	// Package the built resource
 	if err := pack.Pack(ctx); err != nil {

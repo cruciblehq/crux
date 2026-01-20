@@ -3,8 +3,10 @@ package cli
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/cruciblehq/crux/pkg/config"
 	"github.com/cruciblehq/crux/pkg/crex"
@@ -16,17 +18,19 @@ const (
 	DefaultAWSRegion = "us-east-1"
 )
 
-// Add a new cloud provider configuration.
+// Represents the 'crux provider add' command.
 type ProviderAddCmd struct {
-	Name string `arg:"" help:"Name for this provider configuration (e.g., aws-production)"` // Name of the provider
+	Name string `arg:"" help:"Name for this provider configuration (e.g., aws-production)"`
 }
 
-// Run executes the provider add command.
+// Executes the provider add command.
 //
 // Prompts the user for provider information (type, region, credentials, etc.),
 // validates the input, and saves the configuration to disk. If this is the first
 // provider being added, it automatically becomes the default provider.
 func (c *ProviderAddCmd) Run(ctx context.Context) error {
+	slog.Info("adding new provider...", "name", c.Name)
+
 	cfg, err := config.LoadProviders()
 	if err != nil {
 		return err
@@ -37,7 +41,9 @@ func (c *ProviderAddCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	cfg.AddProvider(c.Name, *provider)
+	if err := cfg.AddProvider(c.Name, *provider); err != nil {
+		return err
+	}
 
 	if err := cfg.Save(); err != nil {
 		return err
@@ -98,10 +104,17 @@ func promptAWSProviderInfo(reader *bufio.Reader) (*config.AWSProvider, error) {
 
 	// Access keys
 	if profile != "" {
-		cfg.AuthMethod = config.AuthMethodProfile
-		cfg.Auth = &config.AWSProfileAuth{
+		auth := &config.AWSProfileAuth{
 			Profile: profile,
 		}
+
+		// Validate the profile exists
+		if err := auth.Validate(); err != nil {
+			return nil, err
+		}
+
+		cfg.AuthMethod = config.AuthMethodProfile
+		cfg.Auth = auth
 		return cfg, nil
 	}
 
@@ -135,4 +148,19 @@ func promptAWSAuthKeys(reader *bufio.Reader) (*config.AWSKeysAuth, error) {
 	}
 
 	return auth, nil
+}
+
+// Prompts the user with a message and returns the input or a default value.
+func promptWithDefault(reader *bufio.Reader, prompt, defaultValue string) string {
+	if defaultValue != "" {
+		fmt.Printf("%s [%s]: ", prompt, defaultValue)
+	} else {
+		fmt.Printf("%s: ", prompt)
+	}
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultValue
+	}
+	return input
 }

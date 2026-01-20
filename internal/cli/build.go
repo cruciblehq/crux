@@ -10,13 +10,15 @@ import (
 
 // Represents the 'crux build' command.
 type BuildCmd struct {
-	Watch bool `short:"w" help:"Watch for changes and rebuild automatically."` // Whether to watch for file changes
+	Watch bool `short:"w" help:"Watch for changes and rebuild automatically."`
 }
 
 // Executes the build command.
 //
 // Performs an initial build, and if the Watch flag is set, enters watch mode.
 func (c *BuildCmd) Run(ctx context.Context) error {
+
+	slog.Info("building resource...", "watch", c.Watch)
 
 	// Build first (don't wait for changes)
 	if err := build.Build(ctx); err != nil {

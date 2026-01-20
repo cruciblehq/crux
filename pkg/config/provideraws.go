@@ -1,26 +1,12 @@
 package config
 
 import (
-	"regexp"
-	"strings"
+	"context"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/cruciblehq/crux/pkg/crex"
-)
-
-const (
-	// AWS Access Key ID length
-	AWSAccessKeyIDLength = 20
-
-	// AWS Secret Access Key length
-	AWSSecretAccessKeyLength = 40
-)
-
-var (
-	// AWS Access Key ID pattern (starts with AKIA for IAM users or ASIA for temporary credentials)
-	awsAccessKeyIDPattern = regexp.MustCompile(`^(AKIA|ASIA)[A-Z0-9]{16}$`)
-
-	// AWS Secret Access Key pattern (base64-like characters)
-	awsSecretAccessKeyPattern = regexp.MustCompile(`^[A-Za-z0-9/+=]{40}$`)
 )
 
 // Specifies the authentication method for AWS providers.
@@ -68,6 +54,32 @@ type AWSProfileAuth struct {
 	Profile string `field:"profile"` // AWS profile name from ~/.aws/credentials
 }
 
+// Validates that an AWS profile exists and can be loaded.
+//
+// Uses the AWS SDK to attempt loading the profile configuration. This properly
+// handles all AWS credential sources including SSO, role assumptions, credential
+// chains, and environment variables.
+func (a *AWSProfileAuth) Validate() error {
+	if a.Profile == "" {
+		return crex.UserError("invalid AWS profile", "profile name cannot be empty").Err()
+	}
+
+	// Load the AWS config with the specified profile
+	ctx := context.Background()
+	_, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithSharedConfigProfile(a.Profile),
+	)
+
+	if err != nil {
+		return crex.UserErrorf("invalid AWS profile configuration", "failed to load profile %q", a.Profile).
+			Fallback("Ensure the profile exists and is properly configured with 'aws configure --profile " + a.Profile + "', or use access keys instead").
+			Cause(err).
+			Err()
+	}
+
+	return nil
+}
+
 // AWS access key authentication.
 //
 // Uses explicit AWS access key ID and secret access key for authentication.
@@ -80,36 +92,36 @@ type AWSKeysAuth struct {
 	SecretAccessKey string `field:"secret_access_key"` // AWS secret access key
 }
 
-// Validates AWS access key credentials format.
+// Validates AWS access key credentials.
 //
-// Checks that both AccessKeyID and SecretAccessKey are provided and conform
-// to AWS credential format requirements.
+// Uses AWS STS GetCallerIdentity to verify that the credentials are valid and
+// have the necessary permissions. This is the recommended way to validate AWS
+// credentials as it checks actual validity, not just format. This makes a
+// network call to AWS and requires sts:GetCallerIdentity permissions.
 func (a *AWSKeysAuth) Validate() error {
-	// Check for empty values
-	if a.AccessKeyID == "" || a.SecretAccessKey == "" {
-		return crex.UserError("invalid AWS credentials", "access key ID and secret access key cannot be empty").Err()
+
+	// Create AWS config with the provided credentials
+	ctx := context.Background()
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			a.AccessKeyID,
+			a.SecretAccessKey,
+			"", // session token (empty for long-term credentials)
+		)),
+	)
+	if err != nil {
+		return crex.UserError("invalid AWS credentials", "failed to configure AWS SDK").
+			Cause(err).Err()
 	}
 
-	// Validate Access Key ID format
-	if len(a.AccessKeyID) != AWSAccessKeyIDLength {
-		return crex.UserError("invalid AWS access key ID", "access key ID must be exactly 20 characters long").
-			Fallback("Verify your AWS access key ID and try again.").Err()
-	}
-
-	if !awsAccessKeyIDPattern.MatchString(strings.TrimSpace(a.AccessKeyID)) {
-		return crex.UserError("invalid AWS access key ID", "access key ID format is incorrect (must start with AKIA or ASIA)").
-			Fallback("Verify your AWS access key ID and try again.").Err()
-	}
-
-	// Validate Secret Access Key format
-	if len(a.SecretAccessKey) != AWSSecretAccessKeyLength {
-		return crex.UserError("invalid AWS secret access key", "secret access key must be exactly 40 characters long").
-			Fallback("Verify your AWS secret access key and try again.").Err()
-	}
-
-	if !awsSecretAccessKeyPattern.MatchString(strings.TrimSpace(a.SecretAccessKey)) {
-		return crex.UserError("invalid AWS secret access key", "secret access key contains invalid characters").
-			Fallback("Verify your AWS secret access key and try again.").Err()
+	// Validate credentials by calling STS GetCallerIdentity
+	stsClient := sts.NewFromConfig(cfg)
+	_, err = stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return crex.UserError("invalid AWS credentials", "credentials failed AWS validation").
+			Fallback("Verify your AWS access key ID and secret access key and try again.").
+			Cause(err).
+			Err()
 	}
 
 	return nil

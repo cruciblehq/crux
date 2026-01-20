@@ -2,18 +2,11 @@ package build
 
 import (
 	"context"
-	"errors"
 	"os"
 
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/manifest"
-)
-
-var (
-	ErrBuildFailed         = errors.New("build failed")
-	ErrInvalidResourceType = errors.New("invalid resource type")
-	ErrInvalidPath         = errors.New("invalid path")
 )
 
 const (
@@ -25,6 +18,11 @@ const (
 	Manifestfile = "crucible.yaml"
 )
 
+// Builds the Crucible resource located in the current working directory.
+//
+// It reads the manifest file, selects the appropriate builder based on the
+// resource type, and invokes the build process. The built artifacts are placed
+// in the [Dist] directory.
 func Build(ctx context.Context) error {
 
 	// Load manifest options
@@ -35,7 +33,7 @@ func Build(ctx context.Context) error {
 
 	// Ensure output directory exists (same for all builders)
 	if err := os.MkdirAll(Dist, paths.DefaultDirMode); err != nil {
-		return crex.Wrap(ErrBuildFailed, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	var builder Builder

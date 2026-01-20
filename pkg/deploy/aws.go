@@ -17,20 +17,20 @@ var (
 	ErrGatewayOperation = errors.New("gateway operation failed")
 )
 
-// AWSDeployer implements deployment to AWS (ECS, ECR, ALB).
+// Implements deployment to AWS (ECS, ECR, ALB).
 type AWSDeployer struct {
 	provider config.Provider
 	// TODO: Add AWS SDK clients (ECS, ECR, ELB, etc.)
 }
 
-// NewAWSDeployer creates a new AWS deployer.
+// Creates a new AWS deployer.
 func NewAWSDeployer(provider config.Provider) *AWSDeployer {
 	return &AWSDeployer{
 		provider: provider,
 	}
 }
 
-// Deploy executes a deployment plan on AWS infrastructure.
+// Executes a deployment plan on AWS infrastructure.
 func (d *AWSDeployer) Deploy(ctx context.Context, p *plan.Plan, currentState *plan.State) (*plan.State, error) {
 	// Calculate changes needed
 	changes := d.calculateChanges(p, currentState)
@@ -46,7 +46,7 @@ func (d *AWSDeployer) Deploy(ctx context.Context, p *plan.Plan, currentState *pl
 	return newState, nil
 }
 
-// calculateChanges determines what needs to be added, updated, or removed.
+// Determines what needs to be added, updated, or removed.
 func (d *AWSDeployer) calculateChanges(p *plan.Plan, currentState *plan.State) *ChangeSet {
 	changes := &ChangeSet{
 		ServicesToAdd:    []plan.ResolvedService{},
@@ -111,7 +111,7 @@ func (d *AWSDeployer) calculateChanges(p *plan.Plan, currentState *plan.State) *
 	return changes
 }
 
-// needsUpdate checks if a service needs to be updated.
+// Checks if a service needs to be updated.
 func (d *AWSDeployer) needsUpdate(desired plan.ResolvedService, current plan.DeployedService) bool {
 	// Check if image digest changed
 	if desired.ImageDigest != current.ImageDigest {
@@ -124,7 +124,7 @@ func (d *AWSDeployer) needsUpdate(desired plan.ResolvedService, current plan.Dep
 	return false
 }
 
-// gatewayNeedsUpdate checks if gateway configuration changed.
+// Checks if gateway configuration changed.
 func (d *AWSDeployer) gatewayNeedsUpdate(desired *plan.Gateway, current *plan.DeployedGateway) bool {
 	// Check if routes changed
 	if len(desired.Routes) != len(current.Routes) {
@@ -136,7 +136,7 @@ func (d *AWSDeployer) gatewayNeedsUpdate(desired *plan.Gateway, current *plan.De
 	return false
 }
 
-// executeChanges applies the calculated changes to AWS infrastructure.
+// Applies the calculated changes to AWS infrastructure.
 func (d *AWSDeployer) executeChanges(ctx context.Context, changes *ChangeSet) error {
 	// Remove services first
 	for _, svc := range changes.ServicesToRemove {
@@ -169,7 +169,7 @@ func (d *AWSDeployer) executeChanges(ctx context.Context, changes *ChangeSet) er
 	return nil
 }
 
-// addService deploys a new service to AWS ECS.
+// Deploys a new service to AWS ECS.
 func (d *AWSDeployer) addService(ctx context.Context, svc plan.ResolvedService) error {
 	// TODO: Implement AWS ECS service creation
 	// 1. Push image to ECR (or verify it exists)
@@ -179,7 +179,7 @@ func (d *AWSDeployer) addService(ctx context.Context, svc plan.ResolvedService) 
 	return ErrNotImplemented
 }
 
-// updateService updates an existing service in AWS ECS.
+// Updates an existing service in AWS ECS.
 func (d *AWSDeployer) updateService(ctx context.Context, update ServiceUpdate) error {
 	// TODO: Implement AWS ECS service update
 	// 1. Update task definition with new image
@@ -188,7 +188,7 @@ func (d *AWSDeployer) updateService(ctx context.Context, update ServiceUpdate) e
 	return ErrNotImplemented
 }
 
-// removeService removes a service from AWS ECS.
+// Removes a service from AWS ECS.
 func (d *AWSDeployer) removeService(ctx context.Context, svc plan.DeployedService) error {
 	// TODO: Implement AWS ECS service deletion
 	// 1. Scale service to 0
@@ -197,7 +197,7 @@ func (d *AWSDeployer) removeService(ctx context.Context, svc plan.DeployedServic
 	return ErrNotImplemented
 }
 
-// applyGatewayChanges creates, updates, or deletes the gateway (ALB).
+// Applies gateway changes to AWS ALB.
 func (d *AWSDeployer) applyGatewayChanges(ctx context.Context, changes *GatewayChange) error {
 	// TODO: Implement AWS ALB management
 	// 1. Create/update ALB
@@ -206,7 +206,7 @@ func (d *AWSDeployer) applyGatewayChanges(ctx context.Context, changes *GatewayC
 	return ErrNotImplemented
 }
 
-// buildState constructs the new state from the deployed plan.
+// Builds the new state from the deployed plan.
 func (d *AWSDeployer) buildState(p *plan.Plan, currentState *plan.State) *plan.State {
 	state := &plan.State{
 		Plan:       "", // TODO: Store plan reference/digest
@@ -257,7 +257,7 @@ func (d *AWSDeployer) buildState(p *plan.Plan, currentState *plan.State) *plan.S
 	return state
 }
 
-// ChangeSet represents the changes needed to reach desired state.
+// Represents the changes needed to reach desired state.
 type ChangeSet struct {
 	ServicesToAdd    []plan.ResolvedService
 	ServicesToUpdate []ServiceUpdate
@@ -265,13 +265,13 @@ type ChangeSet struct {
 	GatewayChanges   *GatewayChange
 }
 
-// ServiceUpdate represents a service that needs updating.
+// Represents a service that needs updating.
 type ServiceUpdate struct {
 	Current plan.DeployedService
 	Desired plan.ResolvedService
 }
 
-// GatewayChange represents gateway configuration changes.
+// Represents gateway configuration changes.
 type GatewayChange struct {
 	Action     string // create, update, delete
 	Current    *plan.DeployedGateway

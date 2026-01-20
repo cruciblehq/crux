@@ -7,16 +7,18 @@ import (
 	"github.com/cruciblehq/crux/pkg/config"
 )
 
-// Remove a provider configuration.
+// Represents the 'crux provider remove' command.
 type ProviderRemoveCmd struct {
 	Name string `arg:"" help:"Name of the provider to remove"`
 }
 
-// Run executes the provider remove command.
+// Executes the provider remove command.
 //
 // Removes the specified provider configuration. If the removed provider was
 // the default provider, the default is cleared and a warning is displayed.
 func (c *ProviderRemoveCmd) Run(ctx context.Context) error {
+	slog.Info("removing provider...", "name", c.Name)
+
 	cfg, err := config.LoadProviders()
 	if err != nil {
 		return err
@@ -35,7 +37,7 @@ func (c *ProviderRemoveCmd) Run(ctx context.Context) error {
 	slog.Info("Provider removed successfully", "name", c.Name)
 
 	if wasDefault {
-		slog.Warn("The removed provider was the default provider, so no default provider is set now. Use 'crux provider set-default <name>' to set a new default.", "name", c.Name)
+		slog.Warn("The removed provider was the default provider, so no default provider is now set. Use 'crux provider set-default <name>' to set a new default.", "name", c.Name)
 	}
 
 	return nil
