@@ -8,26 +8,27 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/pkg/crex"
-	"github.com/cruciblehq/crux/pkg/pack"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 	"github.com/cruciblehq/protocol/pkg/registry"
 )
 
 // Options for pushing a package to the Hub registry.
 type PushOptions struct {
-	HubURL   string // Hub registry URL
-	Resource string // Resource identifier (namespace/name)
+	HubURL       string // Hub registry URL
+	Resource     string // Resource identifier (namespace/name)
+	Manifestfile string // Path to the manifest file
+	Package      string // Path to the package archive
 }
 
 // Pushes a resource package to the Hub registry.
 func Push(ctx context.Context, opts PushOptions) error {
 	// Validate package exists
-	if err := validatePackage(); err != nil {
+	if err := validatePackage(opts.Package); err != nil {
 		return err
 	}
 
 	// Load manifest
-	man, err := loadManifest()
+	man, err := loadManifest(opts.Manifestfile)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func Push(ctx context.Context, opts PushOptions) error {
 	}
 
 	// Upload package
-	return uploadPackage(ctx, client, namespace, resourceName, man.Resource.Version)
+	return uploadPackage(ctx, client, namespace, resourceName, man.Resource.Version, opts.Package)
 }
 
 // Validates that the package file exists.
@@ -65,11 +66,11 @@ func Push(ctx context.Context, opts PushOptions) error {
 // The package file is expected to be at the default location. If not found, an
 // error is returned prompting the user to package the resource first. The
 // package's format and integrity are not validated.
-func validatePackage() error {
-	f, err := os.Open(pack.PackageOutput)
+func validatePackage(packageOutput string) error {
+	f, err := os.Open(packageOutput)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return crex.UserError("package not found", fmt.Sprintf("%s does not exist", pack.PackageOutput)).
+			return crex.UserError("package not found", fmt.Sprintf("%s does not exist", packageOutput)).
 				Fallback("Run 'crux pack' first to create the package.").
 				Err()
 		}
@@ -83,8 +84,8 @@ func validatePackage() error {
 //
 // Ensures that crucible.yaml exists and is valid. If not, an error is returned.
 // Returns the loaded manifest on success.
-func loadManifest() (*manifest.Manifest, error) {
-	man, err := manifest.Read(pack.Manifestfile)
+func loadManifest(manifestfile string) (*manifest.Manifest, error) {
+	man, err := manifest.Read(manifestfile)
 	if err != nil {
 		return nil, crex.UserError("failed to read manifest", err.Error()).
 			Fallback("Ensure crucible.yaml exists and is valid.").
@@ -194,8 +195,8 @@ func createVersion(ctx context.Context, client *registry.Client, namespace, reso
 //
 // Opens the package file and uploads it to the specified resource version in
 // the registry.
-func uploadPackage(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
-	archive, err := os.Open(pack.PackageOutput)
+func uploadPackage(ctx context.Context, client *registry.Client, namespace, resource, version, packageOutput string) error {
+	archive, err := os.Open(packageOutput)
 	if err != nil {
 		return crex.Wrap(ErrFileSystemOperation, err)
 	}

@@ -4,7 +4,8 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/pkg/config"
-	"github.com/cruciblehq/crux/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/state"
 )
 
 // Implements deployment to local Docker.
@@ -21,7 +22,7 @@ func NewLocalDeployer(provider config.Provider) *LocalDeployer {
 }
 
 // Executes the deployment plan locally using Docker.
-func (d *LocalDeployer) Deploy(ctx context.Context, p *plan.Plan, currentState *plan.State) (*plan.State, error) {
+func (d *LocalDeployer) Deploy(ctx context.Context, p *plan.Plan, currentState *state.State) (*state.State, error) {
 	// TODO: Implement local Docker deployment
 	// - Start/update Docker containers for services
 	// - Configure local reverse proxy

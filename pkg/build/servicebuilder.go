@@ -31,19 +31,19 @@ func NewServiceBuilder() *ServiceBuilder {
 // Service resources reference pre-built container images. This method validates
 // that the specified image exists and prepares it for packaging by copying it
 // to the standardized dist/ output location (dist/image.tar).
-func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error {
+func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output string) (*Result, error) {
 
 	// Correct manifest type?
 	service, ok := m.Config.(*manifest.Service)
 	if !ok {
-		return crex.ProgrammingError("an internal configuration type mismatch occurred", "unexpected manifest type").
+		return nil, crex.ProgrammingError("an internal configuration type mismatch occurred", "unexpected manifest type").
 			Fallback("Please report this issue to the Crucible team.").
 			Err()
 	}
 
 	// Check if image path is specified
 	if service.Build.Image == "" {
-		return crex.UserError("service image not specified", "no image path in manifest").
+		return nil, crex.UserError("service image not specified", "no image path in manifest").
 			Fallback("Add a build image to your manifest.").
 			Err()
 	}
@@ -52,21 +52,23 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest) error 
 	imagePath := service.Build.Image
 	if err := validateOCIMultiPlatform(imagePath); err != nil {
 		if os.IsNotExist(err) {
-			return crex.UserError("service image not found", "image does not exist at specified path").
+			return nil, crex.UserError("service image not found", "image does not exist at specified path").
 				Cause(err).
 				Fallback("Either the image path is incorrect or the image has not been built yet. Try building your service image first and make sure the image file exists at the specified path.").
 				Err()
 		}
-		return err
+		return nil, err
 	}
 
 	// Copy to standardized output location (always dist/image.tar)
-	destPath := filepath.Join(Dist, ServiceImagePath)
+	destPath := filepath.Join(output, ServiceImagePath)
 	if err := copyFile(imagePath, destPath); err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
+		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
-	return nil
+	return &Result{
+		Output: output,
+	}, nil
 }
 
 // Copies a file from src to dst.

@@ -16,20 +16,20 @@ type DeployCmd struct {
 
 // Executes the deploy command.
 func (c *DeployCmd) Run(ctx context.Context) error {
-	opts := deploy.DeployOptions{
-		PlanPath:     c.Plan,
-		StatePath:    c.State,
+	opts := deploy.Options{
+		Plan:         c.Plan,
+		State:        c.State,
 		ProviderName: c.Provider,
 	}
 
 	slog.Info("deploying plan...", "plan", c.Plan, "state", c.State, "provider", c.Provider)
 
-	result, err := deploy.Execute(ctx, opts)
+	result, err := deploy.Deploy(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	slog.Info("deployment completed successfully", "state", result.OutputPath)
+	slog.Info("deployment completed successfully", "state", result.Output)
 
 	return nil
 }

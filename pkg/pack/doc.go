@@ -9,7 +9,11 @@
 //
 // Example usage:
 //
-//	if err := pack.Pack(ctx); err != nil {
+//	if err := pack.Pack(ctx, pack.PackOptions{
+//	    Manifestfile:  "crucible.yaml",
+//	    Dist:          "dist",
+//	    PackageOutput: "package.tar.zst",
+//	}); err != nil {
 //	    return err
 //	}
 //

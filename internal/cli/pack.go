@@ -18,14 +18,19 @@ type PackCmd struct{}
 // created package.
 func (c *PackCmd) Run(ctx context.Context) error {
 
-	slog.Info("packaging resource...", "output", pack.PackageOutput)
+	slog.Info("packaging resource...", "output", Package)
 
 	// Package the built resource
-	if err := pack.Pack(ctx); err != nil {
+	result, err := pack.Pack(ctx, pack.Options{
+		Manifest: Manifestfile,
+		Dist:     Dist,
+		Output:   Package,
+	})
+	if err != nil {
 		return err
 	}
 
-	slog.Info("package created successfully", "path", pack.PackageOutput)
+	slog.Info("package created successfully", "path", result.Output)
 
 	return nil
 }

@@ -22,33 +22,39 @@ func NewWidgetBuilder() *WidgetBuilder {
 // It converts the manifest options into esbuild build options, invokes
 // esbuild to perform the build, and processes the build result to log
 // messages and handle errors.
-func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest) error {
+func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output string) (*Result, error) {
 
 	// Correct manifest type?
 	widget, ok := m.Config.(*manifest.Widget)
 	if !ok {
-		return crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
+		return nil, crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
 			Fallback("Please report this issue to the Crucible team.").
 			Err()
 	}
 
 	// Convert to esbuild options
-	esOptions, err := esBuildOptionsFromManifest(widget)
+	esOptions, err := esBuildOptionsFromManifest(widget, output)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// esbuild doesn't support context cancellation, so this is the last chance
 	// to abort the build.
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 
 	// Build with esbuild
 	result := es.Build(esOptions)
 
 	// Process build result
-	return processEsBuildResult(result)
+	if err := processEsBuildResult(result); err != nil {
+		return nil, err
+	}
+
+	return &Result{
+		Output: output,
+	}, nil
 }
 
 // Converts [manifest.Widget] options into esbuild's [es.BuildOptions].
@@ -76,7 +82,7 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest) error {
 //
 // Currently, crux builds only for web platforms. If additional platforms are
 // introduced, the build process must run separately for each platform target.
-func esBuildOptionsFromManifest(options *manifest.Widget) (es.BuildOptions, error) {
+func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.BuildOptions, error) {
 
 	// Determine project root
 	projectRoot, err := filepath.Abs(filepath.Dir(options.Build.Main))
@@ -109,7 +115,7 @@ func esBuildOptionsFromManifest(options *manifest.Widget) (es.BuildOptions, erro
 			"react",
 			"react-reconciler",
 		},
-		Outdir:    Dist,
+		Outdir:    dist,
 		Platform:  es.PlatformBrowser,
 		Target:    es.ES2015,
 		Format:    es.FormatESModule,

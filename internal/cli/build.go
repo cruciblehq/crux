@@ -21,11 +21,15 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	slog.Info("building resource...", "watch", c.Watch)
 
 	// Build first (don't wait for changes)
-	if err := build.Build(ctx); err != nil {
+	result, err := build.Build(ctx, build.Options{
+		Manifest: Manifestfile,
+		Output:   Dist,
+	})
+	if err != nil {
 		return err
 	}
 
-	slog.Info("build completed successfully")
+	slog.Info("build completed successfully", "output", result.Output)
 
 	// Watch mode
 	if c.Watch {
@@ -52,7 +56,10 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context) error {
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
 		// Rebuild
-		if err := build.Build(ctx); err != nil {
+		if _, err := build.Build(ctx, build.Options{
+			Manifest: Manifestfile,
+			Output:   Dist,
+		}); err != nil {
 			slog.Error(err.Error())
 			return nil
 		}

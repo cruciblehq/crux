@@ -16,8 +16,10 @@ type PushCmd struct {
 // Executes the push command.
 func (c *PushCmd) Run(ctx context.Context) error {
 	opts := push.PushOptions{
-		HubURL:   c.Hub,
-		Resource: c.Resource,
+		HubURL:       c.Hub,
+		Resource:     c.Resource,
+		Manifestfile: Manifestfile,
+		Package:      Package,
 	}
 
 	slog.Info("pushing package...", "resource", c.Resource, "hub", c.Hub)

@@ -151,6 +151,12 @@ func promptAWSAuthKeys(reader *bufio.Reader) (*config.AWSKeysAuth, error) {
 }
 
 // Prompts the user with a message and returns the input or a default value.
+//
+// This function displays a prompt message to the user and reads their input
+// from the provided bufio.Reader. If a default value is specified, it is shown
+// in brackets. The user can either enter a new value or press Enter to accept
+// the default. If the user provides no input (just presses Enter), the default
+// value is returned. Otherwise, the trimmed user input is returned.
 func promptWithDefault(reader *bufio.Reader, prompt, defaultValue string) string {
 	if defaultValue != "" {
 		fmt.Printf("%s [%s]: ", prompt, defaultValue)

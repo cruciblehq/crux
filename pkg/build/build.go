@@ -9,31 +9,33 @@ import (
 	"github.com/cruciblehq/protocol/pkg/manifest"
 )
 
-const (
+// Options for building a Crucible resource.
+type Options struct {
+	Manifest string // Path to the manifest file.
+	Output   string // Directory where built artifacts are placed.
+}
 
-	// Directory where built artifacts are placed
-	Dist = "dist"
+// Result of building a Crucible resource.
+type Result struct {
+	Output string // Path where the artifacts were written.
+}
 
-	// The path of the manifest file within a Crucible resource project.
-	Manifestfile = "crucible.yaml"
-)
-
-// Builds the Crucible resource located in the current working directory.
+// Builds the Crucible resource.
 //
 // It reads the manifest file, selects the appropriate builder based on the
 // resource type, and invokes the build process. The built artifacts are placed
-// in the [Dist] directory.
-func Build(ctx context.Context) error {
+// in the directory specified by opts.OutputPath.
+func Build(ctx context.Context, opts Options) (*Result, error) {
 
 	// Load manifest options
-	man, err := manifest.Read(Manifestfile)
+	man, err := manifest.Read(opts.Manifest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Ensure output directory exists (same for all builders)
-	if err := os.MkdirAll(Dist, paths.DefaultDirMode); err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
+	if err := os.MkdirAll(opts.Output, paths.DefaultDirMode); err != nil {
+		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
 	var builder Builder
@@ -44,8 +46,13 @@ func Build(ctx context.Context) error {
 	case "service":
 		builder = NewServiceBuilder()
 	default:
-		return ErrInvalidResourceType
+		return nil, ErrInvalidResourceType
 	}
 
-	return builder.Build(ctx, *man)
+	result, err := builder.Build(ctx, *man, opts.Output)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

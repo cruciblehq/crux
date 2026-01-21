@@ -3,7 +3,8 @@ package deploy
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/state"
 )
 
 // Interface for deploying plans to different cloud providers.
@@ -13,5 +14,5 @@ type Deployer interface {
 	//
 	// The plan 'p' contains the desired state to deploy. If currentState is
 	// provided, performs an incremental deployment.
-	Deploy(ctx context.Context, p *plan.Plan, currentState *plan.State) (*plan.State, error)
+	Deploy(ctx context.Context, p *plan.Plan, currentState *state.State) (*state.State, error)
 }

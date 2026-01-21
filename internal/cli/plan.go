@@ -15,19 +15,19 @@ type PlanCmd struct {
 
 // Executes the plan command.
 func (c *PlanCmd) Run(ctx context.Context) error {
-	opts := plan.PlanOptions{
-		BlueprintPath: c.Blueprint,
-		StatePath:     c.State,
+	opts := plan.Options{
+		Blueprint: c.Blueprint,
+		State:     c.State,
 	}
 
 	slog.Info("generating deployment plan...", "blueprint", c.Blueprint, "state", c.State)
 
-	_, _, err := plan.Generate(ctx, opts)
+	result, err := plan.Plan(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	slog.Info("deployment plan generated successfully")
+	slog.Info("deployment plan generated successfully", "output", result.Output)
 
 	return nil
 }

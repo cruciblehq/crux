@@ -1,77 +1,127 @@
 package plan
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/cruciblehq/protocol/pkg/codec"
+	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/crux/pkg/paths"
+	"github.com/cruciblehq/protocol/pkg/blueprint"
+	"github.com/cruciblehq/protocol/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/state"
 )
 
-// Represents a resolved deployment plan.
-type Plan struct {
-	CreatedAt time.Time         `field:"created_at"`
-	Services  []ResolvedService `field:"services"`
-	Widgets   []ResolvedWidget  `field:"widgets"`
-	Gateway   *Gateway          `field:"gateway"`
+// Options for generating a deployment plan.
+type Options struct {
+	Blueprint string // Path to blueprint file.
+	State     string // Path to existing state for incremental planning (optional).
+	Output    string // Output path for plan file (optional).
 }
 
-// Represents a service with all references resolved.
-type ResolvedService struct {
-	Reference   string      `field:"reference"`
-	Resolved    string      `field:"resolved"`
-	Prefix      string      `field:"prefix"`
-	ImageDigest string      `field:"image_digest"`
-	Deployment  *Deployment `field:"deployment"`
+// Result of generating a deployment plan.
+type Result struct {
+	Plan   *plan.Plan // The generated plan.
+	Output string     // Path where the plan was written.
 }
 
-// Deployment contains target-specific deployment info.
-type Deployment struct {
-	Type      string               `field:"type"`
-	Container *ContainerDeployment `field:"container"`
-}
+// Generates a deployment plan from a blueprint.
+func Plan(ctx context.Context, opts Options) (*Result, error) {
 
-// ContainerDeployment defines Docker container deployment.
-type ContainerDeployment struct {
-	Name  string `field:"name"`
-	Port  int    `field:"port"`
-	Image string `field:"image"`
-}
+	// Read blueprint
+	bp, err := blueprint.Read(opts.Blueprint)
+	if err != nil {
+		return nil, crex.UserError("invalid blueprint", err.Error()).
+			Fallback("Ensure the blueprint file exists and is valid.").
+			Err()
+	}
 
-// ResolvedWidget is a widget with references resolved.
-type ResolvedWidget struct {
-	Reference string `field:"reference"`
-	Resolved  string `field:"resolved"`
-	Name      string `field:"name"`
-	Bundle    string `field:"bundle"`
-}
+	// Read existing state if provided
+	var st *state.State
+	if opts.State != "" {
+		st, err = state.Read(opts.State)
+		if err != nil {
+			return nil, crex.UserError("invalid state file", err.Error()).
+				Fallback("Ensure the state file exists and is valid.").
+				Err()
+		}
+	}
 
-// Gateway defines API gateway configuration.
-type Gateway struct {
-	Type   string         `field:"type"`
-	Listen string         `field:"listen"`
-	Routes []GatewayRoute `field:"routes"`
-}
-
-// GatewayRoute maps a prefix to a service.
-type GatewayRoute struct {
-	Prefix   string `field:"prefix"`
-	Upstream string `field:"upstream"`
-	Service  string `field:"service"`
-}
-
-// Saves the plan to a file.
-//
-// The file format is inferred from the path extension (.json, .yaml, .toml).
-func (p *Plan) Write(path string) error {
-	return codec.EncodeFile(path, "field", p)
-}
-
-// Read loads a plan from a file.
-//
-// The file format is inferred from the path extension (.json, .yaml, .toml).
-func Read(path string) (*Plan, error) {
-	var p Plan
-	if _, err := codec.DecodeFile(path, "field", &p); err != nil {
+	// Generate plan
+	p, err := build(ctx, bp, opts.Blueprint, st)
+	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+
+	// Determine output path
+	output, err := determineOutputPath(opts.Output, opts.Blueprint)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write plan
+	if err := p.Write(output); err != nil {
+		return nil, err
+	}
+
+	return &Result{
+		Plan:   p,
+		Output: output,
+	}, nil
+}
+
+// Determines the output path for the plan file.
+// If outputPath is provided, it is used. Otherwise, a timestamped path is generated.
+func determineOutputPath(outputPath, blueprintPath string) (string, error) {
+	if outputPath != "" {
+		return outputPath, nil
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	dir := filepath.Dir(blueprintPath)
+	plansDir := filepath.Join(dir, "dist", "plans")
+	if err := os.MkdirAll(plansDir, paths.DefaultDirMode); err != nil {
+		return "", err
+	}
+	return filepath.Join(plansDir, fmt.Sprintf("plan-%s.json", timestamp)), nil
+}
+
+// Generates a plan from a blueprint.
+// If state is provided, generates an incremental plan based on current deployment state.
+func build(ctx context.Context, bp *blueprint.Blueprint, blueprintPath string, st *state.State) (*plan.Plan, error) {
+	p := &plan.Plan{
+		Version:  1,
+		Services: make([]plan.Service, 0, len(bp.Services)),
+		Gateway: plan.Gateway{
+			Routes: make([]plan.Route, 0, len(bp.Services)),
+		},
+		Infrastructure: plan.Infrastructure{
+			Provider: "local", // TODO: Determine provider from config
+		},
+	}
+
+	// For now, just create a simple plan for local Docker deployment
+	// TODO: Actually resolve references, fetch manifests, validate, etc.
+
+	for _, svc := range bp.Services {
+		// TODO: Parse reference string into reference.Reference
+		// TODO: Resolve version constraint to exact version + digest
+		// For now, create a placeholder service with empty Reference
+		service := plan.Service{
+			ID: svc.ID, // Use ID from blueprint
+			// Reference: will be populated when resolution is implemented
+		}
+		p.Services = append(p.Services, service)
+
+		// Create gateway route
+		route := plan.Route{
+			Pattern:   svc.Prefix + "/*", // Add wildcard for all sub-paths
+			ServiceID: svc.ID,
+		}
+		p.Gateway.Routes = append(p.Gateway.Routes, route)
+	}
+
+	return p, nil
 }

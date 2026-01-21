@@ -58,4 +58,4 @@ coverage.html
 *.pid
 
 # Test artifacts
-testdata/**/output/
+testdata/**/dist/
