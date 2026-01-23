@@ -12,12 +12,12 @@ import (
 
 // Implements deployment to AWS (ECS, ECR, ALB).
 type AWSDeployer struct {
-	provider config.Provider
+	provider *config.Provider
 	// TODO: Add AWS SDK clients (ECS, ECR, ELB, etc.)
 }
 
 // Creates a new AWS deployer.
-func NewAWSDeployer(provider config.Provider) *AWSDeployer {
+func NewAWSDeployer(provider *config.Provider) *AWSDeployer {
 	return &AWSDeployer{
 		provider: provider,
 	}

@@ -16,10 +16,10 @@ import (
 
 // Options for executing a deployment.
 type Options struct {
-	Plan         string // Path to plan file.
-	State        string // Optional path to existing state for incremental deployment.
-	Output       string // Optional output path for state file.
-	ProviderName string // Optional provider configuration name (uses default if empty).
+	Plan     string // Path to plan file.
+	State    string // Optional path to existing state for incremental deployment.
+	Output   string // Optional output path for state file.
+	Provider string // Optional provider configuration name (uses default if empty).
 }
 
 // Result of a deployment execution.
@@ -31,7 +31,7 @@ type Result struct {
 // Deploy executes a deployment plan.
 func Deploy(ctx context.Context, opts Options) (*Result, error) {
 	// Load provider configuration
-	providerConfig, err := loadProviderConfig(opts.ProviderName)
+	providerConfig, err := loadProviderConfig(opts.Provider)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +87,10 @@ func Deploy(ctx context.Context, opts Options) (*Result, error) {
 }
 
 // Loads the provider configuration.
-func loadProviderConfig(providerName string) (config.Provider, error) {
+func loadProviderConfig(providerName string) (*config.Provider, error) {
 	cfg, err := config.LoadProviders()
 	if err != nil {
-		return config.Provider{}, err
+		return nil, err
 	}
 
 	if providerName != "" {
@@ -101,13 +101,13 @@ func loadProviderConfig(providerName string) (config.Provider, error) {
 	// Use default provider
 	provider, err := cfg.GetDefault()
 	if err != nil {
-		return config.Provider{}, fmt.Errorf("%w: run 'crux provider add <name>' to configure a provider", config.ErrProviderNotFound)
+		return nil, fmt.Errorf("%w: run 'crux provider add <name>' to configure a provider", config.ErrProviderNotFound)
 	}
 	return provider, nil
 }
 
 // Creates the appropriate deployer based on provider.
-func createDeployer(provider config.Provider) (Deployer, error) {
+func createDeployer(provider *config.Provider) (Deployer, error) {
 	switch provider.Type {
 	case "aws":
 		return NewAWSDeployer(provider), nil

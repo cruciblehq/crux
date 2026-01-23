@@ -17,9 +17,9 @@ type DeployCmd struct {
 // Executes the deploy command.
 func (c *DeployCmd) Run(ctx context.Context) error {
 	opts := deploy.Options{
-		Plan:         c.Plan,
-		State:        c.State,
-		ProviderName: c.Provider,
+		Plan:     c.Plan,
+		State:    c.State,
+		Provider: c.Provider,
 	}
 
 	slog.Info("deploying plan...", "plan", c.Plan, "state", c.State, "provider", c.Provider)

@@ -53,14 +53,14 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 	if err := validateOCIMultiPlatform(imagePath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, crex.UserError("service image not found", "image does not exist at specified path").
-				Cause(err).
 				Fallback("Either the image path is incorrect or the image has not been built yet. Try building your service image first and make sure the image file exists at the specified path.").
+				Cause(err).
 				Err()
 		}
 		return nil, err
 	}
 
-	// Copy to standardized output location (always dist/image.tar)
+	// Copy to standardized output location
 	destPath := filepath.Join(output, ServiceImagePath)
 	if err := copyFile(imagePath, destPath); err != nil {
 		return nil, crex.Wrap(ErrFileSystemOperation, err)

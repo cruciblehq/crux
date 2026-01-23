@@ -9,6 +9,7 @@ import (
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/archive"
 	"github.com/cruciblehq/protocol/pkg/manifest"
+	"github.com/cruciblehq/protocol/pkg/resource"
 )
 
 // Options for packaging a Crucible resource.
@@ -49,8 +50,8 @@ func Pack(ctx context.Context, opts Options) (*Result, error) {
 	mismatch := crex.ProgrammingError("pack failed", "manifest config type mismatch").
 		Fallback("Please report this issue to the Crucible team.")
 
-	switch man.Resource.Type {
-	case "widget":
+	switch resource.Type(man.Resource.Type) {
+	case resource.TypeWidget:
 		widget, ok := man.Config.(*manifest.Widget)
 		if !ok {
 			return nil, mismatch.Err()
@@ -61,7 +62,7 @@ func Pack(ctx context.Context, opts Options) (*Result, error) {
 				Err()
 		}
 
-	case "service":
+	case resource.TypeService:
 		service, ok := man.Config.(*manifest.Service)
 		if !ok {
 			return nil, mismatch.Err()

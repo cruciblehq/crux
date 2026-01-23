@@ -7,6 +7,7 @@ import (
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/manifest"
+	"github.com/cruciblehq/protocol/pkg/resource"
 )
 
 // Options for building a Crucible resource.
@@ -40,10 +41,10 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 
 	var builder Builder
 
-	switch man.Resource.Type {
-	case "widget":
+	switch resource.Type(man.Resource.Type) {
+	case resource.TypeWidget:
 		builder = NewWidgetBuilder()
-	case "service":
+	case resource.TypeService:
 		builder = NewServiceBuilder()
 	default:
 		return nil, ErrInvalidResourceType

@@ -14,10 +14,10 @@ import (
 
 // Options for pushing a package to the Hub registry.
 type PushOptions struct {
-	HubURL       string // Hub registry URL
-	Resource     string // Resource identifier (namespace/name)
-	Manifestfile string // Path to the manifest file
-	Package      string // Path to the package archive
+	Registry     string // Hub registry URL.
+	Resource     string // Resource identifier (namespace/name).
+	Manifestfile string // Path to the manifest file.
+	Package      string // Path to the package archive.
 }
 
 // Pushes a resource package to the Hub registry.
@@ -40,7 +40,7 @@ func Push(ctx context.Context, opts PushOptions) error {
 	}
 
 	// Create registry client
-	client := registry.NewClient(opts.HubURL, nil)
+	client := registry.NewClient(opts.Registry, nil)
 
 	// Verify namespace exists
 	if err := verifyNamespace(ctx, client, namespace); err != nil {

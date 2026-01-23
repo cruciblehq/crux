@@ -10,12 +10,12 @@ import (
 
 // Implements deployment to local Docker.
 type LocalDeployer struct {
-	provider config.Provider
+	provider *config.Provider
 	// TODO: Add Docker client
 }
 
 // Creates a new local deployer.
-func NewLocalDeployer(provider config.Provider) *LocalDeployer {
+func NewLocalDeployer(provider *config.Provider) *LocalDeployer {
 	return &LocalDeployer{
 		provider: provider,
 	}

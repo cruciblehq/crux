@@ -15,6 +15,9 @@ var (
 
 	// Provider names must be alphanumeric with hyphens or underscores
 	providerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+
+	// Maximum length for provider names
+	maxProviderNameLength = 64
 )
 
 // Specifies the type of cloud provider.
@@ -57,7 +60,7 @@ func ValidateProviderName(name string) error {
 			Err()
 	}
 
-	if len(name) > 64 {
+	if len(name) > maxProviderNameLength {
 		return crex.UserError(invalidProviderNameErrMsg, "provider name cannot exceed 64 characters").
 			Fallback("Please choose a shorter name.").
 			Err()
@@ -124,6 +127,18 @@ func LoadProviders() (*ProvidersConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// Gets a provider by name, or the default provider if name is empty.
+//
+// If name is empty and no default is set, returns an error. If name is provided
+// but the provider does not exist, returns an error.
+func GetOrDefaultProvider(name string) (*Provider, error) {
+	config, err := LoadProviders()
+	if err != nil {
+		return nil, err
+	}
+	return config.GetOrDefault(name)
 }
 
 // Writes the providers configuration to disk.
@@ -199,21 +214,21 @@ func (c *ProvidersConfig) RemoveProvider(name string) error {
 // Gets a provider by name.
 //
 // Returns the provider configuration or an error if the provider does not exist.
-func (c *ProvidersConfig) GetProvider(name string) (Provider, error) {
+func (c *ProvidersConfig) GetProvider(name string) (*Provider, error) {
 	provider, exists := c.Providers[name]
 	if !exists {
-		return Provider{}, ErrProviderNotFound
+		return nil, ErrProviderNotFound
 	}
-	return provider, nil
+	return &provider, nil
 }
 
 // Gets the default provider.
 //
 // Returns the default provider configuration or an error if no default is set.
 // The provider with the given name must exist, otherwise an error is returned.
-func (c *ProvidersConfig) GetDefault() (Provider, error) {
+func (c *ProvidersConfig) GetDefault() (*Provider, error) {
 	if c.Default == "" {
-		return Provider{}, ErrProviderNotFound
+		return nil, ErrProviderNotFound
 	}
 	return c.GetProvider(c.Default)
 }
@@ -234,7 +249,7 @@ func (c *ProvidersConfig) SetDefault(name string) error {
 //
 // If name is empty and no default is set, returns an error. If name is provided
 // but the provider does not exist, returns an error.
-func (c *ProvidersConfig) GetOrDefault(name string) (Provider, error) {
+func (c *ProvidersConfig) GetOrDefault(name string) (*Provider, error) {
 	if name == "" {
 		return c.GetDefault()
 	}

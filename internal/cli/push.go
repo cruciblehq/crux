@@ -4,25 +4,31 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/pkg/push"
 )
 
 // Represents the 'crux push' command.
 type PushCmd struct {
-	Hub      string `help:"Hub registry URL." default:"http://hub.cruciblehq.xyz:8080"`
+	Registry string `help:"Hub registry URL (default: http://hub.cruciblehq.xyz:8080)."`
 	Resource string `arg:"" help:"Resource to push (namespace/name)."`
 }
 
 // Executes the push command.
 func (c *PushCmd) Run(ctx context.Context) error {
-	opts := push.PushOptions{
-		HubURL:       c.Hub,
-		Resource:     c.Resource,
-		Manifestfile: Manifestfile,
-		Package:      Package,
+	registry := c.Registry
+	if registry == "" {
+		registry = internal.DefaultRegistryURL
 	}
 
-	slog.Info("pushing package...", "resource", c.Resource, "hub", c.Hub)
+	opts := push.PushOptions{
+		Registry:     registry,
+		Resource:     c.Resource,
+		Manifestfile: internal.Manifestfile,
+		Package:      internal.Package,
+	}
+
+	slog.Info("pushing package...", "resource", c.Resource, "registry", registry)
 
 	if err := push.Push(ctx, opts); err != nil {
 		return err

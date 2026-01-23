@@ -7,11 +7,25 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cruciblehq/crux/pkg/config"
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/blueprint"
 	"github.com/cruciblehq/protocol/pkg/plan"
+	"github.com/cruciblehq/protocol/pkg/registry"
 	"github.com/cruciblehq/protocol/pkg/state"
+)
+
+const (
+
+	// Directory for plan outputs relative to blueprint location.
+	planOutputDir = "dist/plans"
+
+	// Timestamp format for plan filenames.
+	timestampFormat = "20060102-150405"
+
+	// Current supported plan version.
+	Version = 1
 )
 
 // Options for generating a deployment plan.
@@ -19,6 +33,8 @@ type Options struct {
 	Blueprint string // Path to blueprint file.
 	State     string // Path to existing state for incremental planning (optional).
 	Output    string // Output path for plan file (optional).
+	Registry  string // Registry URL for resolving references.
+	Provider  string // Provider profile name (empty = default).
 }
 
 // Result of generating a deployment plan.
@@ -28,6 +44,10 @@ type Result struct {
 }
 
 // Generates a deployment plan from a blueprint.
+//
+// If state is provided, generates an incremental plan based on current
+// deployment state. The generated plan is written to the specified output path
+// or to a default location if no output path is provided.
 func Plan(ctx context.Context, opts Options) (*Result, error) {
 
 	// Read blueprint
@@ -49,8 +69,16 @@ func Plan(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 
+	// Load provider configuration
+	provider, err := config.GetOrDefaultProvider(opts.Provider)
+	if err != nil {
+		return nil, crex.UserError("provider not found", err.Error()).
+			Fallback("Run 'crux provider list' to see configured providers or 'crux provider add' to add one.").
+			Err()
+	}
+
 	// Generate plan
-	p, err := build(ctx, bp, opts.Blueprint, st)
+	p, err := build(ctx, bp, st, opts.Registry, provider.Type)
 	if err != nil {
 		return nil, err
 	}
@@ -73,54 +101,47 @@ func Plan(ctx context.Context, opts Options) (*Result, error) {
 }
 
 // Determines the output path for the plan file.
-// If outputPath is provided, it is used. Otherwise, a timestamped path is generated.
+//
+// If outputPath is provided, it is used. Otherwise, a path based on the current
+// timestamp and blueprint location is generated.
 func determineOutputPath(outputPath, blueprintPath string) (string, error) {
 	if outputPath != "" {
 		return outputPath, nil
 	}
 
-	timestamp := time.Now().Format("20060102-150405")
+	timestamp := time.Now().Format(timestampFormat)
 	dir := filepath.Dir(blueprintPath)
-	plansDir := filepath.Join(dir, "dist", "plans")
+	plansDir := filepath.Join(dir, planOutputDir)
 	if err := os.MkdirAll(plansDir, paths.DefaultDirMode); err != nil {
 		return "", err
 	}
-	return filepath.Join(plansDir, fmt.Sprintf("plan-%s.json", timestamp)), nil
+	return filepath.Join(plansDir, fmt.Sprintf("plan-%s%s", timestamp, ".json")), nil
 }
 
 // Generates a plan from a blueprint.
-// If state is provided, generates an incremental plan based on current deployment state.
-func build(ctx context.Context, bp *blueprint.Blueprint, blueprintPath string, st *state.State) (*plan.Plan, error) {
+//
+// Transforms a blueprint containing symbolic service references into a concrete
+// deployment plan with frozen references. Groups services by namespace and name,
+// intersects version constraints when multiple instances reference the same service,
+// and resolves each reference to a specific version with digest by querying the
+// registry. When state is provided, the function compares against the current
+// deployment to enable incremental planning.
+func build(ctx context.Context, bp *blueprint.Blueprint, st *state.State, registryURL string, providerType config.ProviderType) (*plan.Plan, error) {
 	p := &plan.Plan{
-		Version:  1,
+		Version:  Version,
 		Services: make([]plan.Service, 0, len(bp.Services)),
 		Gateway: plan.Gateway{
 			Routes: make([]plan.Route, 0, len(bp.Services)),
 		},
 		Infrastructure: plan.Infrastructure{
-			Provider: "local", // TODO: Determine provider from config
+			Provider: string(providerType),
 		},
 	}
 
-	// For now, just create a simple plan for local Docker deployment
-	// TODO: Actually resolve references, fetch manifests, validate, etc.
+	registryClient := registry.NewClient(registryURL, nil)
 
-	for _, svc := range bp.Services {
-		// TODO: Parse reference string into reference.Reference
-		// TODO: Resolve version constraint to exact version + digest
-		// For now, create a placeholder service with empty Reference
-		service := plan.Service{
-			ID: svc.ID, // Use ID from blueprint
-			// Reference: will be populated when resolution is implemented
-		}
-		p.Services = append(p.Services, service)
-
-		// Create gateway route
-		route := plan.Route{
-			Pattern:   svc.Prefix + "/*", // Add wildcard for all sub-paths
-			ServiceID: svc.ID,
-		}
-		p.Gateway.Routes = append(p.Gateway.Routes, route)
+	if err := resolveServiceReferences(ctx, bp, st, registryClient, p); err != nil {
+		return nil, err
 	}
 
 	return p, nil
