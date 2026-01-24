@@ -26,6 +26,9 @@ const (
 
 	// Current supported plan version.
 	Version = 1
+
+	// Default compute instance type for all deployments.
+	DefaultInstanceType = "t3.micro"
 )
 
 // Options for generating a deployment plan.
@@ -128,21 +131,28 @@ func determineOutputPath(outputPath, blueprintPath string) (string, error) {
 // deployment to enable incremental planning.
 func build(ctx context.Context, bp *blueprint.Blueprint, st *state.State, registryURL string, providerType config.ProviderType) (*plan.Plan, error) {
 	p := &plan.Plan{
-		Version:  Version,
-		Services: make([]plan.Service, 0, len(bp.Services)),
+		Version:      Version,
+		Services:     make([]plan.Service, 0, len(bp.Services)),
+		Compute:      make([]plan.Compute, 0, 1),
+		Environments: make([]plan.Environment, 0),
+		Bindings:     make([]plan.Binding, 0, len(bp.Services)),
 		Gateway: plan.Gateway{
 			Routes: make([]plan.Route, 0, len(bp.Services)),
-		},
-		Infrastructure: plan.Infrastructure{
-			Provider: string(providerType),
 		},
 	}
 
 	registryClient := registry.NewClient(registryURL, nil)
 
+	// Resolve all service references
 	if err := resolveServiceReferences(ctx, bp, st, registryClient, p); err != nil {
 		return nil, err
 	}
+
+	// Allocate compute resources
+	allocateCompute(p, string(providerType))
+
+	// Create bindings between services and compute
+	bind(p)
 
 	return p, nil
 }

@@ -44,25 +44,6 @@ func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *
 	return nil
 }
 
-// Adds a service to the plan.
-//
-// Creates a service entry with the frozen reference and adds it to the plan
-// along with a corresponding gateway route. The route maps the service's prefix
-// path to the service instance, allowing the gateway to forward requests.
-func addServiceToPlan(svc *blueprint.Service, frozenRef *reference.Reference, p *plan.Plan) {
-	service := plan.Service{
-		ID:        svc.ID,
-		Reference: *frozenRef,
-	}
-	p.Services = append(p.Services, service)
-
-	route := plan.Route{
-		Pattern:   svc.Prefix,
-		ServiceID: svc.ID,
-	}
-	p.Gateway.Routes = append(p.Gateway.Routes, route)
-}
-
 // Resolves a reference to a frozen reference with digest.
 //
 // Takes a reference from the blueprint (which may use version constraints or
@@ -193,4 +174,25 @@ func tryParseMatchingVersion(v registry.VersionSummary, constraint *reference.Ve
 	}
 
 	return parsedVersion
+}
+
+// Adds a service to the plan.
+//
+// Creates a service entry with the frozen reference and adds it to the plan
+// along with a corresponding gateway route. The route maps the service's prefix
+// path to the service instance, allowing the gateway to forward requests.
+func addServiceToPlan(svc *blueprint.Service, frozenRef *reference.Reference, p *plan.Plan) {
+	service := plan.Service{
+		ID:        svc.ID,
+		Reference: *frozenRef,
+	}
+	p.Services = append(p.Services, service)
+
+	route := plan.Route{
+		Pattern: svc.Prefix,
+		Service: svc.ID,
+	}
+
+	// Service routes are added to the gateway
+	p.Gateway.Routes = append(p.Gateway.Routes, route)
 }
