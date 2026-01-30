@@ -387,7 +387,7 @@ func TestProvidersConfig_SaveLoad(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(testPath), 0755); err != nil {
 		t.Fatalf("Failed to create test dir: %v", err)
 	}
-	if err := codec.EncodeFile(testPath, "field", original); err != nil {
+	if err := codec.EncodeFile(testPath, "field", false, original); err != nil {
 		t.Fatalf("Failed to encode config: %v", err)
 	}
 

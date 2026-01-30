@@ -19,11 +19,16 @@ import (
 // Each service is resolved independently to a frozen reference (with digest).
 // The resolution queries the registry to find the latest matching version for
 // version constraints or follows channel pointers to specific versions.
-func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *state.State, registryClient *registry.Client, p *plan.Plan) error {
+func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *state.State, registryClient *registry.Client, registryHost string, p *plan.Plan) error {
+	slog.Info("resolving service references", "registryHost", registryHost, "serviceCount", len(bp.Services))
 	for i := range bp.Services {
 		service := &bp.Services[i]
 
-		ref, err := reference.Parse(service.Reference, resource.TypeService, nil)
+		opts := &reference.IdentifierOptions{
+			DefaultRegistry: registryHost,
+		}
+
+		ref, err := reference.Parse(service.Reference, resource.TypeService, opts)
 		if err != nil {
 			return crex.UserError("invalid service reference in blueprint", fmt.Sprintf("cannot parse reference '%s'", service.Reference)).
 				Fallback("Ensure the service reference follows the expected format.").
@@ -38,7 +43,9 @@ func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *
 				Err()
 		}
 
-		addServiceToPlan(service, frozenRef, p)
+		if err := addServiceToPlan(service, frozenRef, p); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -106,7 +113,12 @@ func resolveVersion(ctx context.Context, client *registry.Client, ref *reference
 // Constructs a frozen reference directly from components, avoiding the overhead
 // of string formatting and parsing.
 func buildFrozenReference(ref *reference.Reference, namespace, resourceName string, version *registry.Version) (*reference.Reference, error) {
-	id := reference.NewIdentifier(ref.Type(), namespace, resourceName)
+	id := reference.NewIdentifier(
+		ref.Type(),
+		ref.Registry(),
+		namespace,
+		resourceName,
+	)
 
 	digest, err := reference.ParseDigest(*version.Digest)
 	if err != nil {
@@ -181,10 +193,16 @@ func tryParseMatchingVersion(v registry.VersionSummary, constraint *reference.Ve
 // Creates a service entry with the frozen reference and adds it to the plan
 // along with a corresponding gateway route. The route maps the service's prefix
 // path to the service instance, allowing the gateway to forward requests.
-func addServiceToPlan(svc *blueprint.Service, frozenRef *reference.Reference, p *plan.Plan) {
+func addServiceToPlan(svc *blueprint.Service, frozenRef *reference.Reference, p *plan.Plan) error {
+	if svc.ID == "" {
+		return crex.UserError("invalid service in blueprint", "service ID is required").
+			Fallback("Add an 'id' field to each service in the blueprint.").
+			Err()
+	}
+
 	service := plan.Service{
 		ID:        svc.ID,
-		Reference: *frozenRef,
+		Reference: frozenRef.String(),
 	}
 	p.Services = append(p.Services, service)
 
@@ -195,4 +213,5 @@ func addServiceToPlan(svc *blueprint.Service, frozenRef *reference.Reference, p 
 
 	// Service routes are added to the gateway
 	p.Gateway.Routes = append(p.Gateway.Routes, route)
+	return nil
 }

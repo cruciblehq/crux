@@ -23,7 +23,6 @@ var RootCmd struct {
 	Pack     PackCmd     `cmd:"" help:"Package a built resource for distribution."`
 	Push     PushCmd     `cmd:"" help:"Push a resource package to the Hub registry."`
 	Plan     PlanCmd     `cmd:"" help:"Generate a deployment plan from a blueprint."`
-	Deploy   DeployCmd   `cmd:"" help:"Deploy a blueprint using a plan."`
 	Provider ProviderCmd `cmd:"" help:"Manage cloud provider configurations."`
 	Version  VersionCmd  `cmd:"" help:"Show version information."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`

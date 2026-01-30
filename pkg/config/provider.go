@@ -156,7 +156,7 @@ func (c *ProvidersConfig) Save() error {
 	}
 
 	// Write config with restricted permissions (user only)
-	if err := codec.EncodeFile(configPath, "field", c); err != nil {
+	if err := codec.EncodeFile(configPath, "field", false, c); err != nil {
 		return err
 	}
 

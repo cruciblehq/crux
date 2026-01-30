@@ -14,6 +14,7 @@ type PlanCmd struct {
 	State     string `optional:"" help:"Path to existing state file for incremental planning"`
 	Registry  string `help:"Registry URL for resolving references (default: http://hub.cruciblehq.xyz:8080)."`
 	Provider  string `help:"Provider profile name (empty = default)"`
+	Pretty    bool   `help:"Pretty print JSON output"`
 }
 
 // Executes the plan command.
@@ -28,6 +29,7 @@ func (c *PlanCmd) Run(ctx context.Context) error {
 		State:     c.State,
 		Registry:  registry,
 		Provider:  c.Provider,
+		Pretty:    c.Pretty,
 	}
 
 	slog.Info("generating deployment plan...", "blueprint", c.Blueprint, "state", c.State)

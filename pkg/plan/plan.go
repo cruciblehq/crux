@@ -26,9 +26,6 @@ const (
 
 	// Current supported plan version.
 	Version = 1
-
-	// Default compute instance type for all deployments.
-	DefaultInstanceType = "t3.micro"
 )
 
 // Options for generating a deployment plan.
@@ -38,6 +35,7 @@ type Options struct {
 	Output    string // Output path for plan file (optional).
 	Registry  string // Registry URL for resolving references.
 	Provider  string // Provider profile name (empty = default).
+	Pretty    bool   // Pretty print JSON output.
 }
 
 // Result of generating a deployment plan.
@@ -93,7 +91,7 @@ func Plan(ctx context.Context, opts Options) (*Result, error) {
 	}
 
 	// Write plan
-	if err := p.Write(output); err != nil {
+	if err := p.Write(output, opts.Pretty); err != nil {
 		return nil, err
 	}
 
@@ -144,12 +142,12 @@ func build(ctx context.Context, bp *blueprint.Blueprint, st *state.State, regist
 	registryClient := registry.NewClient(registryURL, nil)
 
 	// Resolve all service references
-	if err := resolveServiceReferences(ctx, bp, st, registryClient, p); err != nil {
+	if err := resolveServiceReferences(ctx, bp, st, registryClient, registryURL, p); err != nil {
 		return nil, err
 	}
 
 	// Allocate compute resources
-	allocateCompute(p, string(providerType))
+	allocateCompute(p, providerType, string(providerType))
 
 	// Create bindings between services and compute
 	bind(p)

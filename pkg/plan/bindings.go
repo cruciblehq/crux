@@ -10,7 +10,7 @@ import (
 // its own binding entry, enabling the deployment system to provision all
 // services on the same infrastructure.
 func bind(p *plan.Plan) {
-	computeID := "main-compute"
+	computeID := DefaultComputeID
 
 	for _, service := range p.Services {
 		binding := plan.Binding{
