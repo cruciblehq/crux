@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -21,6 +22,11 @@ import (
 // version constraints or follows channel pointers to specific versions.
 func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *state.State, registryClient *registry.Client, registryHost string, p *plan.Plan) error {
 	slog.Info("resolving service references", "registryHost", registryHost, "serviceCount", len(bp.Services))
+
+	if st != nil {
+		slog.Warn("service reference resolution does not currently support incremental planning; ignoring existing state")
+	}
+
 	for i := range bp.Services {
 		service := &bp.Services[i]
 
@@ -57,55 +63,32 @@ func resolveServiceReferences(ctx context.Context, bp *blueprint.Blueprint, st *
 // channels) and resolves it against the registry to determine the exact version
 // with digest. Returns an error if the reference cannot be resolved.
 func resolveReference(ctx context.Context, client *registry.Client, ref *reference.Reference) (*reference.Reference, error) {
-	namespace := ref.Namespace()
-	resourceName := ref.Name()
-
-	selectedVersion, err := resolveVersion(ctx, client, ref, namespace, resourceName)
+	selectedVersion, err := registry.ResolveVersion(ctx, client, ref)
 	if err != nil {
-		return nil, err
+		return nil, wrapResolveError(err)
 	}
 
 	if selectedVersion.Digest == nil {
 		return nil, ErrMissingDigest
 	}
 
-	return buildFrozenReference(ref, namespace, resourceName, selectedVersion)
+	return buildFrozenReference(ref, ref.Namespace(), ref.Name(), selectedVersion)
 }
 
-// Resolves a reference to a specific version.
-//
-// For channel-based references, follows the channel to get the version. For
-// version-constrained references, finds the latest version matching the constraint.
-func resolveVersion(ctx context.Context, client *registry.Client, ref *reference.Reference, namespace, resourceName string) (*registry.Version, error) {
-	if ref.IsChannelBased() {
-		channelName := *ref.Channel()
-		channel, err := client.ReadChannel(ctx, namespace, resourceName, channelName)
-		if err != nil {
-			return nil, crex.Wrap(ErrChannelNotFound, err)
-		}
-		return &channel.Version, nil
+// Wraps resolution errors with plan-specific sentinel errors for context.
+func wrapResolveError(err error) error {
+	// Check for local resolution errors (from ResolveVersion)
+	if errors.Is(err, registry.ErrNoVersions) || errors.Is(err, registry.ErrNoMatchingVersion) {
+		return crex.Wrap(ErrNoMatchingVersion, err)
 	}
 
-	versions, err := client.ListVersions(ctx, namespace, resourceName)
-	if err != nil {
-		return nil, crex.Wrap(ErrCannotListVersions, err)
+	// Check for API errors (channel not found, etc.)
+	var regErr *registry.Error
+	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+		return crex.Wrap(ErrChannelNotFound, err)
 	}
 
-	if len(versions.Versions) == 0 {
-		return nil, ErrNoMatchingVersion
-	}
-
-	latestVersion, err := findLatestVersion(versions.Versions, ref.Version())
-	if err != nil {
-		return nil, err
-	}
-
-	selectedVersion, err := client.ReadVersion(ctx, namespace, resourceName, latestVersion.String())
-	if err != nil {
-		return nil, crex.Wrap(ErrCannotReadVersion, err)
-	}
-
-	return selectedVersion, nil
+	return crex.Wrap(ErrCannotReadVersion, err)
 }
 
 // Builds a frozen reference from a resolved version.
@@ -131,61 +114,6 @@ func buildFrozenReference(ref *reference.Reference, namespace, resourceName stri
 	}
 
 	return frozenRef, nil
-}
-
-// Finds the latest version matching the constraint.
-//
-// Iterates through all versions, filtering by the constraint and comparing
-// semantic versions to find the highest match. Returns the parsed version of
-// the latest match or an error if no versions satisfy the constraint.
-func findLatestVersion(versions []registry.VersionSummary, constraint *reference.VersionConstraint) (*reference.Version, error) {
-	var latestVersion *reference.Version
-
-	for _, v := range versions {
-		parsedVersion := tryParseMatchingVersion(v, constraint)
-		if parsedVersion == nil {
-			continue
-		}
-
-		if latestVersion == nil {
-			latestVersion = parsedVersion
-		} else {
-			cmp, valid := parsedVersion.Compare(latestVersion)
-			if valid && cmp > 0 {
-				latestVersion = parsedVersion
-			}
-		}
-	}
-
-	if latestVersion == nil {
-		return nil, ErrNoMatchingVersion
-	}
-
-	return latestVersion, nil
-}
-
-// Attempts to parse and validate a version against the given constraint.
-//
-// Returns the parsed version if it matches the constraint, or nil if parsing
-// failed, the version doesn't match, or any other error occurred.
-func tryParseMatchingVersion(v registry.VersionSummary, constraint *reference.VersionConstraint) *reference.Version {
-	parsedVersion, err := reference.ParseVersion(v.String)
-	if err != nil {
-		slog.Warn("skipping malformed version from registry", "version", v.String, "error", err.Error())
-		return nil
-	}
-
-	matches, err := constraint.MatchesVersion(parsedVersion)
-	if err != nil {
-		slog.Warn("skipping malformed version from registry", "version", v.String, "error", err.Error())
-		return nil
-	}
-
-	if !matches {
-		return nil
-	}
-
-	return parsedVersion
 }
 
 // Adds a service to the plan.

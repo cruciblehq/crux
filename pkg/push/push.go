@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
+	"github.com/cruciblehq/crux/pkg/cache"
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 	"github.com/cruciblehq/protocol/pkg/registry"
@@ -22,42 +24,34 @@ type PushOptions struct {
 
 // Pushes a resource package to the Hub registry.
 func Push(ctx context.Context, opts PushOptions) error {
-	// Validate package exists
 	if err := validatePackage(opts.Package); err != nil {
 		return err
 	}
 
-	// Load manifest
 	man, err := loadManifest(opts.Manifestfile)
 	if err != nil {
 		return err
 	}
 
-	// Parse resource identifier
 	namespace, resourceName, err := parseResource(opts.Resource)
 	if err != nil {
 		return err
 	}
 
-	// Create registry client
 	client := registry.NewClient(opts.Registry, nil)
 
-	// Verify namespace exists
 	if err := verifyNamespace(ctx, client, namespace); err != nil {
 		return err
 	}
 
-	// Ensure resource exists (create if not)
 	if err := ensureResource(ctx, client, namespace, resourceName, man); err != nil {
 		return err
 	}
 
-	// Create version
 	if err := createVersion(ctx, client, namespace, resourceName, man.Resource.Version); err != nil {
 		return err
 	}
 
-	// Upload package
 	return uploadPackage(ctx, client, namespace, resourceName, man.Resource.Version, opts.Package)
 }
 
@@ -141,7 +135,6 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 		return nil // Resource exists
 	}
 
-	// Check if error is "not found"
 	var regErr *registry.Error
 	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
 		return crex.UserError("failed to check resource", err.Error()).
@@ -149,7 +142,6 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 			Err()
 	}
 
-	// Create resource
 	resInfo := registry.ResourceInfo{
 		Name:        resource,
 		Type:        man.Resource.Type,
@@ -194,7 +186,7 @@ func createVersion(ctx context.Context, client *registry.Client, namespace, reso
 // Uploads the package archive to the registry.
 //
 // Opens the package file and uploads it to the specified resource version in
-// the registry.
+// the registry. After successful upload, updates the local cache.
 func uploadPackage(ctx context.Context, client *registry.Client, namespace, resource, version, packageOutput string) error {
 	archive, err := os.Open(packageOutput)
 	if err != nil {
@@ -209,5 +201,32 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 			Err()
 	}
 
+	// Update local cache with pushed package
+	if err := updateLocalCache(ctx, namespace, resource, version, packageOutput); err != nil {
+		// Log warning but don't fail the push - the remote was updated successfully
+		slog.Warn("failed to update local cache", "error", err)
+	}
+
 	return nil
+}
+
+// Adds the pushed package to the local cache.
+//
+// This ensures the local cache is in sync with the remote after a push,
+// avoiding the need to re-download the package if it's needed locally.
+func updateLocalCache(ctx context.Context, namespace, resource, version, packagePath string) error {
+	localCache, err := cache.Open(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer localCache.Close()
+
+	archive, err := os.Open(packagePath)
+	if err != nil {
+		return err
+	}
+	defer archive.Close()
+
+	_, err = localCache.Put(ctx, namespace, resource, version, archive)
+	return err
 }
