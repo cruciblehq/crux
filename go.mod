@@ -8,9 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6
-	github.com/cruciblehq/protocol v0.0.0-20260112054043-10f8b5625bab
+	github.com/cruciblehq/protocol v0.0.0-00010101000000-000000000000
 	github.com/evanw/esbuild v0.27.2
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/mattn/go-sqlite3 v1.14.33
 )
 
@@ -28,6 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.13 // indirect
 	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.1 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/google/go-containerregistry v0.20.7 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect

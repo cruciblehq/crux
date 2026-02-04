@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/pull"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/resource"
 )
 

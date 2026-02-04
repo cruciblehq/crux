@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crux/pkg/config"
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/blueprint"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/plan"
 	"github.com/cruciblehq/protocol/pkg/registry"
 	"github.com/cruciblehq/protocol/pkg/state"

@@ -3,7 +3,7 @@ package build
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 )
 
@@ -38,10 +38,8 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 	return NewImageBuilder(sb.registry, service.Runtime, service.Files, service.Entrypoint, output).Build(ctx)
 }
 
-// Validates required fields in the service manifest.
-//
-// Services require a runtime reference (base image to extend), an entrypoint
-// (command to run), and at least one file mapping (application code).
+// Validates required fields in the service manifest, requiring a runtime
+// reference and an entrypoint.
 func (sb *ServiceBuilder) validateManifest(service *manifest.Service) error {
 	if service.Runtime == "" {
 		return crex.UserError("runtime not specified", "service manifest has no runtime").
@@ -51,11 +49,6 @@ func (sb *ServiceBuilder) validateManifest(service *manifest.Service) error {
 	if len(service.Entrypoint) == 0 {
 		return crex.UserError("entrypoint not specified", "service manifest has no entrypoint").
 			Fallback("Add an entrypoint to the service manifest specifying the command to run.").
-			Err()
-	}
-	if len(service.Files) == 0 {
-		return crex.UserError("no files specified", "service manifest has no files").
-			Fallback("Add files to the service manifest specifying application code to include.").
 			Err()
 	}
 	return nil

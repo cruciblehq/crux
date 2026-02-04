@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/archive"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 	"github.com/cruciblehq/protocol/pkg/resource"
 )
@@ -72,7 +72,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		if _, ok := man.Config.(*manifest.Runtime); !ok {
 			return mismatch.Err()
 		}
-		if err := archive.ValidateImageStructure(dist); err != nil {
+		if err := validateImageStructure(dist); err != nil {
 			return crex.UserError("runtime build output not found", "dist/image.tar does not exist").
 				Fallback("Run 'crux build' to generate the runtime image.").
 				Cause(err).
@@ -83,7 +83,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		if _, ok := man.Config.(*manifest.Service); !ok {
 			return mismatch.Err()
 		}
-		if err := archive.ValidateImageStructure(dist); err != nil {
+		if err := validateImageStructure(dist); err != nil {
 			return crex.UserError("service build output not found", "dist/image.tar does not exist").
 				Fallback("Run 'crux build' to prepare the service image.").
 				Cause(err).
@@ -95,7 +95,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		if !ok {
 			return mismatch.Err()
 		}
-		if err := archive.ValidateWidgetStructure(dist, widget); err != nil {
+		if err := validateWidgetStructure(dist, widget); err != nil {
 			return crex.UserError("widget build output not found", "dist/index.js does not exist").
 				Fallback("Run 'crux build' to generate the widget bundle.").
 				Cause(err).

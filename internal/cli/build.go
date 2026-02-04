@@ -6,8 +6,8 @@ import (
 
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/pkg/build"
-	"github.com/cruciblehq/crux/pkg/watch"
 	"github.com/cruciblehq/protocol/pkg/resource"
+	"github.com/cruciblehq/protocol/pkg/watch"
 )
 
 // Represents the 'crux build' command.

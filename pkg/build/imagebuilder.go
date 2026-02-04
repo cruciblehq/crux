@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/pkg/cache"
-	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/crux/pkg/pack"
 	"github.com/cruciblehq/crux/pkg/pull"
 	"github.com/cruciblehq/protocol/pkg/archive"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 	"github.com/cruciblehq/protocol/pkg/oci"
 	"github.com/cruciblehq/protocol/pkg/resource"
@@ -66,7 +67,7 @@ func (ib *ImageBuilder) Build(ctx context.Context) (*Result, error) {
 		}
 	}
 
-	outputPath := filepath.Join(ib.output, archive.ImageFile)
+	outputPath := filepath.Join(ib.output, pack.ImageFile)
 	if err := buildResourceImage(baseImagePath, platformFiles, sharedFiles, ib.entrypoint, outputPath); err != nil {
 		return nil, crex.UserError("failed to build image", err.Error()).
 			Fallback("Check that all source files exist and the output directory is writable.").
@@ -144,7 +145,7 @@ func (ib *ImageBuilder) fetchBaseImage(ctx context.Context) (string, func(), err
 		return "", nil, err
 	}
 
-	imagePath := filepath.Join(extractDir, resource.DistDirectory, archive.ImageFile)
+	imagePath := filepath.Join(extractDir, resource.DistDirectory, pack.ImageFile)
 	if _, err := os.Stat(imagePath); err != nil {
 		cleanup()
 		return "", nil, crex.UserError("base image not found", "dist/image.tar missing from archive").

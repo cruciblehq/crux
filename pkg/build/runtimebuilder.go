@@ -3,7 +3,7 @@ package build
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 )
 
@@ -39,13 +39,6 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 }
 
 // Validates required fields in the runtime manifest.
-//
-// Runtimes require at least one file mapping.
-func (rb *RuntimeBuilder) validateManifest(runtime *manifest.Runtime) error {
-	if len(runtime.Files) == 0 {
-		return crex.UserError("no files specified", "runtime manifest has no files").
-			Fallback("Add files to the runtime manifest specifying binaries and supporting files.").
-			Err()
-	}
-	return nil
+func (rb *RuntimeBuilder) validateManifest(_ *manifest.Runtime) error {
+	return nil // No required fields for runtimes at this time.
 }

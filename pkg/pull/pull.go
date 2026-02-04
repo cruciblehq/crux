@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/cruciblehq/crux/pkg/cache"
-	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/reference"
 	"github.com/cruciblehq/protocol/pkg/registry"
 	"github.com/cruciblehq/protocol/pkg/resource"

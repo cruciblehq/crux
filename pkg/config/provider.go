@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
 	"github.com/cruciblehq/protocol/pkg/codec"
+	"github.com/cruciblehq/protocol/pkg/crex"
 )
 
 var (

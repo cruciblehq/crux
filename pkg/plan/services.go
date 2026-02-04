@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/blueprint"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/plan"
 	"github.com/cruciblehq/protocol/pkg/reference"
 	"github.com/cruciblehq/protocol/pkg/registry"

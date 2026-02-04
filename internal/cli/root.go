@@ -7,7 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pkg/crex"
+	"github.com/cruciblehq/protocol/pkg/crex"
 )
 
 // Represents the root command for the Crux CLI.

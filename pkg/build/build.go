@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/crux/pkg/paths"
+	"github.com/cruciblehq/protocol/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
 	"github.com/cruciblehq/protocol/pkg/resource"
 )
