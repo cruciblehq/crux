@@ -6,6 +6,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/pkg/pack"
+	"github.com/cruciblehq/protocol/pkg/resource"
 )
 
 // Represents the 'crux pack' command.
@@ -24,7 +25,7 @@ func (c *PackCmd) Run(ctx context.Context) error {
 	// Package the built resource
 	result, err := pack.Pack(ctx, pack.Options{
 		Manifest: internal.Manifestfile,
-		Dist:     internal.Dist,
+		Dist:     resource.DistDirectory,
 		Output:   internal.Package,
 	})
 	if err != nil {

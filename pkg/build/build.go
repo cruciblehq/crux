@@ -14,6 +14,7 @@ import (
 type Options struct {
 	Manifest string // Path to the manifest file.
 	Output   string // Directory where built artifacts are placed.
+	Registry string // Hub registry URL (required for services to fetch runtimes).
 }
 
 // Result of building a Crucible resource.
@@ -42,10 +43,12 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 	var builder Builder
 
 	switch resource.Type(man.Resource.Type) {
+	case resource.TypeRuntime:
+		builder = NewRuntimeBuilder(opts.Registry)
+	case resource.TypeService:
+		builder = NewServiceBuilder(opts.Registry)
 	case resource.TypeWidget:
 		builder = NewWidgetBuilder()
-	case resource.TypeService:
-		builder = NewServiceBuilder()
 	default:
 		return nil, ErrInvalidResourceType
 	}

@@ -29,61 +29,84 @@ type Result struct {
 // Creates a zstd-compressed tar archive containing the manifest and build
 // artifacts from the directory specified by opts.Dist.
 func Pack(ctx context.Context, opts Options) (*Result, error) {
-
-	// Load manifest to determine resource type
 	man, err := manifest.Read(opts.Manifest)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if dist/ exists by attempting to read it
-	if _, err := os.ReadDir(opts.Dist); err != nil {
-		if os.IsNotExist(err) {
-			return nil, crex.UserError("build artifacts not found", "dist/ directory does not exist").
-				Fallback("Run 'crux build' first to generate the distribution artifacts.").
-				Err()
-		}
-		return nil, crex.Wrap(ErrFileSystemOperation, err)
+	if err := validateDistExists(opts.Dist); err != nil {
+		return nil, err
 	}
 
-	// Validate resource structure based on type
-	mismatch := crex.ProgrammingError("pack failed", "manifest config type mismatch").
-		Fallback("Please report this issue to the Crucible team.")
-
-	switch resource.Type(man.Resource.Type) {
-	case resource.TypeWidget:
-		widget, ok := man.Config.(*manifest.Widget)
-		if !ok {
-			return nil, mismatch.Err()
-		}
-		if err := archive.ValidateWidgetStructure(opts.Dist, widget); err != nil {
-			return nil, crex.UserError("widget build output not found", "dist/index.js does not exist").
-				Fallback("Run 'crux build' to generate the widget bundle.").
-				Err()
-		}
-
-	case resource.TypeService:
-		service, ok := man.Config.(*manifest.Service)
-		if !ok {
-			return nil, mismatch.Err()
-		}
-		if err := archive.ValidateServiceStructure(opts.Dist, service); err != nil {
-			return nil, crex.UserError("service build output not found", "dist/image.tar does not exist").
-				Fallback("Run 'crux build' to prepare the service image.").
-				Err()
-		}
-
-	default:
-		return nil, ErrInvalidResourceType
+	if err := validateResourceStructure(man, opts.Dist); err != nil {
+		return nil, err
 	}
 
 	if err := createArchive(opts.Output, opts.Manifest, opts.Dist); err != nil {
 		return nil, err
 	}
 
-	return &Result{
-		Output: opts.Output,
-	}, nil
+	return &Result{Output: opts.Output}, nil
+}
+
+// Validates that the dist/ directory exists.
+func validateDistExists(dist string) error {
+	if _, err := os.ReadDir(dist); err != nil {
+		if os.IsNotExist(err) {
+			return crex.UserError("build artifacts not found", "dist/ directory does not exist").
+				Fallback("Run 'crux build' first to generate the distribution artifacts.").
+				Err()
+		}
+		return crex.Wrap(ErrFileSystemOperation, err)
+	}
+	return nil
+}
+
+// Validates the resource structure based on type.
+func validateResourceStructure(man *manifest.Manifest, dist string) error {
+	mismatch := crex.ProgrammingError("pack failed", "manifest config type mismatch").
+		Fallback("Please report this issue to the Crucible team.")
+
+	switch resource.Type(man.Resource.Type) {
+	case resource.TypeRuntime:
+		if _, ok := man.Config.(*manifest.Runtime); !ok {
+			return mismatch.Err()
+		}
+		if err := archive.ValidateImageStructure(dist); err != nil {
+			return crex.UserError("runtime build output not found", "dist/image.tar does not exist").
+				Fallback("Run 'crux build' to generate the runtime image.").
+				Cause(err).
+				Err()
+		}
+
+	case resource.TypeService:
+		if _, ok := man.Config.(*manifest.Service); !ok {
+			return mismatch.Err()
+		}
+		if err := archive.ValidateImageStructure(dist); err != nil {
+			return crex.UserError("service build output not found", "dist/image.tar does not exist").
+				Fallback("Run 'crux build' to prepare the service image.").
+				Cause(err).
+				Err()
+		}
+
+	case resource.TypeWidget:
+		widget, ok := man.Config.(*manifest.Widget)
+		if !ok {
+			return mismatch.Err()
+		}
+		if err := archive.ValidateWidgetStructure(dist, widget); err != nil {
+			return crex.UserError("widget build output not found", "dist/index.js does not exist").
+				Fallback("Run 'crux build' to generate the widget bundle.").
+				Cause(err).
+				Err()
+		}
+
+	default:
+		return ErrInvalidResourceType
+	}
+
+	return nil
 }
 
 // Creates the archive with manifest and dist/ contents.

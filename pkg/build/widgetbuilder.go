@@ -85,7 +85,7 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output 
 func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.BuildOptions, error) {
 
 	// Determine project root
-	projectRoot, err := filepath.Abs(filepath.Dir(options.Build.Main))
+	projectRoot, err := filepath.Abs(filepath.Dir(options.Main))
 	if err != nil {
 		return es.BuildOptions{}, crex.Wrap(ErrInvalidPath, err)
 	}
@@ -97,7 +97,7 @@ func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.Build
 
 		// Input
 		AbsWorkingDir:     projectRoot,
-		EntryPoints:       []string{options.Build.Main},
+		EntryPoints:       []string{options.Main},
 		ResolveExtensions: []string{".tsx", ".ts", ".jsx", ".js"},
 		Loader: map[string]es.Loader{
 			".js":   es.LoaderJS,

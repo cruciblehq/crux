@@ -7,11 +7,13 @@ import (
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/pkg/build"
 	"github.com/cruciblehq/crux/pkg/watch"
+	"github.com/cruciblehq/protocol/pkg/resource"
 )
 
 // Represents the 'crux build' command.
 type BuildCmd struct {
-	Watch bool `short:"w" help:"Watch for changes and rebuild automatically."`
+	Watch    bool   `short:"w" help:"Watch for changes and rebuild automatically."`
+	Registry string `help:"Hub registry URL for fetching runtimes (default: http://hub.cruciblehq.xyz:8080)."`
 }
 
 // Executes the build command.
@@ -21,10 +23,16 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	slog.Info("building resource...", "watch", c.Watch)
 
+	registry := c.Registry
+	if registry == "" {
+		registry = internal.DefaultRegistryURL
+	}
+
 	// Build first (don't wait for changes)
 	result, err := build.Build(ctx, build.Options{
 		Manifest: internal.Manifestfile,
-		Output:   internal.Dist,
+		Output:   resource.DistDirectory,
+		Registry: registry,
 	})
 	if err != nil {
 		return err
@@ -35,7 +43,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	// Watch mode
 	if c.Watch {
 		slog.Info("watching for changes (CTRL+C to exit)...")
-		return c.watchAndRebuild(ctx)
+		return c.watchAndRebuild(ctx, registry)
 	}
 
 	return nil
@@ -46,7 +54,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 // Sets up a recursive file watcher on the current directory, listening for any
 // changes. When a file change is detected, it triggers a rebuild. The function
 // continues to watch for changes until the provided context is canceled.
-func (c *BuildCmd) watchAndRebuild(ctx context.Context) error {
+func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 	callback := func(we *watch.WatchEvent) error {
 
 		// Check for cancellation
@@ -59,7 +67,8 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context) error {
 		// Rebuild
 		if _, err := build.Build(ctx, build.Options{
 			Manifest: internal.Manifestfile,
-			Output:   internal.Dist,
+			Output:   resource.DistDirectory,
+			Registry: registry,
 		}); err != nil {
 			slog.Error(err.Error())
 			return nil

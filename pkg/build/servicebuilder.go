@@ -2,38 +2,28 @@ package build
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/cruciblehq/crux/pkg/crex"
 	"github.com/cruciblehq/protocol/pkg/manifest"
-	"github.com/cruciblehq/protocol/pkg/oci"
-)
-
-const (
-
-	// Relative path to the standardized service image location within dist/
-	ServiceImagePath = "image.tar"
 )
 
 // Builder for Crucible services.
-type ServiceBuilder struct{}
+type ServiceBuilder struct {
+	registry string // Hub registry URL for pulling runtimes.
+}
 
 // Creates a new instance of [ServiceBuilder].
-func NewServiceBuilder() *ServiceBuilder {
-	return &ServiceBuilder{}
+func NewServiceBuilder(registry string) *ServiceBuilder {
+	return &ServiceBuilder{registry: registry}
 }
 
 // Builds a Crucible service resource based on the provided manifest.
 //
-// Service resources reference pre-built container images. This method validates
-// that the specified image exists and prepares it for packaging by copying it
-// to the standardized dist/ output location (dist/image.tar).
+// Service resources extend a runtime base image with application code. This
+// method resolves the runtime reference, loads the base image, adds service
+// files as new layers, sets the entrypoint, and outputs a multi-platform OCI
+// image to the standardized dist/ location.
 func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output string) (*Result, error) {
-
-	// Correct manifest type?
 	service, ok := m.Config.(*manifest.Service)
 	if !ok {
 		return nil, crex.ProgrammingError("an internal configuration type mismatch occurred", "unexpected manifest type").
@@ -41,72 +31,32 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	// Check if image path is specified
-	if service.Build.Image == "" {
-		return nil, crex.UserError("service image not specified", "no image path in manifest").
-			Fallback("Add a build image to your manifest.").
-			Err()
-	}
-
-	// Validate it's a multi-platform OCI image
-	imagePath := service.Build.Image
-	if err := validateOCIMultiPlatform(imagePath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, crex.UserError("service image not found", "image does not exist at specified path").
-				Fallback("Either the image path is incorrect or the image has not been built yet. Try building your service image first and make sure the image file exists at the specified path.").
-				Cause(err).
-				Err()
-		}
+	if err := sb.validateManifest(service); err != nil {
 		return nil, err
 	}
 
-	// Copy to standardized output location
-	destPath := filepath.Join(output, ServiceImagePath)
-	if err := copyFile(imagePath, destPath); err != nil {
-		return nil, crex.Wrap(ErrFileSystemOperation, err)
-	}
-
-	return &Result{
-		Output: output,
-	}, nil
+	return NewImageBuilder(sb.registry, service.Runtime, service.Files, service.Entrypoint, output).Build(ctx)
 }
 
-// Copies a file from src to dst.
-func copyFile(src, dst string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	_, err = io.Copy(destination, source)
-	return err
-}
-
-// Validates that an OCI tarball contains required platforms.
-func validateOCIMultiPlatform(path string) error {
-	err := oci.ValidateMultiPlatform(path)
-	if err == nil {
-		return nil
-	}
-
-	if err == oci.ErrSinglePlatform {
-		return crex.UserError("incomplete platform support", err.Error()).
-			Fallback(fmt.Sprintf("Build a multi-platform image with required platforms %v", oci.RequiredPlatforms())).
+// Validates required fields in the service manifest.
+//
+// Services require a runtime reference (base image to extend), an entrypoint
+// (command to run), and at least one file mapping (application code).
+func (sb *ServiceBuilder) validateManifest(service *manifest.Service) error {
+	if service.Runtime == "" {
+		return crex.UserError("runtime not specified", "service manifest has no runtime").
+			Fallback("Add a runtime reference to the service manifest.").
 			Err()
 	}
-
-	if err == oci.ErrInvalidImage {
-		return crex.UserError("invalid OCI image", err.Error()).
-			Fallback("The image file does not appear to be a valid OCI image. Make sure you're exporting with type=oci.").
+	if len(service.Entrypoint) == 0 {
+		return crex.UserError("entrypoint not specified", "service manifest has no entrypoint").
+			Fallback("Add an entrypoint to the service manifest specifying the command to run.").
 			Err()
 	}
-
-	return crex.Wrap(ErrFileSystemOperation, err)
+	if len(service.Files) == 0 {
+		return crex.UserError("no files specified", "service manifest has no files").
+			Fallback("Add files to the service manifest specifying application code to include.").
+			Err()
+	}
+	return nil
 }

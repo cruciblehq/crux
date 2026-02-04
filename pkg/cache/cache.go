@@ -17,6 +17,7 @@ import (
 )
 
 const (
+
 	// The database filename within the cache directory.
 	databaseFilename = "cache.db"
 
@@ -49,12 +50,10 @@ func Open(ctx context.Context, _ any) (*Cache, error) {
 
 // Opens a cache at the specified directory.
 func OpenAt(ctx context.Context, root string) (*Cache, error) {
-	// Ensure cache directory exists
 	if err := os.MkdirAll(root, paths.DefaultDirMode); err != nil {
 		return nil, err
 	}
 
-	// Acquire file lock
 	lockPath := filepath.Join(root, lockFilename)
 	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, paths.DefaultFileMode)
 	if err != nil {
@@ -154,6 +153,25 @@ func (c *Cache) Get(ctx context.Context, namespace, resource, version string) (*
 		return nil, err
 	}
 	return ver, nil
+}
+
+// Returns a reader for a cached archive.
+//
+// The caller is responsible for closing the returned reader.
+// Returns ErrNotFound if the entry doesn't exist or has no archive.
+func (c *Cache) OpenArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	reader, err := c.registry.DownloadArchive(ctx, namespace, resource, version)
+	if err != nil {
+		var regErr *registry.Error
+		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return reader, nil
 }
 
 // Stores an entry in the cache.
@@ -286,16 +304,6 @@ func (c *Cache) Clear(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// Opens the archive file for reading.
-//
-// The caller is responsible for closing the returned reader.
-func (c *Cache) OpenArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.registry.DownloadArchive(ctx, namespace, resource, version)
 }
 
 // Ensures a namespace exists, creating it if necessary.
