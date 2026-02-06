@@ -5,7 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pkg/push"
+	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/push"
 )
 
 // Represents the 'crux push' command.
@@ -24,8 +25,8 @@ func (c *PushCmd) Run(ctx context.Context) error {
 	opts := push.PushOptions{
 		Registry:     registry,
 		Resource:     c.Resource,
-		Manifestfile: internal.Manifestfile,
-		Package:      internal.Package,
+		Manifestfile: paths.Manifest("."),
+		Package:      paths.Package("."),
 	}
 
 	slog.Info("pushing package...", "resource", c.Resource, "registry", registry)

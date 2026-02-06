@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/pkg/cache"
-	"github.com/cruciblehq/protocol/pkg/crex"
-	"github.com/cruciblehq/protocol/pkg/reference"
-	"github.com/cruciblehq/protocol/pkg/resource"
+	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crux/resource"
 )
 
 // Represents the 'crux cache remove' command.

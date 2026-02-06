@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cruciblehq/crux/pkg/config"
-	"github.com/cruciblehq/protocol/pkg/crex"
+	"github.com/cruciblehq/crux/config"
+	"github.com/cruciblehq/crux/kit/crex"
 )
 
 const (

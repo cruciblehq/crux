@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/pkg/cache"
+	"github.com/cruciblehq/crux/cache"
 )
 
 // Represents the 'crux cache clear' command.

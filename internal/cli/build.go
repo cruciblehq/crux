@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cruciblehq/crux/build"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pkg/build"
-	"github.com/cruciblehq/protocol/pkg/resource"
-	"github.com/cruciblehq/protocol/pkg/watch"
+	"github.com/cruciblehq/crux/kit/watch"
+	"github.com/cruciblehq/crux/paths"
 )
 
 // Represents the 'crux build' command.
@@ -30,8 +30,8 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	// Build first (don't wait for changes)
 	result, err := build.Build(ctx, build.Options{
-		Manifest: internal.Manifestfile,
-		Output:   resource.DistDirectory,
+		Manifest: paths.Manifest("."),
+		Output:   paths.BuildDir("."),
 		Registry: registry,
 	})
 	if err != nil {
@@ -66,8 +66,8 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 		// Rebuild
 		if _, err := build.Build(ctx, build.Options{
-			Manifest: internal.Manifestfile,
-			Output:   resource.DistDirectory,
+			Manifest: paths.Manifest("."),
+			Output:   paths.BuildDir("."),
 			Registry: registry,
 		}); err != nil {
 			slog.Error(err.Error())

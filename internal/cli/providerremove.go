@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/pkg/config"
+	"github.com/cruciblehq/crux/config"
 )
 
 // Represents the 'crux provider remove' command.
