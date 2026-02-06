@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/cruciblehq/crux/kit/crex"
@@ -57,31 +58,30 @@ func NewBuilder(osName, arch string) *Builder {
 // Creates a builder that extends an existing image.
 //
 // Initializes a builder starting from the provided base image. The builder
-// inherits all layers and configuration from the base, allowing additional
-// layers and configuration changes to be applied on top. This is used for
-// building service images that extend runtime base images.
-func NewBuilderFrom(base v1.Image, osName, arch string) (*Builder, error) {
-	cfg, err := base.ConfigFile()
+// inherits all layers, configuration, and target platform from the base,
+// allowing additional layers and configuration changes to be applied on top.
+func NewBuilderFrom(base *Image) (*Builder, error) {
+	cfg, err := base.img.ConfigFile()
 	if err != nil {
 		return nil, crex.Wrap(ErrInvalidImage, err)
 	}
 
 	return &Builder{
-		image:  base,
-		arch:   arch,
-		os:     osName,
+		image:  base.img,
+		arch:   cfg.Architecture,
+		os:     cfg.OS,
 		config: cfg.Config,
 	}, nil
 }
 
-// Adds files from a directory as a new layer.
+// Adds a directory as a new layer.
 //
 // Recursively walks the source directory and packages all files and directories
 // into a single filesystem layer. The destDir parameter specifies the absolute
 // path where the contents will appear in the container's filesystem. File
 // permissions and directory structure are preserved, but modification times
 // are zeroed for reproducible builds.
-func (b *Builder) AddLayer(srcDir, destDir string) error {
+func (b *Builder) AddDir(srcDir, destDir string) error {
 	layerData, err := createTarFromDir(srcDir, destDir)
 	if err != nil {
 		return crex.Wrap(ErrLayerCreate, err)
@@ -128,7 +128,7 @@ func (b *Builder) AddMapping(src, dest string) error {
 	}
 
 	if info.IsDir() {
-		return b.AddLayer(src, dest)
+		return b.AddDir(src, dest)
 	}
 
 	mode := ModeReadOnly
@@ -159,8 +159,7 @@ func (b *Builder) addLayerFromBytes(data []byte) error {
 // Configures the executable that runs when the container starts. The entrypoint
 // is specified as a list of strings where the first element is the command and
 // subsequent elements are fixed arguments. Setting an entrypoint clears any
-// previously configured default command, as the two are mutually exclusive in
-// typical usage.
+// previously configured default command.
 func (b *Builder) SetEntrypoint(entrypoint ...string) {
 	b.config.Entrypoint = entrypoint
 	b.config.Cmd = nil
@@ -208,16 +207,11 @@ func (b *Builder) SetLabel(key, value string) {
 	b.config.Labels[key] = value
 }
 
-// Writes the image to an OCI tarball file.
-//
-// Serializes the accumulated layers and configuration into a complete OCI image
-// layout and writes it as a tar archive to the specified path. The resulting
-// file can be loaded into container runtimes or pushed to OCI-compliant
-// registries. This method creates or overwrites the destination file.
-func (b *Builder) SaveTarball(path string) error {
+// Applies runtime configuration and returns the finalized image.
+func (b *Builder) build() (v1.Image, error) {
 	cfg, err := b.image.ConfigFile()
 	if err != nil {
-		return crex.Wrap(ErrImageBuild, err)
+		return nil, crex.Wrap(ErrImageBuild, err)
 	}
 
 	cfg.Config = b.config
@@ -226,7 +220,21 @@ func (b *Builder) SaveTarball(path string) error {
 
 	img, err := mutate.ConfigFile(b.image, cfg)
 	if err != nil {
-		return crex.Wrap(ErrImageBuild, err)
+		return nil, crex.Wrap(ErrImageBuild, err)
+	}
+	return img, nil
+}
+
+// Writes the image to an OCI tarball file.
+//
+// Serializes the accumulated layers and configuration into a complete OCI image
+// layout and writes it as a tar archive to the specified path. The resulting
+// file can be loaded into container runtimes or pushed to OCI-compliant
+// registries. This method creates or overwrites the destination file.
+func (b *Builder) SaveTarball(path string) error {
+	img, err := b.build()
+	if err != nil {
+		return err
 	}
 
 	idx := mutate.AppendManifests(empty.Index, mutate.IndexAddendum{
@@ -242,24 +250,16 @@ func (b *Builder) SaveTarball(path string) error {
 	return writeIndexToTarball(idx, path)
 }
 
-// Returns the built image for further manipulation or registry operations.
+// Returns the built image with runtime configuration applied.
 //
-// Provides access to the built image after applying configuration. Use
-// Underlying() on the returned Image to access the raw v1.Image for
-// go-containerregistry operations like remote.Write.
+// Finalizes the accumulated layers and configuration into an [Image] that can
+// be passed to [NewBuilderFrom] for extension, added to a
+// [MultiPlatformBuilder] via [MultiPlatformBuilder.AddImage], or inspected
+// for its digest and layers.
 func (b *Builder) Image() (*Image, error) {
-	cfg, err := b.image.ConfigFile()
+	img, err := b.build()
 	if err != nil {
-		return nil, crex.Wrap(ErrImageBuild, err)
-	}
-
-	cfg.Config = b.config
-	cfg.Architecture = b.arch
-	cfg.OS = b.os
-
-	img, err := mutate.ConfigFile(b.image, cfg)
-	if err != nil {
-		return nil, crex.Wrap(ErrImageBuild, err)
+		return nil, err
 	}
 	return &Image{img: img}, nil
 }
@@ -332,9 +332,10 @@ func (mb *MultiPlatformBuilder) SaveTarball(path string) error {
 
 // Returns the multi-platform index for registry operations.
 //
-// Provides access to the built image index after assembling all platforms. Use
-// Underlying() on the returned Index to access the raw v1.ImageIndex for
-// go-containerregistry operations like remote.WriteIndex.
+// Assembles all platform-specific images into an [Index] containing every
+// configured platform. The returned index can be inspected for its digest or
+// saved to an OCI layout directory via [Index.SaveLayout]. Platforms are
+// ordered deterministically by their "os/arch" key.
 func (mb *MultiPlatformBuilder) Index() (*Index, error) {
 	idx, err := mb.buildIndex()
 	if err != nil {
@@ -347,15 +348,16 @@ func (mb *MultiPlatformBuilder) Index() (*Index, error) {
 func (mb *MultiPlatformBuilder) buildIndex() (v1.ImageIndex, error) {
 	var idx v1.ImageIndex = empty.Index
 
-	// Add images from builders
-	for _, b := range mb.builders {
+	// Iterate in sorted key order for deterministic output.
+	for _, key := range sortedKeys(mb.builders) {
+		b := mb.builders[key]
 		img, err := b.Image()
 		if err != nil {
 			return nil, err
 		}
 
 		idx = mutate.AppendManifests(idx, mutate.IndexAddendum{
-			Add: img.Underlying(),
+			Add: img.img,
 			Descriptor: v1.Descriptor{
 				Platform: &v1.Platform{
 					Architecture: b.arch,
@@ -365,13 +367,13 @@ func (mb *MultiPlatformBuilder) buildIndex() (v1.ImageIndex, error) {
 		})
 	}
 
-	// Add pre-built images
-	for key, img := range mb.images {
+	for _, key := range sortedKeys(mb.images) {
+		img := mb.images[key]
 		parts := strings.Split(key, "/")
 		osName, arch := parts[0], parts[1]
 
 		idx = mutate.AppendManifests(idx, mutate.IndexAddendum{
-			Add: img.Underlying(),
+			Add: img.img,
 			Descriptor: v1.Descriptor{
 				Platform: &v1.Platform{
 					Architecture: arch,
@@ -382,4 +384,14 @@ func (mb *MultiPlatformBuilder) buildIndex() (v1.ImageIndex, error) {
 	}
 
 	return idx, nil
+}
+
+// Returns the keys of a map in sorted order.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

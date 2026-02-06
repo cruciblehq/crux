@@ -10,6 +10,36 @@ import (
 	"time"
 )
 
+// Reads all entries from a tar archive, returning a map of entry names to their
+// content (or "<dir>" for directories). Fails the test if any entry has a
+// non-zero modification time.
+func readTarEntries(t *testing.T, data []byte) map[string]string {
+	t.Helper()
+	tr := tar.NewReader(bytes.NewReader(data))
+	entries := make(map[string]string)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("reading tar: %v", err)
+		}
+
+		if header.Typeflag == tar.TypeReg {
+			content, _ := io.ReadAll(tr)
+			entries[header.Name] = string(content)
+		} else {
+			entries[header.Name] = "<dir>"
+		}
+
+		if header.ModTime.Unix() != 0 {
+			t.Errorf("ModTime should be Unix epoch for %s, got %v", header.Name, header.ModTime)
+		}
+	}
+	return entries
+}
+
 func TestCreateTarFromDir(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -30,30 +60,7 @@ func TestCreateTarFromDir(t *testing.T) {
 		t.Fatalf("createTarFromDir: %v", err)
 	}
 
-	// Verify tar contents
-	tr := tar.NewReader(bytes.NewReader(data))
-	entries := make(map[string]string)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatalf("reading tar: %v", err)
-		}
-
-		if header.Typeflag == tar.TypeReg {
-			content, _ := io.ReadAll(tr)
-			entries[header.Name] = string(content)
-		} else {
-			entries[header.Name] = "<dir>"
-		}
-
-		// Verify modification time is zeroed (Unix epoch) for reproducible builds
-		if header.ModTime.Unix() != 0 {
-			t.Errorf("ModTime should be Unix epoch for %s, got %v", header.Name, header.ModTime)
-		}
-	}
+	entries := readTarEntries(t, data)
 
 	if entries["/app/file1.txt"] != "content1" {
 		t.Errorf("expected file1.txt content 'content1', got %q", entries["/app/file1.txt"])
@@ -256,7 +263,7 @@ func TestWriteTarEntry(t *testing.T) {
 
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	if err := writeTarEntry(tw, testFile, "custom/path.txt", info); err != nil {
+	if err := writeTarEntry(tw, testFile, "custom/path.txt", info, preserveModTime); err != nil {
 		t.Fatalf("writeTarEntry: %v", err)
 	}
 	tw.Close()
@@ -277,7 +284,7 @@ func TestWriteTarEntry(t *testing.T) {
 	}
 }
 
-func TestWriteLayerTarEntry_ZerosModTime(t *testing.T) {
+func TestWriteTarEntry_ZerosModTime(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "file.txt")
 	if err := os.WriteFile(testFile, []byte("content"), 0644); err != nil {
@@ -295,8 +302,8 @@ func TestWriteLayerTarEntry_ZerosModTime(t *testing.T) {
 
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	if err := writeLayerTarEntry(tw, testFile, "file.txt", info); err != nil {
-		t.Fatalf("writeLayerTarEntry: %v", err)
+	if err := writeTarEntry(tw, testFile, "file.txt", info, zeroModTime); err != nil {
+		t.Fatalf("writeTarEntry: %v", err)
 	}
 	tw.Close()
 

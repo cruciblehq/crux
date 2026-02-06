@@ -10,8 +10,18 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crux/paths"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
+)
+
+const (
+
+	// Keep the original file modification time (see [writeTarEntry]).
+	preserveModTime = false
+
+	// Set modification time to Unix epoch for reproducible builds (see [writeTarEntry]).
+	zeroModTime = true
 )
 
 // Writes an image index to a tarball by creating a temporary OCI layout.
@@ -58,17 +68,24 @@ func writeDirToTarball(srcDir, destPath string) error {
 			return nil
 		}
 
-		return writeTarEntry(tw, path, relPath, info)
+		return writeTarEntry(tw, path, relPath, info, preserveModTime)
 	})
 }
 
 // Writes a single entry to a tar writer.
-func writeTarEntry(tw *tar.Writer, srcPath, name string, info os.FileInfo) error {
+//
+// When zeroModTime is true, the modification time is set to the Unix epoch
+// for reproducible builds. This is used for layer creation where consistent
+// timestamps are required.
+func writeTarEntry(tw *tar.Writer, srcPath, name string, info os.FileInfo, zeroModTime bool) error {
 	header, err := tar.FileInfoHeader(info, "")
 	if err != nil {
 		return err
 	}
 	header.Name = name
+	if zeroModTime {
+		header.ModTime = time.Time{}
+	}
 
 	if err := tw.WriteHeader(header); err != nil {
 		return err
@@ -110,7 +127,7 @@ func createTarFromDir(srcDir, destDir string) ([]byte, error) {
 			return nil
 		}
 
-		return writeLayerTarEntry(tw, path, destPath, info)
+		return writeTarEntry(tw, path, destPath, info, zeroModTime)
 	})
 
 	if err != nil {
@@ -122,35 +139,6 @@ func createTarFromDir(srcDir, destDir string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
-}
-
-// Writes a single entry to a tar writer with zeroed modification time.
-//
-// Used for layer creation where reproducible builds require consistent timestamps.
-func writeLayerTarEntry(tw *tar.Writer, srcPath, name string, info os.FileInfo) error {
-	header, err := tar.FileInfoHeader(info, "")
-	if err != nil {
-		return err
-	}
-	header.Name = name
-	header.ModTime = time.Time{}
-
-	if err := tw.WriteHeader(header); err != nil {
-		return err
-	}
-
-	if info.IsDir() {
-		return nil
-	}
-
-	file, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(tw, file)
-	return err
 }
 
 // Creates a tar archive containing a single file.
@@ -209,11 +197,11 @@ func extractTarEntry(r io.Reader, header *tar.Header, destDir string) error {
 
 	switch header.Typeflag {
 	case tar.TypeDir:
-		if err := os.MkdirAll(target, DirPermissions); err != nil {
+		if err := os.MkdirAll(target, paths.DefaultDirMode); err != nil {
 			return crex.Wrap(ErrInvalidImage, err)
 		}
 	case tar.TypeReg:
-		if err := os.MkdirAll(filepath.Dir(target), DirPermissions); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), paths.DefaultDirMode); err != nil {
 			return crex.Wrap(ErrInvalidImage, err)
 		}
 		if err := writeFile(target, r); err != nil {

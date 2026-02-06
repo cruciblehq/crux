@@ -46,7 +46,7 @@ func TestBuilder_SinglePlatform(t *testing.T) {
 	}
 	defer idx.Close()
 
-	manifest, err := idx.IndexManifest()
+	manifest, err := idx.idx.IndexManifest()
 	if err != nil {
 		t.Fatalf("IndexManifest: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestBuilder_AddBytes(t *testing.T) {
 	}
 	defer idx.Close()
 
-	manifest, err := idx.IndexManifest()
+	manifest, err := idx.idx.IndexManifest()
 	if err != nil {
 		t.Fatalf("IndexManifest: %v", err)
 	}
@@ -121,8 +121,8 @@ func TestBuilder_AddDirectory(t *testing.T) {
 	}
 
 	builder := NewBuilder("linux", "amd64")
-	if err := builder.AddLayer(srcDir, "/app"); err != nil {
-		t.Fatalf("AddLayer: %v", err)
+	if err := builder.AddDir(srcDir, "/app"); err != nil {
+		t.Fatalf("AddDir: %v", err)
 	}
 	builder.SetEntrypoint("node", "/app/main.js")
 
@@ -181,7 +181,7 @@ func TestMultiPlatformBuilder(t *testing.T) {
 	}
 	defer idx.Close()
 
-	manifest, err := idx.IndexManifest()
+	manifest, err := idx.idx.IndexManifest()
 	if err != nil {
 		t.Fatalf("IndexManifest: %v", err)
 	}
@@ -189,6 +189,215 @@ func TestMultiPlatformBuilder(t *testing.T) {
 	if len(manifest.Manifests) != 2 {
 		t.Errorf("Manifests count = %d, want 2", len(manifest.Manifests))
 	}
+
+	platforms, err := idx.Platforms()
+	if err != nil {
+		t.Fatalf("Platforms: %v", err)
+	}
+	if !platforms["linux/amd64"] {
+		t.Error("Missing linux/amd64 platform")
+	}
+	if !platforms["linux/arm64"] {
+		t.Error("Missing linux/arm64 platform")
+	}
+
+	if err := idx.ValidateMultiPlatform(); err != nil {
+		t.Errorf("ValidateMultiPlatform: %v", err)
+	}
+}
+
+func TestBuilder_AddMapping_File(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create executable file
+	execFile := filepath.Join(tmpDir, "app")
+	if err := os.WriteFile(execFile, []byte("#!/bin/sh"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create non-executable file
+	dataFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(dataFile, []byte(`{"key":"value"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	builder := NewBuilder("linux", "amd64")
+	if err := builder.AddMapping(execFile, "/app"); err != nil {
+		t.Fatalf("AddMapping executable: %v", err)
+	}
+	if err := builder.AddMapping(dataFile, "/config.json"); err != nil {
+		t.Fatalf("AddMapping data file: %v", err)
+	}
+	builder.SetEntrypoint("/app")
+
+	outputPath := filepath.Join(tmpDir, "image.tar")
+	if err := builder.SaveTarball(outputPath); err != nil {
+		t.Fatalf("SaveTarball: %v", err)
+	}
+
+	idx, err := ReadIndex(outputPath)
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	defer idx.Close()
+}
+
+func TestBuilder_AddMapping_Directory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "main.js"), []byte("console.log('hi')"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	builder := NewBuilder("linux", "amd64")
+	if err := builder.AddMapping(srcDir, "/app"); err != nil {
+		t.Fatalf("AddMapping directory: %v", err)
+	}
+
+	outputPath := filepath.Join(tmpDir, "image.tar")
+	if err := builder.SaveTarball(outputPath); err != nil {
+		t.Fatalf("SaveTarball: %v", err)
+	}
+
+	idx, err := ReadIndex(outputPath)
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	defer idx.Close()
+}
+
+func TestBuilder_NewBuilderFrom(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Build a base image
+	base := NewBuilder("linux", "amd64")
+	if err := base.AddBytes([]byte("base content"), "/base.txt", 0644); err != nil {
+		t.Fatal(err)
+	}
+	base.SetEntrypoint("/bin/sh")
+	base.SetEnv("BASE_VAR", "base_value")
+
+	baseImg, err := base.Image()
+	if err != nil {
+		t.Fatalf("base Image: %v", err)
+	}
+
+	// Extend the base image
+	ext, err := NewBuilderFrom(baseImg)
+	if err != nil {
+		t.Fatalf("NewBuilderFrom: %v", err)
+	}
+	if err := ext.AddBytes([]byte("extra content"), "/extra.txt", 0644); err != nil {
+		t.Fatal(err)
+	}
+	ext.SetEntrypoint("/app")
+
+	outputPath := filepath.Join(tmpDir, "image.tar")
+	if err := ext.SaveTarball(outputPath); err != nil {
+		t.Fatalf("SaveTarball: %v", err)
+	}
+
+	idx, err := ReadIndex(outputPath)
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	defer idx.Close()
+
+	img, err := idx.LoadImage("linux", "amd64")
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	cfg, err := img.img.ConfigFile()
+	if err != nil {
+		t.Fatalf("ConfigFile: %v", err)
+	}
+
+	if cfg.Config.Entrypoint[0] != "/app" {
+		t.Errorf("Entrypoint = %v, want [/app]", cfg.Config.Entrypoint)
+	}
+
+	// Base env should be inherited
+	found := false
+	for _, env := range cfg.Config.Env {
+		if env == "BASE_VAR=base_value" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected inherited BASE_VAR env, got %v", cfg.Config.Env)
+	}
+}
+
+func TestBuilder_SetCmd(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	builder := NewBuilder("linux", "amd64")
+	builder.SetCmd("echo", "hello")
+
+	outputPath := filepath.Join(tmpDir, "image.tar")
+	if err := builder.SaveTarball(outputPath); err != nil {
+		t.Fatalf("SaveTarball: %v", err)
+	}
+
+	idx, err := ReadIndex(outputPath)
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	defer idx.Close()
+
+	img, err := idx.LoadImage("linux", "amd64")
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	cfg, err := img.img.ConfigFile()
+	if err != nil {
+		t.Fatalf("ConfigFile: %v", err)
+	}
+
+	if len(cfg.Config.Cmd) != 2 || cfg.Config.Cmd[0] != "echo" || cfg.Config.Cmd[1] != "hello" {
+		t.Errorf("Cmd = %v, want [echo hello]", cfg.Config.Cmd)
+	}
+}
+
+func TestMultiPlatformBuilder_AddImage(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Build individual images
+	amd64Builder := NewBuilder("linux", "amd64")
+	amd64Builder.SetEntrypoint("/amd64-app")
+	amd64Img, err := amd64Builder.Image()
+	if err != nil {
+		t.Fatalf("amd64 Image: %v", err)
+	}
+
+	arm64Builder := NewBuilder("linux", "arm64")
+	arm64Builder.SetEntrypoint("/arm64-app")
+	arm64Img, err := arm64Builder.Image()
+	if err != nil {
+		t.Fatalf("arm64 Image: %v", err)
+	}
+
+	// Add pre-built images to multi-platform builder
+	mb := NewMultiPlatformBuilder()
+	mb.AddImage("linux", "amd64", amd64Img)
+	mb.AddImage("linux", "arm64", arm64Img)
+
+	outputPath := filepath.Join(tmpDir, "image.tar")
+	if err := mb.SaveTarball(outputPath); err != nil {
+		t.Fatalf("SaveTarball: %v", err)
+	}
+
+	idx, err := ReadIndex(outputPath)
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	defer idx.Close()
 
 	platforms, err := idx.Platforms()
 	if err != nil {
