@@ -42,11 +42,10 @@ var configTemplate = template.Must(template.New("lima").Parse(configTemplateSour
 
 // Holds the values injected into the Lima YAML template.
 type configData struct {
-	Arch    string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs    int    // Number of virtual CPUs.
-	Memory  string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk    string // Disk size with unit suffix (e.g. "10GiB").
-	DataDir string // Host directory mounted into the VM at /mnt/crux.
+	Arch   string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs   int    // Number of virtual CPUs.
+	Memory string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk   string // Disk size with unit suffix (e.g. "10GiB").
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -55,11 +54,10 @@ type configData struct {
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
 	data := configData{
-		Arch:    limaArch(),
-		CPUs:    defaultCPUs,
-		Memory:  fmt.Sprintf("%dGiB", defaultMemoryGiB),
-		Disk:    fmt.Sprintf("%dGiB", defaultDiskGiB),
-		DataDir: paths.Data(),
+		Arch:   limaArch(),
+		CPUs:   defaultCPUs,
+		Memory: fmt.Sprintf("%dGiB", defaultMemoryGiB),
+		Disk:   fmt.Sprintf("%dGiB", defaultDiskGiB),
 	}
 
 	configDir := paths.VM()

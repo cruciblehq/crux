@@ -6,4 +6,5 @@ type VmCmd struct {
 	Stop    *VmStopCmd    `cmd:"" help:"Stop the VM."`
 	Status  *VmStatusCmd  `cmd:"" help:"Show VM status."`
 	Destroy *VmDestroyCmd `cmd:"" help:"Delete the VM and its disk images."`
+	Exec    *VmExecCmd    `cmd:"" help:"Run a command inside the VM."`
 }

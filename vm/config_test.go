@@ -10,11 +10,10 @@ import (
 
 func TestConfigTemplate_IsValid(t *testing.T) {
 	data := configData{
-		Arch:    "aarch64",
-		CPUs:    2,
-		Memory:  "2GiB",
-		Disk:    "10GiB",
-		DataDir: "/tmp/crux-test",
+		Arch:   "aarch64",
+		CPUs:   2,
+		Memory: "2GiB",
+		Disk:   "10GiB",
 	}
 
 	var buf bytes.Buffer
@@ -29,10 +28,6 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"cpus: 2",
 		"memory: 2GiB",
 		"disk: 10GiB",
-		"mountType: virtiofs",
-		"location: /tmp/crux-test",
-		"mountPoint: /mnt/crux",
-		"writable: true",
 		"containerd:",
 		"system: false",
 		"user: false",
@@ -48,11 +43,10 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 
 func TestConfigTemplate_x86(t *testing.T) {
 	data := configData{
-		Arch:    "x86_64",
-		CPUs:    4,
-		Memory:  "4GiB",
-		Disk:    "20GiB",
-		DataDir: "/home/user/.local/share/crux",
+		Arch:   "x86_64",
+		CPUs:   4,
+		Memory: "4GiB",
+		Disk:   "20GiB",
 	}
 
 	var buf bytes.Buffer
