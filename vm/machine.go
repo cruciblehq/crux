@@ -59,7 +59,7 @@ func (m *Machine) Start() error {
 		return ErrVMAlreadyRunning
 
 	case StatusStopped:
-		if err := m.run("start", limaInstanceName); err != nil {
+		if err := m.run("start", "--tty=false", limaInstanceName); err != nil {
 			return crex.Wrap(ErrVMStart, err)
 		}
 		return nil
@@ -69,7 +69,7 @@ func (m *Machine) Start() error {
 		if err != nil {
 			return err
 		}
-		if err := m.run("start", "--name="+limaInstanceName, configPath); err != nil {
+		if err := m.run("start", "--tty=false", "--name="+limaInstanceName, configPath); err != nil {
 			return crex.Wrap(ErrVMStart, err)
 		}
 		return nil

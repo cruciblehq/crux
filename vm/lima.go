@@ -22,7 +22,7 @@ const (
 	limaVersion = "2.0.3"
 
 	// Download URL template for Lima releases.
-	// Placeholders: version, os, arch (aarch64/x86_64).
+	// Placeholders: version, version, OS, arch.
 	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
 
 	// Binary name for the Lima CLI.
@@ -32,12 +32,16 @@ const (
 	goarchARM64 = "arm64"
 	goarchAMD64 = "amd64"
 
-	// Lima architecture identifiers.
+	// Architecture identifiers used in Lima YAML configuration.
 	limaArchARM64 = "aarch64"
 	limaArchAMD64 = "x86_64"
+
+	// Architecture identifiers used in Darwin release asset filenames.
+	downloadArchARM64 = "arm64"
+	downloadArchAMD64 = "x86_64"
 )
 
-// Returns the Lima architecture identifier for the current host.
+// Returns the Lima architecture identifier for the YAML config.
 func limaArch() string {
 	switch runtime.GOARCH {
 	case goarchARM64:
@@ -49,34 +53,51 @@ func limaArch() string {
 	}
 }
 
+// Returns the architecture identifier for Darwin release asset URLs.
+func downloadArch() string {
+	switch runtime.GOARCH {
+	case goarchARM64:
+		return downloadArchARM64
+	case goarchAMD64:
+		return downloadArchAMD64
+	default:
+		return downloadArchAMD64
+	}
+}
+
 // Returns the path to the vendored limactl binary.
 //
 // The binary is stored in the crux data directory so it persists across
 // sessions and does not require system-wide installation.
 func limactlPath() string {
-	return filepath.Join(paths.Data(), "bin", limactlBin)
+	return filepath.Join(limaDir(), "bin", limactlBin)
+}
+
+// Returns the root directory where Lima is extracted.
+func limaDir() string {
+	return filepath.Join(paths.Data(), "lima")
 }
 
 // Ensures the limactl binary is available, downloading it if necessary.
 //
 // Returns the absolute path to the limactl binary. If the binary does not
-// exist at the expected location, it is downloaded from the Lima GitHub
-// releases and extracted.
+// exist at the expected location, the full Lima distribution is downloaded
+// from GitHub releases and extracted.
 func ensureLima() (string, error) {
 	bin := limactlPath()
 	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
 
-	if err := downloadLima(bin); err != nil {
+	if err := downloadLima(limaDir()); err != nil {
 		return "", err
 	}
 	return bin, nil
 }
 
-// Downloads and extracts the limactl binary from GitHub releases.
+// Downloads and extracts Lima from GitHub releases.
 func downloadLima(dest string) error {
-	url := fmt.Sprintf(limaDownloadURL, limaVersion, limaVersion, runtime.GOOS, limaArch())
+	url := fmt.Sprintf(limaDownloadURL, limaVersion, limaVersion, "Darwin", downloadArch())
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -88,14 +109,15 @@ func downloadLima(dest string) error {
 		return crex.Wrap(ErrLimaDownload, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, url))
 	}
 
-	return extractLimactl(resp.Body, dest)
+	return extractLima(resp.Body, dest)
 }
 
-// Extracts the limactl binary from a gzipped tar archive.
+// Extracts the Lima distribution from a gzipped tar archive.
 //
-// Scans the archive for the bin/limactl entry and writes it to dest. All other
-// entries are skipped. The destination directory is created if needed.
-func extractLimactl(r io.Reader, dest string) error {
+// Extracts all regular files from the archive into the destination directory,
+// preserving the archive's internal structure. This includes the limactl binary
+// and supporting files like guest agents that Lima requires at runtime.
+func extractLima(r io.Reader, dest string) error {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return crex.Wrap(ErrLimaDownload, err)
@@ -106,29 +128,40 @@ func extractLimactl(r io.Reader, dest string) error {
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			return crex.Wrap(ErrLimaDownload, fmt.Errorf("limactl not found in archive"))
+			break
 		}
 		if err != nil {
 			return crex.Wrap(ErrLimaDownload, err)
 		}
 
-		if filepath.Base(header.Name) != limactlBin || header.Typeflag != tar.TypeReg {
+		if header.Typeflag != tar.TypeReg {
 			continue
 		}
 
-		if err := os.MkdirAll(filepath.Dir(dest), paths.DefaultDirMode); err != nil {
+		target := filepath.Join(dest, filepath.Clean(header.Name))
+
+		if err := os.MkdirAll(filepath.Dir(target), paths.DefaultDirMode); err != nil {
 			return crex.Wrap(ErrLimaDownload, err)
 		}
 
-		f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, paths.DefaultDirMode)
+		mode := os.FileMode(header.Mode)
+		f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 		if err != nil {
 			return crex.Wrap(ErrLimaDownload, err)
 		}
-		defer f.Close()
 
 		if _, err := io.Copy(f, tr); err != nil {
+			f.Close()
 			return crex.Wrap(ErrLimaDownload, err)
 		}
-		return nil
+		f.Close()
 	}
+
+	// Verify limactl was extracted.
+	limactlDest := filepath.Join(dest, "bin", limactlBin)
+	if _, err := os.Stat(limactlDest); err != nil {
+		return crex.Wrap(ErrLimaDownload, fmt.Errorf("limactl not found in archive"))
+	}
+
+	return nil
 }

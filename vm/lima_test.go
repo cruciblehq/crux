@@ -11,45 +11,65 @@ import (
 	"testing"
 )
 
-func TestExtractLimactl(t *testing.T) {
-	// Create a fake tar.gz archive with a bin/limactl entry.
+func TestExtractLima(t *testing.T) {
+	// Create a fake tar.gz archive with a bin/limactl entry and a guest agent.
 	var archiveBuf bytes.Buffer
 	gw := gzip.NewWriter(&archiveBuf)
 	tw := tar.NewWriter(gw)
 
-	content := []byte("#!/bin/sh\necho fake limactl")
+	limactlContent := []byte("#!/bin/sh\necho fake limactl")
 	tw.WriteHeader(&tar.Header{
 		Name:     "bin/limactl",
 		Mode:     0755,
-		Size:     int64(len(content)),
+		Size:     int64(len(limactlContent)),
 		Typeflag: tar.TypeReg,
 	})
-	tw.Write(content)
+	tw.Write(limactlContent)
+
+	agentContent := []byte("fake-guest-agent")
+	tw.WriteHeader(&tar.Header{
+		Name:     "share/lima/lima-guestagent.Linux-aarch64.gz",
+		Mode:     0644,
+		Size:     int64(len(agentContent)),
+		Typeflag: tar.TypeReg,
+	})
+	tw.Write(agentContent)
+
 	tw.Close()
 	gw.Close()
 
 	// Extract to temp dir.
 	tmpDir := t.TempDir()
-	dest := filepath.Join(tmpDir, "bin", "limactl")
-	if err := extractLimactl(&archiveBuf, dest); err != nil {
-		t.Fatalf("extractLimactl: %v", err)
+	if err := extractLima(&archiveBuf, tmpDir); err != nil {
+		t.Fatalf("extractLima: %v", err)
 	}
 
-	// Verify the file was extracted.
-	got, err := os.ReadFile(dest)
+	// Verify limactl was extracted.
+	limactlPath := filepath.Join(tmpDir, "bin", "limactl")
+	got, err := os.ReadFile(limactlPath)
 	if err != nil {
-		t.Fatalf("reading extracted file: %v", err)
+		t.Fatalf("reading extracted limactl: %v", err)
 	}
-	if string(got) != string(content) {
-		t.Errorf("expected %q, got %q", string(content), string(got))
+	if string(got) != string(limactlContent) {
+		t.Errorf("limactl: expected %q, got %q", string(limactlContent), string(got))
 	}
 
 	// Verify it's executable.
-	info, err := os.Stat(dest)
+	info, err := os.Stat(limactlPath)
 	if err != nil {
-		t.Fatalf("stat: %v", err)
+		t.Fatalf("stat limactl: %v", err)
 	}
 	if info.Mode()&0111 == 0 {
-		t.Error("expected executable permissions")
+		t.Error("expected executable permissions on limactl")
+	}
+
+	// Verify guest agent was also extracted.
+	agentPath := filepath.Join(tmpDir, "share", "lima", "lima-guestagent.Linux-aarch64.gz")
+	gotAgent, err := os.ReadFile(agentPath)
+	if err != nil {
+		t.Fatalf("reading extracted guest agent: %v", err)
+	}
+	if string(gotAgent) != string(agentContent) {
+		t.Errorf("guest agent: expected %q, got %q", string(agentContent), string(gotAgent))
 	}
 }

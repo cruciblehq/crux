@@ -34,9 +34,10 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"mountPoint: /mnt/crux",
 		"writable: true",
 		"containerd:",
-		"system: true",
+		"system: false",
 		"user: false",
 		"containerd.sock",
+		"apk add --no-cache containerd",
 	}
 	for _, s := range required {
 		if !strings.Contains(output, s) {

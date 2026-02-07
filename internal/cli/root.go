@@ -26,6 +26,7 @@ var RootCmd struct {
 	Plan     PlanCmd     `cmd:"" help:"Generate a deployment plan from a blueprint."`
 	Provider ProviderCmd `cmd:"" help:"Manage cloud provider configurations."`
 	Cache    CacheCmd    `cmd:"" help:"Manage the local resource cache."`
+	Vm       VmCmd       `cmd:"" help:"Manage the local development VM."`
 	Version  VersionCmd  `cmd:"" help:"Show version information."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
