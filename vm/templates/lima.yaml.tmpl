@@ -1,0 +1,20 @@
+vmType: vz
+arch: {{ .Arch }}
+cpus: {{ .CPUs }}
+memory: {{ .Memory }}
+disk: {{ .Disk }}
+mountType: virtiofs
+mounts:
+  - location: {{ .DataDir }}
+    mountPoint: /mnt/crux
+    writable: true
+containerd:
+  system: true
+  user: false
+probes:
+  - mode: readiness
+    description: containerd to be running
+    script: |
+      #!/bin/sh
+      test -S /run/containerd/containerd.sock
+    hint: containerd is not running

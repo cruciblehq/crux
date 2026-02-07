@@ -106,6 +106,16 @@ func Store() string {
 	return filepath.Join(Cache(), "store")
 }
 
+// Path to the VM data directory.
+//
+// Contains the Lima configuration, disk images, and runtime state for the
+// Crucible virtual machine.
+//
+//	macOS:   ~/Library/Application Support/crux/vm
+func VM() string {
+	return filepath.Join(Data(), "vm")
+}
+
 // Path to the directory for runtime files (sockets, PIDs).
 //
 //	Linux:   $XDG_RUNTIME_DIR/crux or /run/user/<uid>/crux
