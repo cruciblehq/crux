@@ -9,92 +9,31 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/cruciblehq/crux/kit/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-// A running instance of an [Image] within the container runtime.
+// A container instance within the container runtime.
 //
-// Containers are created by calling [Image.Start]. The container identifier
-// is an opaque string provided by the caller, typically the path mapping
-// from a blueprint. Multiple containers can be started from the same image
-// with different identifiers.
+// Use [NewContainer] to construct a handle for an existing container, or
+// [Image.Start] to create and start one.
 type Container struct {
-	image *Image // Image this container was started from.
-	id    string // Container identifier.
+	registry string // Containerd namespace.
+	id       string // Container identifier.
+}
+
+// Creates a [Container] handle for an existing container.
+//
+// The registry is the containerd namespace (typically the Crucible registry
+// authority). The id is the container identifier within that namespace.
+// This does not create or start anything in the runtime.
+func NewContainer(registry, id string) *Container {
+	return &Container{registry: registry, id: id}
 }
 
 // Sequence counter for generating unique exec process identifiers.
 var execSeq uint64
-
-// Creates and starts the container in detached mode.
-//
-// Any existing container with the same identifier is cleaned up first. A fresh
-// container is created from the current image with a new snapshot and OCI spec
-// derived from the image configuration.
-func (c *Container) Start(ctx context.Context) error {
-	client, err := newContainerdClient(c.image.registry)
-	if err != nil {
-		return crex.Wrap(ErrContainerStart, err)
-	}
-	defer client.Close()
-
-	cleanupStaleContainer(ctx, client, c.id)
-
-	image, err := client.GetImage(ctx, c.image.tag())
-	if err != nil {
-		return crex.Wrap(ErrContainerStart, err)
-	}
-
-	ctr, err := createContainer(ctx, client, c.id, image)
-	if err != nil {
-		return crex.Wrap(ErrContainerStart, err)
-	}
-
-	if err := startTask(ctx, ctr); err != nil {
-		ctr.Delete(ctx, containerd.WithSnapshotCleanup)
-		return crex.Wrap(ErrContainerStart, err)
-	}
-
-	return nil
-}
-
-// Removes a leftover container and its task from a previous run.
-func cleanupStaleContainer(ctx context.Context, client *containerd.Client, id string) {
-	existing, err := client.LoadContainer(ctx, id)
-	if err != nil {
-		return
-	}
-	if task, err := existing.Task(ctx, nil); err == nil {
-		task.Kill(ctx, syscall.SIGKILL)
-		task.Delete(ctx, containerd.WithProcessKill)
-	}
-	existing.Delete(ctx, containerd.WithSnapshotCleanup)
-}
-
-// Creates a container with a fresh snapshot and OCI spec from the image.
-func createContainer(ctx context.Context, client *containerd.Client, id string, image containerd.Image) (containerd.Container, error) {
-	return client.NewContainer(ctx, id,
-		containerd.WithImage(image),
-		containerd.WithNewSnapshot(id, image),
-		containerd.WithNewSpec(oci.WithImageConfig(image)),
-	)
-}
-
-// Creates and starts a task for the container in detached mode.
-func startTask(ctx context.Context, ctr containerd.Container) error {
-	task, err := ctr.NewTask(ctx, cio.NullIO)
-	if err != nil {
-		return err
-	}
-	if err := task.Start(ctx); err != nil {
-		task.Delete(ctx)
-		return err
-	}
-	return nil
-}
 
 // Stops the container's task.
 //
@@ -102,7 +41,7 @@ func startTask(ctx context.Context, ctr containerd.Container) error {
 // preserved. Stop is idempotent; calling it on an already-stopped
 // container is not an error.
 func (c *Container) Stop(ctx context.Context) error {
-	client, err := newContainerdClient(c.image.registry)
+	client, err := newContainerdClient(c.registry)
 	if err != nil {
 		return crex.Wrap(ErrContainerStop, err)
 	}
@@ -138,30 +77,28 @@ func (c *Container) Stop(ctx context.Context) error {
 // with its snapshot. The image is not affected. After destruction the
 // container cannot be restarted.
 func (c *Container) Destroy(ctx context.Context) error {
-	client, err := newContainerdClient(c.image.registry)
+	client, err := newContainerdClient(c.registry)
 	if err != nil {
 		return crex.Wrap(ErrContainerDestroy, err)
 	}
 	defer client.Close()
 
-	if ctr, loadErr := client.LoadContainer(ctx, c.id); loadErr == nil {
-		if task, taskErr := ctr.Task(ctx, nil); taskErr == nil {
-			task.Kill(ctx, syscall.SIGKILL)
-			task.Delete(ctx, containerd.WithProcessKill)
+	ctr, loadErr := client.LoadContainer(ctx, c.id)
+	if loadErr != nil {
+		if errdefs.IsNotFound(loadErr) {
+			return nil
 		}
-		if err := ctr.Delete(ctx, containerd.WithSnapshotCleanup); err != nil && !errdefs.IsNotFound(err) {
-			return crex.Wrap(ErrContainerDestroy, err)
-		}
+		return crex.Wrap(ErrContainerDestroy, loadErr)
 	}
 
-	c.image.mu.Lock()
-	for i, cc := range c.image.containers {
-		if cc == c {
-			c.image.containers = append(c.image.containers[:i], c.image.containers[i+1:]...)
-			break
-		}
+	if task, taskErr := ctr.Task(ctx, nil); taskErr == nil {
+		task.Kill(ctx, syscall.SIGKILL)
+		task.Delete(ctx, containerd.WithProcessKill)
 	}
-	c.image.mu.Unlock()
+
+	if err := ctr.Delete(ctx, containerd.WithSnapshotCleanup); err != nil && !errdefs.IsNotFound(err) {
+		return crex.Wrap(ErrContainerDestroy, err)
+	}
 
 	return nil
 }
@@ -172,7 +109,7 @@ func (c *Container) Destroy(ctx context.Context) error {
 // process inherits the container's OCI spec (environment, working
 // directory, capabilities). The container must be running.
 func (c *Container) Exec(ctx context.Context, command string, args ...string) (*ExecResult, error) {
-	client, err := newContainerdClient(c.image.registry)
+	client, err := newContainerdClient(c.registry)
 	if err != nil {
 		return nil, crex.Wrap(ErrContainerExec, err)
 	}
@@ -254,7 +191,7 @@ func runExec(ctx context.Context, task containerd.Task, pspec *specs.Process) (*
 // container exists but has no running task, or [StateNotCreated] if the
 // container does not exist.
 func (c *Container) Status(ctx context.Context) (State, error) {
-	client, err := newContainerdClient(c.image.registry)
+	client, err := newContainerdClient(c.registry)
 	if err != nil {
 		return StateNotCreated, crex.Wrap(ErrContainerStatus, err)
 	}
@@ -287,16 +224,4 @@ func (c *Container) Status(ctx context.Context) (State, error) {
 	default:
 		return StateStopped, nil
 	}
-}
-
-// Stops the container, re-imports the image from a new tarball, and
-// restarts the container.
-func (c *Container) Update(ctx context.Context, path string) error {
-	if err := c.Stop(ctx); err != nil {
-		return err
-	}
-	if err := c.image.Import(ctx, path); err != nil {
-		return err
-	}
-	return c.Start(ctx)
 }

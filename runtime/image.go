@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
+	"syscall"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/reference"
@@ -18,12 +20,10 @@ import (
 // resource reference, providing isolation between registries. The image is
 // tagged as "namespace/name:version".
 type Image struct {
-	registry   string       // Containerd namespace (from registry).
-	namespace  string       // Resource namespace.
-	name       string       // Resource name.
-	version    string       // Image version.
-	mu         sync.Mutex   // Guards concurrent access to containers.
-	containers []*Container // Containers started from this image.
+	registry  string // Containerd namespace (from registry).
+	namespace string // Resource namespace.
+	name      string // Resource name.
+	version   string // Image version.
 }
 
 // Returns the image reference as "namespace/name".
@@ -79,26 +79,30 @@ func (img *Image) Import(ctx context.Context, path string) error {
 
 // Destroys the image and all its containers.
 //
-// Every container started from this image is destroyed first. The image
-// is then removed from containerd's image store. After destruction no new
-// containers can be started from this image.
+// Containers created from this image are discovered by querying containerd
+// and destroyed first. The image is then removed from the image store.
 func (img *Image) Destroy(ctx context.Context) error {
-	img.mu.Lock()
-	remaining := make([]*Container, len(img.containers))
-	copy(remaining, img.containers)
-	img.mu.Unlock()
-
-	for _, c := range remaining {
-		if err := c.Destroy(ctx); err != nil {
-			return crex.Wrap(ErrImageDestroy, err)
-		}
-	}
-
 	c, err := newContainerdClient(img.registry)
 	if err != nil {
 		return crex.Wrap(ErrImageDestroy, err)
 	}
 	defer c.Close()
+
+	filter := fmt.Sprintf("image==%s", img.tag())
+	ctrs, err := c.Containers(ctx, filter)
+	if err != nil {
+		return crex.Wrap(ErrImageDestroy, err)
+	}
+
+	for _, ctr := range ctrs {
+		if task, taskErr := ctr.Task(ctx, nil); taskErr == nil {
+			task.Kill(ctx, syscall.SIGKILL)
+			task.Delete(ctx, containerd.WithProcessKill)
+		}
+		if err := ctr.Delete(ctx, containerd.WithSnapshotCleanup); err != nil && !errdefs.IsNotFound(err) {
+			return crex.Wrap(ErrImageDestroy, err)
+		}
+	}
 
 	if err := c.ImageService().Delete(ctx, img.tag()); err != nil && !errdefs.IsNotFound(err) {
 		return crex.Wrap(ErrImageDestroy, err)
@@ -110,20 +114,78 @@ func (img *Image) Destroy(ctx context.Context) error {
 // Creates and starts a container from this image.
 //
 // If id is empty, the image name is used as the default container
-// identifier. The container runs detached.
+// identifier. Any existing container with the same identifier is
+// cleaned up first. The container runs detached.
 func (img *Image) Start(ctx context.Context, id string) (*Container, error) {
 	if id == "" {
 		id = img.name
 	}
 
-	c := &Container{image: img, id: id}
-	if err := c.Start(ctx); err != nil {
-		return nil, err
+	client, err := newContainerdClient(img.registry)
+	if err != nil {
+		return nil, crex.Wrap(ErrContainerStart, err)
+	}
+	defer client.Close()
+
+	cleanupStaleContainer(ctx, client, id)
+
+	image, err := client.GetImage(ctx, img.tag())
+	if err != nil {
+		return nil, crex.Wrap(ErrContainerStart, err)
 	}
 
-	img.mu.Lock()
-	img.containers = append(img.containers, c)
-	img.mu.Unlock()
+	ctr, err := client.NewContainer(ctx, id,
+		containerd.WithImage(image),
+		containerd.WithNewSnapshot(id, image),
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
+	)
+	if err != nil {
+		return nil, crex.Wrap(ErrContainerStart, err)
+	}
 
-	return c, nil
+	if err := startTask(ctx, ctr); err != nil {
+		ctr.Delete(ctx, containerd.WithSnapshotCleanup)
+		return nil, crex.Wrap(ErrContainerStart, err)
+	}
+
+	return NewContainer(img.registry, id), nil
+}
+
+// Stops the container, re-imports the image from a new tarball, and
+// restarts the container with the same identifier.
+func (img *Image) Update(ctx context.Context, c *Container, path string) error {
+	if err := c.Stop(ctx); err != nil {
+		return err
+	}
+	if err := img.Import(ctx, path); err != nil {
+		return err
+	}
+	_, err := img.Start(ctx, c.id)
+	return err
+}
+
+// Removes a leftover container and its task from a previous run.
+func cleanupStaleContainer(ctx context.Context, client *containerd.Client, id string) {
+	existing, err := client.LoadContainer(ctx, id)
+	if err != nil {
+		return
+	}
+	if task, err := existing.Task(ctx, nil); err == nil {
+		task.Kill(ctx, syscall.SIGKILL)
+		task.Delete(ctx, containerd.WithProcessKill)
+	}
+	existing.Delete(ctx, containerd.WithSnapshotCleanup)
+}
+
+// Creates and starts a task for the container in detached mode.
+func startTask(ctx context.Context, ctr containerd.Container) error {
+	task, err := ctr.NewTask(ctx, cio.NullIO)
+	if err != nil {
+		return err
+	}
+	if err := task.Start(ctx); err != nil {
+		task.Delete(ctx)
+		return err
+	}
+	return nil
 }

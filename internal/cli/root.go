@@ -19,15 +19,17 @@ var RootCmd struct {
 
 	// Subcommands
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
-	Build    BuildCmd    `cmd:"" help:"Build and bundle Crucible resources."`
-	Pack     PackCmd     `cmd:"" help:"Package a built resource for distribution."`
-	Push     PushCmd     `cmd:"" help:"Push a resource package to the Hub registry."`
-	Pull     PullCmd     `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
-	Plan     PlanCmd     `cmd:"" help:"Generate a deployment plan from a blueprint."`
-	Provider ProviderCmd `cmd:"" help:"Manage cloud provider configurations."`
-	Cache    CacheCmd    `cmd:"" help:"Manage the local resource cache."`
-	Vm       VmCmd       `cmd:"" help:"Manage the local development VM."`
-	Version  VersionCmd  `cmd:"" help:"Show version information."`
+	Build     BuildCmd     `cmd:"" help:"Build and bundle Crucible resources."`
+	Pack      PackCmd      `cmd:"" help:"Package a built resource for distribution."`
+	Push      PushCmd      `cmd:"" help:"Push a resource package to the Hub registry."`
+	Pull      PullCmd      `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
+	Plan      PlanCmd      `cmd:"" help:"Generate a deployment plan from a blueprint."`
+	Provider  ProviderCmd  `cmd:"" help:"Manage cloud provider configurations."`
+	Cache     CacheCmd     `cmd:"" help:"Manage the local resource cache."`
+	Runtime   RuntimeCmd   `cmd:"" help:"Manage the container runtime environment."`
+	Image     ImageCmd     `cmd:"" help:"Manage OCI images in the runtime."`
+	Container ContainerCmd `cmd:"" help:"Manage containers in the runtime."`
+	Version   VersionCmd   `cmd:"" help:"Show version information."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
 
