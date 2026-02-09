@@ -8,13 +8,15 @@ import (
 	"github.com/cruciblehq/crux/runtime"
 )
 
-// Represents the 'crux vm exec' command.
-type VmExecCmd struct {
-	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to run inside the VM."`
+// Represents the 'crux runtime exec' command.
+type RuntimeExecCmd struct {
+	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to run inside the runtime."`
 }
 
-// Executes a command inside the VM and prints its output.
-func (c *VmExecCmd) Run(ctx context.Context) error {
+// Executes a command inside the runtime and prints its output.
+//
+// The process exit code is propagated from the executed command.
+func (c *RuntimeExecCmd) Run(ctx context.Context) error {
 	result, err := runtime.Exec(c.Command[0], c.Command[1:]...)
 	if err != nil {
 		return err

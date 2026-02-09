@@ -47,9 +47,26 @@
 //		log.Fatal(err)
 //	}
 //
-//	c, err := img.Start(ctx, "/my-service")
+//	c, err := img.Start(ctx, "my-service")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //	defer c.Stop(ctx)
+//
+// Constructing a handle for an existing container:
+//
+//	ctr := runtime.NewContainer(id.Registry(), "my-service")
+//	status, err := ctr.Status(ctx)
+//
+// Updating a container with a new image:
+//
+//	if err := img.Update(ctx, ctr, "build/image.tar"); err != nil {
+//		log.Fatal(err)
+//	}
+//
+// Destroying an image and all its containers:
+//
+//	if err := img.Destroy(ctx); err != nil {
+//		log.Fatal(err)
+//	}
 package runtime
