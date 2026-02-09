@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -55,14 +54,14 @@ func OpenAt(ctx context.Context, root string) (*Cache, error) {
 	}
 
 	lockPath := filepath.Join(root, lockFilename)
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, paths.DefaultFileMode)
+	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, paths.DefaultFileMode)
 	if err != nil {
 		return nil, err
 	}
 
 	// Acquire exclusive lock (blocks until available)
-	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
-		lockFile.Close()
+	if err := lockFile(lf); err != nil {
+		lf.Close()
 		return nil, err
 	}
 
@@ -70,8 +69,8 @@ func OpenAt(ctx context.Context, root string) (*Cache, error) {
 	dbPath := filepath.Join(root, databaseFilename)
 	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
 	if err != nil {
-		syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
-		lockFile.Close()
+		unlockFile(lf)
+		lf.Close()
 		return nil, err
 	}
 
@@ -80,8 +79,8 @@ func OpenAt(ctx context.Context, root string) (*Cache, error) {
 	reg, err := registry.NewSQLRegistry(ctx, db, archivesPath, nil)
 	if err != nil {
 		db.Close()
-		syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
-		lockFile.Close()
+		unlockFile(lf)
+		lf.Close()
 		return nil, err
 	}
 
@@ -89,7 +88,7 @@ func OpenAt(ctx context.Context, root string) (*Cache, error) {
 		root:     root,
 		registry: reg,
 		db:       db,
-		lockFile: lockFile,
+		lockFile: lf,
 	}, nil
 }
 
@@ -108,7 +107,7 @@ func (c *Cache) Close() error {
 	}
 
 	if c.lockFile != nil {
-		syscall.Flock(int(c.lockFile.Fd()), syscall.LOCK_UN)
+		unlockFile(c.lockFile)
 		if err := c.lockFile.Close(); err != nil {
 			errs = append(errs, err)
 		}
