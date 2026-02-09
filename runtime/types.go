@@ -1,22 +1,22 @@
 package runtime
 
 // Current state of the container runtime environment.
-type Status int
+type State int
 
 const (
-	StatusNotCreated Status = iota // Runtime has not been provisioned.
-	StatusStopped                  // Runtime exists but is not running.
-	StatusRunning                  // Runtime is running and reachable.
+	StateNotCreated State = iota // Runtime has not been provisioned.
+	StateStopped                 // Runtime exists but is not running.
+	StateRunning                 // Runtime is running and reachable.
 )
 
-// Human-readable representation of the status.
-func (s Status) String() string {
+// Human-readable representation of the state.
+func (s State) String() string {
 	switch s {
-	case StatusNotCreated:
+	case StateNotCreated:
 		return "not created"
-	case StatusStopped:
+	case StateStopped:
 		return "stopped"
-	case StatusRunning:
+	case StateRunning:
 		return "running"
 	default:
 		return "unknown"

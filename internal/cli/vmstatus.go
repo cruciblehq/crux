@@ -12,7 +12,7 @@ type VmStatusCmd struct{}
 
 // Executes the VM status command.
 func (c *VmStatusCmd) Run(ctx context.Context) error {
-	status, err := runtime.GetStatus()
+	status, err := runtime.Status()
 	if err != nil {
 		return err
 	}

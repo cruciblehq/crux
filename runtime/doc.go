@@ -1,10 +1,11 @@
 // Package runtime manages the container runtime environment for Crucible.
 //
 // On macOS, containers run inside a Lima virtual machine with containerd.
-// On Linux, containers run natively via a vendored containerd. The package
-// exposes a platform-agnostic API; platform-specific details are handled
-// internally. Calling any function on an unsupported platform returns
-// [ErrUnsupportedPlatform].
+// The containerd socket is forwarded from the guest to the host via Lima's
+// portForwards, allowing the Go client to connect directly. On Linux,
+// containers run natively via a vendored containerd. The package exposes a
+// platform-agnostic API; platform-specific details are handled internally.
+// Calling any function on an unsupported platform returns [ErrUnsupportedPlatform].
 //
 // Starting and stopping the runtime:
 //
@@ -15,7 +16,7 @@
 //
 // Querying the runtime status:
 //
-//	status, err := runtime.GetStatus()
+//	status, err := runtime.Status()
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -35,10 +36,20 @@
 //		log.Fatal(err)
 //	}
 //
-// Importing an OCI image into the runtime:
+// Importing an OCI image and managing containers:
 //
-//	err := runtime.ImportImage(m.Resource.Ref, m.Resource.Type, m.Resource.Version, "build/image.tar")
+//	id, err := reference.ParseIdentifier(ref, resource.TypeService, nil)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
+//	img := runtime.NewImage(id, version)
+//	if err := img.Import(ctx, "build/image.tar"); err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	c, err := img.Start(ctx, "/my-service")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer c.Stop(ctx)
 package runtime
