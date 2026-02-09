@@ -2,20 +2,101 @@ package archive
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/klauspost/compress/zstd"
 )
 
+// Supported archive compression formats.
+//
+// Each format corresponds to a tar archive compressed with a specific
+// algorithm. The format is inferred from the file extension by [Create] and
+// [Extract], or supplied explicitly to [ExtractFromReader].
+type Format int
+
 const (
 
-	// Default file extension for zstd-compressed tar archives.
-	ArchiveFileExtension = ".tar.zst"
+	// Zstandard compression (.tar.zst).
+	Zstd Format = iota
+
+	// Gzip compression (.tar.gz, .tgz).
+	Gzip
+
+	// File extension for Zstandard-compressed tar archives.
+	extZstd = ".tar.zst"
+
+	// File extension for Gzip-compressed tar archives.
+	extGzip = ".tar.gz"
+
+	// Alternate file extension for Gzip-compressed tar archives.
+	extTgz = ".tgz"
+)
+
+// String returns the canonical file extension for the format.
+func (f Format) String() string {
+	switch f {
+	case Zstd:
+		return extZstd
+	case Gzip:
+		return extGzip
+	default:
+		return extZstd
+	}
+}
+
+// Detects the archive format from a filename.
+//
+// Returns [ErrUnsupportedFormat] if the extension is not recognised.
+func detect(name string) (Format, error) {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, extZstd):
+		return Zstd, nil
+	case strings.HasSuffix(lower, extGzip):
+		return Gzip, nil
+	case strings.HasSuffix(lower, extTgz):
+		return Gzip, nil
+	default:
+		return 0, ErrUnsupportedFormat
+	}
+}
+
+// Returns a write-closer that compresses data with the given format.
+func newCompressWriter(w io.Writer, f Format) (io.WriteCloser, error) {
+	switch f {
+	case Zstd:
+		return zstd.NewWriter(w)
+	case Gzip:
+		return gzip.NewWriter(w), nil
+	default:
+		return nil, ErrUnsupportedFormat
+	}
+}
+
+// Returns a read-closer that decompresses data with the given format.
+func newDecompressReader(r io.Reader, f Format) (io.ReadCloser, error) {
+	switch f {
+	case Zstd:
+		zr, err := zstd.NewReader(r)
+		if err != nil {
+			return nil, err
+		}
+		return zr.IOReadCloser(), nil
+	case Gzip:
+		return gzip.NewReader(r)
+	default:
+		return nil, ErrUnsupportedFormat
+	}
+}
+
+const (
 
 	// Permission mode used when creating directories.
 	//
@@ -30,34 +111,40 @@ const (
 	FileMode os.FileMode = 0644
 )
 
-// Creates a zstd-compressed tar archive from a directory.
+// Creates a compressed tar archive from a directory.
 //
-// The archive contains all files and directories under src with paths stored
-// relative to src. Paths in the archive use forward slashes regardless of the
-// host operating system. Only regular files and directories are allowed.
-// Symlinks and other special file types such as devices and sockets will cause
-// the function to return [ErrUnsupportedFileType]. If creation fails, the
-// partially written archive is removed.
+// The compression format is detected from the dest filename extension
+// (see [Format]). The archive contains all files and directories under src
+// with paths stored relative to src. Paths in the archive use forward slashes
+// regardless of the host operating system. Only regular files and directories
+// are allowed. Symlinks and other special file types such as devices and
+// sockets will cause the function to return [ErrUnsupportedFileType]. If
+// creation fails, the partially written archive is removed.
 func Create(src, dest string) (err error) {
+	fmt, err := detect(dest)
+	if err != nil {
+		return crex.Wrap(ErrCreateFailed, err)
+	}
+
 	file, err := os.Create(dest)
 	if err != nil {
 		return crex.Wrap(ErrCreateFailed, err)
 	}
 	defer file.Close()
 
-	zw, err := zstd.NewWriter(file)
+	cw, err := newCompressWriter(file, fmt)
 	if err != nil {
 		os.Remove(dest)
 		return crex.Wrap(ErrCreateFailed, err)
 	}
 	defer func() {
-		zw.Close()
+		cw.Close()
 		if err != nil {
 			os.Remove(dest)
 		}
 	}()
 
-	tw := tar.NewWriter(zw)
+	tw := tar.NewWriter(cw)
 	defer tw.Close()
 
 	if err = writeTar(tw, src); err != nil {
@@ -67,39 +154,47 @@ func Create(src, dest string) (err error) {
 	return nil
 }
 
-// Extracts a zstd-compressed tar archive to a directory.
+// Extracts a compressed tar archive to a directory.
 //
-// Files are extracted with [FileMode] and directories with [DirMode]. Returns
-// [ErrExtractFailed] wrapping [os.ErrExist] if dest already exists. Only regular
-// files and directories are allowed. Symlinks and other special file types
-// return [ErrUnsupportedFileType]. Absolute paths and path traversal attempts
-// (e.g., "../etc/passwd") return [ErrInvalidPath]. If extraction fails, the
-// destination directory and its contents are removed.
+// The compression format is detected from the src filename extension
+// (see [Format]). Files are extracted with [FileMode] and directories with
+// [DirMode]. Returns [ErrExtractFailed] wrapping [os.ErrExist] if dest already
+// exists. Only regular files and directories are allowed. Symlinks and other
+// special file types return [ErrUnsupportedFileType]. Absolute paths and path
+// traversal attempts (e.g., "../etc/passwd") return [ErrInvalidPath]. If
+// extraction fails, the destination directory and its contents are removed.
 func Extract(src, dest string) error {
+	fmt, err := detect(src)
+	if err != nil {
+		return crex.Wrap(ErrExtractFailed, err)
+	}
+
 	file, err := os.Open(src)
 	if err != nil {
 		return crex.Wrap(ErrExtractFailed, err)
 	}
 	defer file.Close()
 
-	return ExtractFromReader(file, dest)
+	return ExtractFromReader(file, dest, fmt)
 }
 
-// Extracts a zstd-compressed tar archive from a reader to a directory.
+// Extracts a compressed tar archive from a reader to a directory.
 //
 // Same behavior as [Extract] but reads from an [io.Reader] instead of a file.
-func ExtractFromReader(r io.Reader, dest string) error {
+// The compression format must be supplied explicitly because there is no
+// filename to detect from.
+func ExtractFromReader(r io.Reader, dest string, f Format) error {
 	if _, statErr := os.Stat(dest); statErr == nil {
 		return crex.Wrap(ErrExtractFailed, os.ErrExist)
 	}
 
-	zr, err := zstd.NewReader(r)
+	dr, err := newDecompressReader(r, f)
 	if err != nil {
 		return crex.Wrap(ErrExtractFailed, err)
 	}
-	defer zr.Close()
+	defer dr.Close()
 
-	err = extractToDirectory(tar.NewReader(zr), dest)
+	err = extractToDirectory(tar.NewReader(dr), dest)
 	if err != nil {
 		return crex.Wrap(ErrExtractFailed, err)
 	}
@@ -254,7 +349,7 @@ func validateAndJoinPath(dest, name string) (string, error) {
 func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 	switch header.Typeflag {
 	case tar.TypeDir:
-		return extractDirectory(target)
+		return os.MkdirAll(target, DirMode)
 
 	case tar.TypeReg:
 		return extractFile(tr, target)
@@ -264,24 +359,14 @@ func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 	}
 }
 
-// Creates a directory at target with [DirMode].
-//
-// Creates all parent directories as needed.
-func extractDirectory(target string) error {
-	return os.MkdirAll(target, DirMode)
-}
-
 // Extracts a regular file from r to target.
 //
-// Creates parent directories as needed, then writes file contents with
-// [FileMode].
+// Creates parent directories as needed, then writes file contents with [FileMode].
 func extractFile(r io.Reader, target string) error {
-	// Ensure parent directory exists
-	if err := extractDirectory(filepath.Dir(target)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), DirMode); err != nil {
 		return err
 	}
 
-	// Create file
 	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FileMode)
 	if err != nil {
 		return err
@@ -301,7 +386,7 @@ func extractFile(r io.Reader, target string) error {
 // exhausted. Returns the file contents and nil error on success, (nil, nil) if
 // the file is not present, or (nil, error) if a read error occurs. The tar
 // reader is advanced past the matched entry and cannot be rewound.
-func FindInTar(tr *tar.Reader, filename string) ([]byte, error) {
+func Find(tr *tar.Reader, filename string) ([]byte, error) {
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {

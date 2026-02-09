@@ -130,10 +130,10 @@ func (b *ErrorBuilder) Context(ctx context.Context) *ErrorBuilder {
 // useful for validating programmatically constructed errors before calling Err.
 func (b *ErrorBuilder) Validate() error {
 	if b.err.description == "" {
-		return fmt.Errorf("crex: error description is empty")
+		return ErrEmptyDescription
 	}
 	if b.err.reason == "" {
-		return fmt.Errorf("crex: error reason is empty")
+		return ErrEmptyReason
 	}
 	return nil
 }

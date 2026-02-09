@@ -7,4 +7,5 @@ var (
 	ErrExtractFailed       = errors.New("extraction failed")
 	ErrInvalidPath         = errors.New("invalid path")
 	ErrUnsupportedFileType = errors.New("unsupported file type")
+	ErrUnsupportedFormat   = errors.New("unsupported archive format")
 )

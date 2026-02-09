@@ -3,6 +3,7 @@ package archive
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ func TestExtractFromReader(t *testing.T) {
 	}
 
 	destDir := filepath.Join(t.TempDir(), "extracted")
-	if err := ExtractFromReader(bytes.NewReader(data), destDir); err != nil {
+	if err := ExtractFromReader(bytes.NewReader(data), destDir, Zstd); err != nil {
 		t.Fatalf("ExtractFromReader failed: %v", err)
 	}
 
@@ -71,7 +72,7 @@ func TestExtractFromReaderDestinationExists(t *testing.T) {
 	}
 
 	destDir := t.TempDir()
-	err = ExtractFromReader(bytes.NewReader(data), destDir)
+	err = ExtractFromReader(bytes.NewReader(data), destDir, Zstd)
 
 	if err == nil {
 		t.Fatal("expected error for existing destination")
@@ -81,7 +82,7 @@ func TestExtractFromReaderDestinationExists(t *testing.T) {
 func TestExtractFromReaderInvalidData(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "extracted")
 
-	err := ExtractFromReader(bytes.NewReader([]byte("not a valid archive")), destDir)
+	err := ExtractFromReader(bytes.NewReader([]byte("not a valid archive")), destDir, Zstd)
 	if err == nil {
 		t.Fatal("expected error for invalid data")
 	}
@@ -148,7 +149,7 @@ func TestExtractPathTraversal(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "extracted")
 	maliciousArchive := createMaliciousArchive(t, "../etc/passwd")
 
-	err := ExtractFromReader(maliciousArchive, destDir)
+	err := ExtractFromReader(maliciousArchive, destDir, Zstd)
 	if err == nil {
 		t.Fatal("expected error for path traversal attempt")
 	}
@@ -163,7 +164,7 @@ func TestExtractAbsolutePath(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), "extracted")
 	maliciousArchive := createMaliciousArchive(t, "/etc/passwd")
 
-	err := ExtractFromReader(maliciousArchive, destDir)
+	err := ExtractFromReader(maliciousArchive, destDir, Zstd)
 	if err == nil {
 		t.Fatal("expected error for absolute path")
 	}
@@ -314,7 +315,7 @@ func createMaliciousArchive(t *testing.T, maliciousPath string) *bytes.Reader {
 	return bytes.NewReader(buf.Bytes())
 }
 
-func TestFindInTar(t *testing.T) {
+func TestFind(t *testing.T) {
 	// Build a tar archive in memory with two files
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -336,7 +337,7 @@ func TestFindInTar(t *testing.T) {
 
 	t.Run("found", func(t *testing.T) {
 		tr := tar.NewReader(bytes.NewReader(buf.Bytes()))
-		data, err := FindInTar(tr, "crucible.yaml")
+		data, err := Find(tr, "crucible.yaml")
 		if err != nil {
 			t.Fatalf("FindInTar error: %v", err)
 		}
@@ -347,7 +348,7 @@ func TestFindInTar(t *testing.T) {
 
 	t.Run("not found", func(t *testing.T) {
 		tr := tar.NewReader(bytes.NewReader(buf.Bytes()))
-		data, err := FindInTar(tr, "missing.txt")
+		data, err := Find(tr, "missing.txt")
 		if err != nil {
 			t.Fatalf("FindInTar error: %v", err)
 		}
@@ -362,7 +363,7 @@ func TestFindInTar(t *testing.T) {
 		emptyTw.Close()
 
 		tr := tar.NewReader(bytes.NewReader(empty.Bytes()))
-		data, err := FindInTar(tr, "any.txt")
+		data, err := Find(tr, "any.txt")
 		if err != nil {
 			t.Fatalf("FindInTar error: %v", err)
 		}
@@ -458,7 +459,7 @@ func TestExtractFromReaderCleansUpOnMaliciousEntry(t *testing.T) {
 	zw.Close()
 
 	destDir := filepath.Join(t.TempDir(), "extracted")
-	err := ExtractFromReader(bytes.NewReader(buf.Bytes()), destDir)
+	err := ExtractFromReader(bytes.NewReader(buf.Bytes()), destDir, Zstd)
 	if err == nil {
 		t.Fatal("expected error for symlink entry")
 	}
@@ -466,5 +467,178 @@ func TestExtractFromReaderCleansUpOnMaliciousEntry(t *testing.T) {
 	// Destination should be cleaned up
 	if _, statErr := os.Stat(destDir); statErr == nil {
 		t.Fatal("destination should not exist after failed extraction")
+	}
+}
+
+func TestCreateAndExtractGzip(t *testing.T) {
+	srcDir := t.TempDir()
+	createTestFiles(t, srcDir)
+
+	archivePath := filepath.Join(t.TempDir(), "test.tar.gz")
+	if err := Create(srcDir, archivePath); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	if err := Extract(archivePath, destDir); err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(destDir, "file.txt"), "hello")
+	assertFileContent(t, filepath.Join(destDir, "subdir", "nested.txt"), "nested")
+	assertDirExists(t, filepath.Join(destDir, "emptydir"))
+}
+
+func TestCreateAndExtractTgz(t *testing.T) {
+	srcDir := t.TempDir()
+	createTestFiles(t, srcDir)
+
+	archivePath := filepath.Join(t.TempDir(), "test.tgz")
+	if err := Create(srcDir, archivePath); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// Extract using .tgz extension directly
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	if err := Extract(archivePath, destDir); err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(destDir, "file.txt"), "hello")
+}
+
+func TestExtractFromReaderGzip(t *testing.T) {
+	srcDir := t.TempDir()
+	createTestFiles(t, srcDir)
+
+	archivePath := filepath.Join(t.TempDir(), "test.tar.gz")
+	if err := Create(srcDir, archivePath); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	if err := ExtractFromReader(bytes.NewReader(data), destDir, Gzip); err != nil {
+		t.Fatalf("ExtractFromReader failed: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(destDir, "file.txt"), "hello")
+}
+
+func TestDetect(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    Format
+		wantErr bool
+	}{
+		{"archive.tar.zst", Zstd, false},
+		{"archive.tar.gz", Gzip, false},
+		{"archive.tgz", Gzip, false},
+		{"ARCHIVE.TAR.ZST", Zstd, false},
+		{"ARCHIVE.TAR.GZ", Gzip, false},
+		{"archive.zip", 0, true},
+		{"archive.tar", 0, true},
+		{"archive.rar", 0, true},
+		{"noextension", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := detect(tt.name)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("detect(%q) error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("detect(%q) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatString(t *testing.T) {
+	if Zstd.String() != ".tar.zst" {
+		t.Fatalf("Zstd.String() = %q, want %q", Zstd.String(), ".tar.zst")
+	}
+	if Gzip.String() != ".tar.gz" {
+		t.Fatalf("Gzip.String() = %q, want %q", Gzip.String(), ".tar.gz")
+	}
+}
+
+func TestCreateUnsupportedFormat(t *testing.T) {
+	srcDir := t.TempDir()
+	archivePath := filepath.Join(t.TempDir(), "test.zip")
+	err := Create(srcDir, archivePath)
+	if err == nil {
+		t.Fatal("expected error for unsupported format")
+	}
+	if !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("expected ErrUnsupportedFormat, got: %v", err)
+	}
+}
+
+func TestExtractUnsupportedFormat(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "test.zip")
+	if err := os.WriteFile(archivePath, []byte("fake"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	err := Extract(archivePath, destDir)
+	if err == nil {
+		t.Fatal("expected error for unsupported format")
+	}
+	if !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("expected ErrUnsupportedFormat, got: %v", err)
+	}
+}
+
+func createMaliciousGzipArchive(t *testing.T, maliciousPath string) *bytes.Reader {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	header := &tar.Header{
+		Name:     maliciousPath,
+		Mode:     0644,
+		Size:     5,
+		Typeflag: tar.TypeReg,
+	}
+
+	if err := tw.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tw.Write([]byte("pwned")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return bytes.NewReader(buf.Bytes())
+}
+
+func TestExtractGzipPathTraversal(t *testing.T) {
+	destDir := filepath.Join(t.TempDir(), "extracted")
+	maliciousArchive := createMaliciousGzipArchive(t, "../etc/passwd")
+
+	err := ExtractFromReader(maliciousArchive, destDir, Gzip)
+	if err == nil {
+		t.Fatal("expected error for path traversal attempt")
+	}
+
+	if !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got: %v", err)
 	}
 }

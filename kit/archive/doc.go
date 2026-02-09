@@ -1,10 +1,13 @@
-// Package archive provides functions for creating and extracting zstd-compressed
-// tar archives.
+// Package archive provides functions for creating and extracting compressed tar
+// archives.
 //
-// Archives are compressed using Zstandard (zstd). Only regular files and
-// directories are supported; symlinks and special files (devices, sockets,
-// named pipes) are rejected with [ErrUnsupportedFileType]. Path traversal
-// attacks and absolute paths are detected and rejected with [ErrInvalidPath].
+// Supported formats are Zstandard (.tar.zst) and Gzip (.tar.gz, .tgz). The
+// compression format is detected automatically from the file extension by
+// [Create] and [Extract], or supplied explicitly to [ExtractFromReader]. Only
+// regular files and directories are supported; symlinks and special files
+// (devices, sockets, named pipes) are rejected with [ErrUnsupportedFileType].
+// Path traversal attacks and absolute paths are detected and rejected with
+// [ErrInvalidPath].
 //
 // Creating an archive from a directory:
 //
@@ -15,7 +18,7 @@
 //
 // Extracting an archive to a new directory:
 //
-//	err := archive.Extract("output.tar.zst", "extracted")
+//	err := archive.Extract("output.tar.gz", "extracted")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -24,7 +27,7 @@
 //
 //	file, _ := os.Open("output.tar.zst")
 //	defer file.Close()
-//	err := archive.ExtractFromReader(file, "extracted")
+//	err := archive.ExtractFromReader(file, "extracted", archive.Zstd)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -32,7 +35,7 @@
 // Reading a single file from a tar stream:
 //
 //	tr := tar.NewReader(r)
-//	data, err := archive.FindInTar(tr, "crucible.yaml")
+//	data, err := archive.Find(tr, "crucible.yaml")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
