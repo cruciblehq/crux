@@ -10,6 +10,8 @@ import (
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/pack"
+	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
 )
 
@@ -49,8 +51,14 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
-	if err := runtime.ImportImage(m.Resource.Ref, m.Resource.Type, m.Resource.Version, destImage); err != nil {
-		slog.Warn("failed to import image into runtime", "error", err)
+	id, err := reference.ParseIdentifier(m.Resource.Ref, resource.TypeService, nil)
+	if err != nil {
+		slog.Warn("failed to parse resource ref", "error", err)
+	} else {
+		img := runtime.NewImage(id, m.Resource.Version)
+		if err := img.Import(ctx, destImage); err != nil {
+			slog.Warn("failed to import image into runtime", "error", err)
+		}
 	}
 
 	return &Result{Output: output}, nil

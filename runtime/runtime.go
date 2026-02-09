@@ -1,10 +1,6 @@
-//go:build !darwin && !linux
+//go:build !darwin
 
 package runtime
-
-import (
-	"github.com/cruciblehq/crux/resource"
-)
 
 // Returns [ErrUnsupportedPlatform] on unsupported platforms.
 func Start() error {
@@ -22,16 +18,11 @@ func Destroy() error {
 }
 
 // Returns [ErrUnsupportedPlatform] on unsupported platforms.
-func GetStatus() (Status, error) {
-	return StatusNotCreated, ErrUnsupportedPlatform
+func Status() (State, error) {
+	return StateNotCreated, ErrUnsupportedPlatform
 }
 
 // Returns [ErrUnsupportedPlatform] on unsupported platforms.
 func Exec(command string, args ...string) (*ExecResult, error) {
 	return nil, ErrUnsupportedPlatform
-}
-
-// Returns [ErrUnsupportedPlatform] on unsupported platforms.
-func ImportImage(_ string, _ resource.Type, _, _ string) error {
-	return ErrUnsupportedPlatform
 }

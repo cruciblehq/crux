@@ -2,10 +2,6 @@
 
 package runtime
 
-import (
-	"github.com/cruciblehq/crux/resource"
-)
-
 // Starts the container runtime environment.
 //
 // On macOS this creates and boots a Lima virtual machine. Blocks until the
@@ -37,10 +33,10 @@ func Destroy() error {
 }
 
 // Queries the current state of the container runtime environment.
-func GetStatus() (Status, error) {
+func Status() (State, error) {
 	l, err := newLima()
 	if err != nil {
-		return StatusNotCreated, err
+		return StateNotCreated, err
 	}
 	return l.status()
 }
@@ -55,17 +51,4 @@ func Exec(command string, args ...string) (*ExecResult, error) {
 		return nil, err
 	}
 	return l.exec(command, args...)
-}
-
-// Imports an OCI image tarball into containerd.
-//
-// The registry component of the resource reference is used as the containerd
-// namespace for isolation. Images are tagged as "namespace/name:version". On
-// macOS the import runs inside the Lima virtual machine.
-func ImportImage(ref string, typ resource.Type, version, path string) error {
-	l, err := newLima()
-	if err != nil {
-		return err
-	}
-	return l.importImage(ref, typ, version, path)
 }
