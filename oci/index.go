@@ -132,7 +132,7 @@ func (i *Index) LoadImage(osName, arch string) (*Image, error) {
 		}
 	}
 
-	return nil, crex.Wrap(ErrInvalidImage, fmt.Errorf("platform %s/%s not found", osName, arch))
+	return nil, crex.Wrap(ErrInvalidImage, ErrPlatformNotFound)
 }
 
 // Saves the index to disk as an OCI layout directory.

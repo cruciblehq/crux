@@ -3,12 +3,14 @@ package build
 import (
 	"context"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/pack"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/pack"
+	"github.com/cruciblehq/crux/runtime"
 )
 
 // Builder for Crucible services.
@@ -45,6 +47,10 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 	destImage := filepath.Join(output, pack.ImageFile)
 	if err := copyFile(sourceImage, destImage); err != nil {
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
+	}
+
+	if err := runtime.ImportImage(m.Resource.Ref, m.Resource.Type, m.Resource.Version, destImage); err != nil {
+		slog.Warn("failed to import image into runtime", "error", err)
 	}
 
 	return &Result{Output: output}, nil

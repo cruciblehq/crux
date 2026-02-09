@@ -37,7 +37,7 @@ func (r *SQLRegistry) archiveTempPath(namespace, resource, version string) strin
 // The path follows the pattern: {archiveDir}/{digest}.tar.zst
 func (r *SQLRegistry) archiveFinalPath(namespace, resource, version, digest string) string {
 	archiveDir := r.archiveDirectoryPath(namespace, resource, version)
-	return filepath.Join(archiveDir, digest+archive.ArchiveFileExtension)
+	return filepath.Join(archiveDir, digest+archive.Zstd.String())
 }
 
 // Stores an archive file to disk and calculates its digest.

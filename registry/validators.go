@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"errors"
 	"regexp"
 
 	"github.com/cruciblehq/crux/reference"
@@ -20,13 +19,13 @@ var (
 // characters.
 func validateName(name string) error {
 	if name == "" {
-		return errors.New("name cannot be empty")
+		return ErrNameEmpty
 	}
 	if len(name) > 63 {
-		return errors.New("name cannot exceed 63 characters")
+		return ErrNameTooLong
 	}
 	if !namePattern.MatchString(name) {
-		return errors.New("name must contain only lowercase letters, numbers, and hyphens, and must start and end with an alphanumeric character")
+		return ErrNameInvalid
 	}
 	return nil
 }
@@ -36,7 +35,7 @@ func validateName(name string) error {
 // Uses proper semantic version validation from the reference package.
 func validateVersionString(version string) error {
 	if _, err := reference.ParseVersion(version); err != nil {
-		return errors.New("invalid version format: must be semantic version (e.g., 1.2.3, 1.0.0-alpha.1)")
+		return ErrVersionInvalid
 	}
 	return nil
 }

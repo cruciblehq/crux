@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/cruciblehq/crux/kit/crex"
 )
 
 // HTTP client for interacting with the Crucible Hub registry.
@@ -38,7 +40,7 @@ func NewClient(baseURL string, httpClient *http.Client) *Client {
 func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Namespace, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal namespace info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	req, err := c.newRequest(ctx, "POST", "/namespaces", bytes.NewReader(body))
@@ -75,7 +77,7 @@ func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*Namespac
 func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info NamespaceInfo) (*Namespace, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal namespace info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace)
@@ -122,7 +124,7 @@ func (c *Client) ListNamespaces(ctx context.Context) (*NamespaceList, error) {
 func (c *Client) CreateResource(ctx context.Context, namespace string, info ResourceInfo) (*Resource, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal resource info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources")
@@ -160,7 +162,7 @@ func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (
 func (c *Client) UpdateResource(ctx context.Context, namespace, resource string, info ResourceInfo) (*Resource, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal resource info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource)
@@ -208,7 +210,7 @@ func (c *Client) ListResources(ctx context.Context, namespace string) (*Resource
 func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, info VersionInfo) (*Version, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal version info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions")
@@ -246,7 +248,7 @@ func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version s
 func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version string, info VersionInfo) (*Version, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal version info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version)
@@ -318,14 +320,14 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("execute request: %w", err)
+		return nil, crex.Wrap(ErrHTTPExecute, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+			return nil, fmt.Errorf("%w: HTTP %d: %s", ErrHTTPStatus, resp.StatusCode, resp.Status)
 		}
 		return nil, &regErr
 	}
@@ -337,7 +339,7 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info ChannelInfo) (*Channel, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal channel info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels")
@@ -375,7 +377,7 @@ func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel s
 func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info ChannelInfo) (*Channel, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("marshal channel info: %w", err)
+		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels", channel)
@@ -423,13 +425,13 @@ func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (
 func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse base URL: %w", err)
+		return nil, crex.Wrap(ErrBaseURL, err)
 	}
 	u.Path = path
 
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return nil, crex.Wrap(ErrHTTPRequest, err)
 	}
 	return req, nil
 }
@@ -438,21 +440,21 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 func (c *Client) do(req *http.Request, result interface{}) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("execute request: %w", err)
+		return crex.Wrap(ErrHTTPExecute, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+			return fmt.Errorf("%w: HTTP %d: %s", ErrHTTPStatus, resp.StatusCode, resp.Status)
 		}
 		return &regErr
 	}
 
 	if result != nil {
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return fmt.Errorf("decode response: %w", err)
+			return crex.Wrap(ErrResponseDecode, err)
 		}
 	}
 

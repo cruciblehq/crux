@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/registry"
 )
 
 // Options for pushing a package to the Hub registry.
 type PushOptions struct {
 	Registry     string // Hub registry URL.
-	Resource     string // Resource identifier (namespace/name).
 	Manifestfile string // Path to the manifest file.
 	Package      string // Path to the package archive.
 }
@@ -33,26 +32,26 @@ func Push(ctx context.Context, opts PushOptions) error {
 		return err
 	}
 
-	namespace, resourceName, err := parseResource(opts.Resource)
+	id, err := reference.ParseIdentifier(man.Resource.Ref, man.Resource.Type, nil)
 	if err != nil {
 		return err
 	}
 
 	client := registry.NewClient(opts.Registry, nil)
 
-	if err := verifyNamespace(ctx, client, namespace); err != nil {
+	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err
 	}
 
-	if err := ensureResource(ctx, client, namespace, resourceName, man); err != nil {
+	if err := ensureResource(ctx, client, id.Namespace(), id.Name(), man); err != nil {
 		return err
 	}
 
-	if err := createVersion(ctx, client, namespace, resourceName, man.Resource.Version); err != nil {
+	if err := createVersion(ctx, client, id.Namespace(), id.Name(), man.Resource.Version); err != nil {
 		return err
 	}
 
-	return uploadPackage(ctx, client, namespace, resourceName, man.Resource.Version, opts.Package)
+	return uploadPackage(ctx, client, id.Namespace(), id.Name(), man.Resource.Version, opts.Package)
 }
 
 // Validates that the package file exists.
@@ -86,20 +85,6 @@ func loadManifest(manifestfile string) (*manifest.Manifest, error) {
 			Err()
 	}
 	return man, nil
-}
-
-// Parses namespace and resource name from the resource argument.
-//
-// The expected format is "namespace/name". If the format is invalid, an error
-// is returned.
-func parseResource(resource string) (namespace, name string, err error) {
-	parts := strings.Split(resource, "/")
-	if len(parts) != 2 {
-		return "", "", crex.UserError("invalid resource format", "expected namespace/name").
-			Fallback("Use the expected format namespace/name.").
-			Err()
-	}
-	return parts[0], parts[1], nil
 }
 
 // Verifies that the namespace exists.
@@ -144,7 +129,7 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 
 	resInfo := registry.ResourceInfo{
 		Name:        resource,
-		Type:        man.Resource.Type,
+		Type:        string(man.Resource.Type),
 		Description: "",
 	}
 	_, err = client.CreateResource(ctx, namespace, resInfo)
