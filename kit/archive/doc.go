@@ -9,6 +9,10 @@
 // Path traversal attacks and absolute paths are detected and rejected with
 // [ErrInvalidPath].
 //
+// Extracted files preserve their original permissions from the archive headers
+// with special bits (setuid, setgid, sticky) stripped via a 0777 mask.
+// Directories are created with [DirMode] (0755).
+//
 // Creating an archive from a directory:
 //
 //	err := archive.Create("mydir", "output.tar.zst")
