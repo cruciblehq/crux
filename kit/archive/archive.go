@@ -104,10 +104,10 @@ const (
 	// optional for other purposes.
 	DirMode os.FileMode = 0755
 
-	// Permission mode used when creating files.
+	// Permission mode used when creating files during archive creation.
 	//
-	// This mode is required when handling resource extraction and storage and
-	// optional for other purposes.
+	// During extraction, file modes are preserved from the archive headers
+	// with special bits (setuid, setgid, sticky) stripped.
 	FileMode os.FileMode = 0644
 )
 
@@ -157,16 +157,21 @@ func Create(src, dest string) (err error) {
 // Extracts a compressed tar archive to a directory.
 //
 // The compression format is detected from the src filename extension
-// (see [Format]). Files are extracted with [FileMode] and directories with
-// [DirMode]. Returns [ErrExtractFailed] wrapping [os.ErrExist] if dest already
-// exists. Only regular files and directories are allowed. Symlinks and other
-// special file types return [ErrUnsupportedFileType]. Absolute paths and path
-// traversal attempts (e.g., "../etc/passwd") return [ErrInvalidPath]. If
-// extraction fails, the destination directory and its contents are removed.
-func Extract(src, dest string) error {
+// (see [Format]). File permissions are preserved from the archive headers
+// with special bits stripped. Directories are created with [DirMode]. Returns
+// [ErrExtractFailed] wrapping [os.ErrExist] if dest already exists. Only
+// regular files and directories are allowed. Symlinks and other special file
+// types return [ErrUnsupportedFileType]. Absolute paths and path traversal
+// attempts (e.g., "../etc/passwd") return [ErrInvalidPath]. If extraction
+// fails, the destination directory and its contents are removed.
+func Extract(src, dest string) (err error) {
 	fmt, err := detect(src)
 	if err != nil {
 		return crex.Wrap(ErrExtractFailed, err)
+	}
+
+	if _, statErr := os.Stat(dest); statErr == nil {
+		return crex.Wrap(ErrExtractFailed, os.ErrExist)
 	}
 
 	file, err := os.Open(src)
@@ -175,49 +180,35 @@ func Extract(src, dest string) error {
 	}
 	defer file.Close()
 
-	return ExtractFromReader(file, dest, fmt)
-}
-
-// Extracts a compressed tar archive from a reader to a directory.
-//
-// Same behavior as [Extract] but reads from an [io.Reader] instead of a file.
-// The compression format must be supplied explicitly because there is no
-// filename to detect from.
-func ExtractFromReader(r io.Reader, dest string, f Format) error {
-	if _, statErr := os.Stat(dest); statErr == nil {
-		return crex.Wrap(ErrExtractFailed, os.ErrExist)
-	}
-
-	dr, err := newDecompressReader(r, f)
-	if err != nil {
-		return crex.Wrap(ErrExtractFailed, err)
-	}
-	defer dr.Close()
-
-	err = extractToDirectory(tar.NewReader(dr), dest)
-	if err != nil {
-		return crex.Wrap(ErrExtractFailed, err)
-	}
-
-	return nil
-}
-
-// Extracts tar contents to a directory with proper cleanup on failure.
-//
-// Creates dest if it doesn't exist. If any error occurs during extraction,
-// dest and all extracted contents are removed.
-func extractToDirectory(tr *tar.Reader, dest string) (err error) {
-	if err = os.MkdirAll(dest, DirMode); err != nil {
-		return err
-	}
 	defer func() {
 		if err != nil {
 			os.RemoveAll(dest)
 		}
 	}()
 
-	if err = readTar(tr, dest); err != nil {
-		return err
+	return ExtractFromReader(file, dest, fmt)
+}
+
+// Extracts a compressed tar archive from a reader to a directory.
+//
+// Creates dest if it does not exist and extracts all entries into it. The
+// compression format must be supplied explicitly because there is no filename
+// to detect from. File permissions are preserved from the archive headers
+// with special bits stripped. Unlike [Extract], this function does not check
+// whether dest already exists and does not clean up on failure.
+func ExtractFromReader(r io.Reader, dest string, f Format) error {
+	dr, err := newDecompressReader(r, f)
+	if err != nil {
+		return crex.Wrap(ErrExtractFailed, err)
+	}
+	defer dr.Close()
+
+	if err := os.MkdirAll(dest, DirMode); err != nil {
+		return crex.Wrap(ErrExtractFailed, err)
+	}
+
+	if err := readTar(tar.NewReader(dr), dest); err != nil {
+		return crex.Wrap(ErrExtractFailed, err)
 	}
 
 	return nil
@@ -352,22 +343,22 @@ func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 		return os.MkdirAll(target, DirMode)
 
 	case tar.TypeReg:
-		return extractFile(tr, target)
+		return extractFile(tr, target, os.FileMode(header.Mode)&0777)
 
 	default:
 		return ErrUnsupportedFileType
 	}
 }
 
-// Extracts a regular file from r to target.
+// Extracts a regular file from r to target with the given mode.
 //
-// Creates parent directories as needed, then writes file contents with [FileMode].
-func extractFile(r io.Reader, target string) error {
+// Creates parent directories as needed.
+func extractFile(r io.Reader, target string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(target), DirMode); err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FileMode)
+	f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
