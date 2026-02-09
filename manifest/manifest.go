@@ -1,5 +1,7 @@
 package manifest
 
+import "github.com/cruciblehq/crux/resource"
+
 // Holds metainformation about a resource.
 //
 // This structure both specifies metadata about the resource and influences the
@@ -52,7 +54,16 @@ type Resource struct {
 	//
 	// This field determines how the rest of the manifest is interpreted, as
 	// well as the behavior of Crucible when managing the resource.
-	Type string `yaml:"type"`
+	Type resource.Type `yaml:"type"`
+
+	// The full resource reference.
+	//
+	// Identifies the resource including its registry, using the format
+	// "registry/namespace/name" (e.g. "hub.crucible.sh/official/my-api").
+	// This field is required. It determines where the resource is pushed to,
+	// which containerd namespace isolates its images in the VM, and how the
+	// resource is referenced throughout the system.
+	Ref string `yaml:"ref"`
 
 	// The version of the resource.
 	//

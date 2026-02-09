@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cruciblehq/crux/vm"
+	"github.com/cruciblehq/crux/runtime"
 )
 
 // Represents the 'crux vm exec' command.
@@ -15,12 +15,7 @@ type VmExecCmd struct {
 
 // Executes a command inside the VM and prints its output.
 func (c *VmExecCmd) Run(ctx context.Context) error {
-	m, err := vm.NewMachine()
-	if err != nil {
-		return err
-	}
-
-	result, err := m.Exec(c.Command[0], c.Command[1:]...)
+	result, err := runtime.Exec(c.Command[0], c.Command[1:]...)
 	if err != nil {
 		return err
 	}

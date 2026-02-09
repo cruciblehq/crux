@@ -3,7 +3,6 @@ package oci
 import (
 	"archive/tar"
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -191,7 +190,7 @@ func extractTar(r io.Reader, destDir string) error {
 func extractTarEntry(r io.Reader, header *tar.Header, destDir string) error {
 	localName, err := filepath.Localize(header.Name)
 	if err != nil || !filepath.IsLocal(localName) {
-		return crex.Wrap(ErrInvalidImage, errors.New("invalid tar path"))
+		return crex.Wrap(ErrInvalidImage, ErrInvalidTarPath)
 	}
 	target := filepath.Join(destDir, localName)
 

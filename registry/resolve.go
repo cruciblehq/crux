@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
 )
 
 // Resolves a reference to a specific version with full metadata.
@@ -32,7 +31,7 @@ func validateResourceType(ctx context.Context, client *Client, ref *reference.Re
 		return err
 	}
 
-	if resource.Type(res.Type) != ref.Type() {
+	if res.Type != string(ref.Type()) {
 		return ErrTypeMismatch
 	}
 	return nil

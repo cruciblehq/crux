@@ -75,6 +75,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 		}
 
 		slog.Info("rebuild completed successfully")
+
 		return nil
 	}
 
@@ -87,3 +88,5 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
+
+

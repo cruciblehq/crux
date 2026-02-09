@@ -98,7 +98,7 @@ func TestArchiveFinalPath(t *testing.T) {
 			resource:  "test-resource",
 			version:   "1.0.0",
 			digest:    "abc123",
-			want:      filepath.Join(tempDir, "test-ns", "test-resource", "1.0.0", "abc123"+archive.ArchiveFileExtension),
+			want:      filepath.Join(tempDir, "test-ns", "test-resource", "1.0.0", "abc123"+archive.Zstd.String()),
 		},
 	}
 
@@ -144,7 +144,7 @@ func TestStoreArchiveFile_Success(t *testing.T) {
 	}
 
 	// Verify path
-	expectedPath := filepath.Join(tempDir, "test-ns", "test-resource", "1.0.0", expectedDigest+archive.ArchiveFileExtension)
+	expectedPath := filepath.Join(tempDir, "test-ns", "test-resource", "1.0.0", expectedDigest+archive.Zstd.String())
 	if path != expectedPath {
 		t.Errorf("path = %q, want %q", path, expectedPath)
 	}

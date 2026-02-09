@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/crux/resource"
 )
 
@@ -19,7 +19,8 @@ type Options struct {
 
 // Result of building a Crucible resource.
 type Result struct {
-	Output string // Path where the artifacts were written.
+	Output   string             // Path where the artifacts were written.
+	Manifest *manifest.Manifest // The parsed manifest used for the build.
 }
 
 // Builds the Crucible resource.
@@ -42,7 +43,7 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 
 	var builder Builder
 
-	switch resource.Type(man.Resource.Type) {
+	switch man.Resource.Type {
 	case resource.TypeService:
 		builder = NewServiceBuilder(opts.Registry)
 	case resource.TypeWidget:
@@ -56,5 +57,6 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, err
 	}
 
+	result.Manifest = man
 	return result, nil
 }

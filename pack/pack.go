@@ -72,7 +72,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 	mismatch := crex.ProgrammingError("pack failed", "manifest config type mismatch").
 		Fallback("Please report this issue to the Crucible team.")
 
-	switch resource.Type(man.Resource.Type) {
+	switch man.Resource.Type {
 	case resource.TypeService:
 		if _, ok := man.Config.(*manifest.Service); !ok {
 			return mismatch.Err()

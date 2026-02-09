@@ -51,9 +51,9 @@ func decodeManifest(raw map[string]any, manifest *Manifest) error {
 	}
 
 	// Resolve type-specific config
-	configs := map[string]any{
-		string(resource.TypeService): &Service{},
-		string(resource.TypeWidget):  &Widget{},
+	configs := map[resource.Type]any{
+		resource.TypeService: &Service{},
+		resource.TypeWidget:  &Widget{},
 	}
 
 	target, ok := configs[manifest.Resource.Type]
