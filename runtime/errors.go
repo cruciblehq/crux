@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ErrUnsupportedPlatform    = errors.New("vm is only supported on macOS")
+	ErrUnsupportedPlatform    = errors.New("unsupported platform")
 	ErrVMNotCreated           = errors.New("vm has not been created")
 	ErrVMAlreadyRunning       = errors.New("vm is already running")
 	ErrVMNotRunning           = errors.New("vm is not running")
@@ -38,6 +38,12 @@ var (
 	ErrResourceRef            = errors.New("failed to parse resource ref")
 	ErrImageFileOpen          = errors.New("failed to open image file")
 	ErrImageImport            = errors.New("failed to import image into containerd")
+	ErrImageDestroy           = errors.New("failed to destroy image")
+	ErrContainerStart         = errors.New("failed to start container")
+	ErrContainerStop          = errors.New("failed to stop container")
+	ErrContainerDestroy       = errors.New("failed to destroy container")
+	ErrContainerExec          = errors.New("failed to execute command in container")
+	ErrContainerStatus        = errors.New("failed to query container status")
 )
 
 // A failed limactl command.

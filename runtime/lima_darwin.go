@@ -18,8 +18,6 @@ import (
 	"github.com/cruciblehq/crux/kit/archive"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
 )
 
 const (
@@ -166,10 +164,11 @@ var configTemplate = template.Must(template.New("lima").Parse(configTemplateSour
 
 // Values injected into the Lima YAML template.
 type configData struct {
-	Arch   string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs   int    // Number of virtual CPUs.
-	Memory string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk   string // Disk size with unit suffix (e.g. "10GiB").
+	Arch           string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs           int    // Number of virtual CPUs.
+	Memory         string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk           string // Disk size with unit suffix (e.g. "10GiB").
+	ContainerdSock string // Host socket path for forwarding the guest containerd socket.
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -178,10 +177,11 @@ type configData struct {
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
 	data := configData{
-		Arch:   limaArch(),
-		CPUs:   defaultCPUs,
-		Memory: fmt.Sprintf("%dGiB", defaultMemoryGiB),
-		Disk:   fmt.Sprintf("%dGiB", defaultDiskGiB),
+		Arch:           limaArch(),
+		CPUs:           defaultCPUs,
+		Memory:         fmt.Sprintf("%dGiB", defaultMemoryGiB),
+		Disk:           fmt.Sprintf("%dGiB", defaultDiskGiB),
+		ContainerdSock: containerdForwardedSocket(),
 	}
 
 	configDir := paths.VM()
@@ -236,16 +236,16 @@ func (l *lima) start() error {
 	}
 
 	switch status {
-	case StatusRunning:
+	case StateRunning:
 		return ErrVMAlreadyRunning
 
-	case StatusStopped:
+	case StateStopped:
 		if err := l.run("start", "--tty=false", limaInstanceName); err != nil {
 			return crex.Wrap(ErrVMStart, err)
 		}
 		return nil
 
-	case StatusNotCreated:
+	case StateNotCreated:
 		configPath, err := generateConfig()
 		if err != nil {
 			return err
@@ -268,7 +268,7 @@ func (l *lima) stop() error {
 	if err != nil {
 		return err
 	}
-	if status != StatusRunning {
+	if status != StateRunning {
 		return ErrVMNotRunning
 	}
 
@@ -287,7 +287,7 @@ func (l *lima) destroy() error {
 	if err != nil {
 		return err
 	}
-	if status == StatusNotCreated {
+	if status == StateNotCreated {
 		return ErrVMNotCreated
 	}
 
@@ -301,25 +301,24 @@ func (l *lima) destroy() error {
 //
 // Limactl is called to determine whether the VM exists and whether it is
 // running or stopped.
-func (l *lima) status() (Status, error) {
+func (l *lima) status() (State, error) {
 	var stdout bytes.Buffer
 	cmd := exec.Command(l.limactl, "list", "--format={{.Status}}", limaInstanceName)
 	cmd.Stdout = &stdout
 	cmd.Env = l.env()
 
 	if err := cmd.Run(); err != nil {
-		// limactl list exits non-zero if instance doesn't exist
-		return StatusNotCreated, nil
+		return StateNotCreated, nil
 	}
 
 	output := strings.TrimSpace(stdout.String())
 	switch output {
 	case limaStatusRunning:
-		return StatusRunning, nil
+		return StateRunning, nil
 	case limaStatusStopped:
-		return StatusStopped, nil
+		return StateStopped, nil
 	default:
-		return StatusNotCreated, nil
+		return StateNotCreated, nil
 	}
 }
 
@@ -332,7 +331,7 @@ func (l *lima) exec(command string, args ...string) (*ExecResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if status != StatusRunning {
+	if status != StateRunning {
 		return nil, ErrVMNotRunning
 	}
 
@@ -358,37 +357,6 @@ func (l *lima) exec(command string, args ...string) (*ExecResult, error) {
 		Stderr:   stderr.String(),
 		ExitCode: exitCode,
 	}, nil
-}
-
-// Imports an OCI image tarball into containerd inside the VM.
-//
-// The registry component of the resource reference is used as the containerd
-// namespace for isolation. Images are tagged as "namespace/name:version" so
-// they can be identified within containerd. The host file path is passed
-// directly because Lima mounts the host home directory into the guest at the
-// same path.
-func (l *lima) importImage(ref string, typ resource.Type, version, path string) error {
-	if _, err := os.Stat(path); err != nil {
-		return crex.Wrap(ErrImageFileOpen, err)
-	}
-
-	id, err := reference.ParseIdentifier(ref, typ, nil)
-	if err != nil {
-		return crex.Wrap(ErrResourceRef, err)
-	}
-
-	ns := id.Registry()
-	tag := id.Namespace() + "/" + id.Name() + ":" + version
-
-	result, err := l.exec("ctr", "--namespace", ns, "image", "import", "--tag", tag, path)
-	if err != nil {
-		return crex.Wrap(ErrImageImport, err)
-	}
-	if result.ExitCode != 0 {
-		return crex.Wrap(ErrImageImport, fmt.Errorf("ctr exited with code %d: %s", result.ExitCode, result.Stderr))
-	}
-
-	return nil
 }
 
 // Runs a limactl subcommand.
