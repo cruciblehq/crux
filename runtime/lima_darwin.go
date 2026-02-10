@@ -186,18 +186,18 @@ func generateConfig() (string, error) {
 
 	configDir := paths.VM()
 	if err := os.MkdirAll(configDir, paths.DefaultDirMode); err != nil {
-		return "", crex.Wrap(ErrVMConfig, err)
+		return "", crex.Wrap(ErrRuntimeConfig, err)
 	}
 
 	configPath := filepath.Join(configDir, limaConfigFile)
 	f, err := os.Create(configPath)
 	if err != nil {
-		return "", crex.Wrap(ErrVMConfig, err)
+		return "", crex.Wrap(ErrRuntimeConfig, err)
 	}
 	defer f.Close()
 
 	if err := configTemplate.Execute(f, data); err != nil {
-		return "", crex.Wrap(ErrVMConfig, err)
+		return "", crex.Wrap(ErrRuntimeConfig, err)
 	}
 
 	return configPath, nil
@@ -227,8 +227,8 @@ func newLima() (*lima, error) {
 //
 // On first call a Lima configuration is generated, the VM instance is
 // created and booted. Blocks until the VM passes its readiness probes
-// (containerd socket available). Returns [ErrVMAlreadyRunning] if the VM
-// is already running.
+// (containerd socket available). Returns [ErrRuntimeAlreadyRunning] if
+// the runtime is already running.
 func (l *lima) start() error {
 	status, err := l.status()
 	if err != nil {
@@ -237,11 +237,11 @@ func (l *lima) start() error {
 
 	switch status {
 	case StateRunning:
-		return ErrVMAlreadyRunning
+		return ErrRuntimeAlreadyRunning
 
 	case StateStopped:
 		if err := l.run("start", "--tty=false", limaInstanceName); err != nil {
-			return crex.Wrap(ErrVMStart, err)
+			return crex.Wrap(ErrRuntimeStart, err)
 		}
 		return nil
 
@@ -251,7 +251,7 @@ func (l *lima) start() error {
 			return err
 		}
 		if err := l.run("start", "--tty=false", "--name="+limaInstanceName, configPath); err != nil {
-			return crex.Wrap(ErrVMStart, err)
+			return crex.Wrap(ErrRuntimeStart, err)
 		}
 		return nil
 	}
@@ -262,18 +262,18 @@ func (l *lima) start() error {
 // Gracefully shuts down the VM.
 //
 // An ACPI shutdown signal is sent and the call blocks until the VM stops.
-// Returns [ErrVMNotRunning] if the VM is not currently running.
+// Returns [ErrRuntimeNotRunning] if the runtime is not currently running.
 func (l *lima) stop() error {
 	status, err := l.status()
 	if err != nil {
 		return err
 	}
 	if status != StateRunning {
-		return ErrVMNotRunning
+		return ErrRuntimeNotRunning
 	}
 
 	if err := l.run("stop", limaInstanceName); err != nil {
-		return crex.Wrap(ErrVMStop, err)
+		return crex.Wrap(ErrRuntimeStop, err)
 	}
 	return nil
 }
@@ -288,11 +288,11 @@ func (l *lima) destroy() error {
 		return err
 	}
 	if status == StateNotCreated {
-		return ErrVMNotCreated
+		return ErrRuntimeNotCreated
 	}
 
 	if err := l.run("delete", "--force", limaInstanceName); err != nil {
-		return crex.Wrap(ErrVMStop, err)
+		return crex.Wrap(ErrRuntimeDestroy, err)
 	}
 	return nil
 }
@@ -332,7 +332,7 @@ func (l *lima) exec(command string, args ...string) (*ExecResult, error) {
 		return nil, err
 	}
 	if status != StateRunning {
-		return nil, ErrVMNotRunning
+		return nil, ErrRuntimeNotRunning
 	}
 
 	shellArgs := append([]string{"shell", limaInstanceName, command}, args...)
@@ -348,7 +348,7 @@ func (l *lima) exec(command string, args ...string) (*ExecResult, error) {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			return nil, crex.Wrap(ErrVMExec, err)
+			return nil, crex.Wrap(ErrRuntimeExec, err)
 		}
 	}
 
