@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"log/slog"
-	"strings"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
@@ -12,18 +12,22 @@ import (
 
 // Represents the 'crux image destroy' command.
 type ImageDestroyCmd struct {
-	Ref []string `arg:"" required:"" help:"Crucible resource reference (e.g., my-namespace/my-service 1.0.0)."`
+	Ref     string `arg:"" required:"" help:"Resource path (e.g., my-namespace/my-service)."`
+	Version string `arg:"" required:"" help:"Resource version (e.g., 1.0.0)."`
 }
 
 // Removes an image and all its containers from the runtime.
 func (c *ImageDestroyCmd) Run(ctx context.Context) error {
-	ref, err := reference.Parse(strings.Join(c.Ref, " "), resource.TypeService, nil)
+	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+	id, err := reference.ParseIdentifier(c.Ref, resource.TypeService, opts)
 	if err != nil {
 		return err
 	}
 
-	id := ref.Identifier
-	img := runtime.NewImage(&id, ref.Version().String())
+	img := runtime.NewImage(id, c.Version)
 
 	slog.Info("destroying image...", "image", img)
 

@@ -4,16 +4,19 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
 )
 
 // Represents the 'crux container exec' command.
+//
+// The command to execute follows after '--'.
 type ContainerExecCmd struct {
-	Ref     []string `arg:"" required:"" help:"Crucible resource reference (e.g., my-namespace/my-service 1.0.0)."`
+	Ref     string   `arg:"" required:"" help:"Resource path (e.g., my-namespace/my-service)."`
+	Version string   `arg:"" required:"" help:"Resource version (e.g., 1.0.0)."`
 	ID      string   `name:"id" optional:"" help:"Container identifier. Defaults to the resource name."`
 	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to execute."`
 }
@@ -22,12 +25,16 @@ type ContainerExecCmd struct {
 //
 // The process exit code is propagated from the executed command.
 func (c *ContainerExecCmd) Run(ctx context.Context) error {
-	ref, err := reference.Parse(strings.Join(c.Ref, " "), resource.TypeService, nil)
+	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+	id, err := reference.ParseIdentifier(c.Ref, resource.TypeService, opts)
 	if err != nil {
 		return err
 	}
 
-	ctr := runtime.NewContainer(ref.Identifier.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Registry(), c.ID)
 
 	result, err := ctr.Exec(ctx, c.Command[0], c.Command[1:]...)
 	if err != nil {

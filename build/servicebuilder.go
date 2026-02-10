@@ -16,11 +16,17 @@ import (
 )
 
 // Builder for Crucible services.
-type ServiceBuilder struct{}
+type ServiceBuilder struct {
+	registry         string
+	defaultNamespace string
+}
 
 // Creates a new instance of [ServiceBuilder].
-func NewServiceBuilder(registry string) *ServiceBuilder {
-	return &ServiceBuilder{}
+func NewServiceBuilder(registry, defaultNamespace string) *ServiceBuilder {
+	return &ServiceBuilder{
+		registry:         registry,
+		defaultNamespace: defaultNamespace,
+	}
 }
 
 // Builds a Crucible service resource based on the provided manifest.
@@ -51,7 +57,10 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
-	id, err := reference.ParseIdentifier(m.Resource.Ref, resource.TypeService, nil)
+	id, err := reference.ParseIdentifier(m.Resource.Ref, resource.TypeService, reference.IdentifierOptions{
+		DefaultRegistry:  sb.registry,
+		DefaultNamespace: sb.defaultNamespace,
+	})
 	if err != nil {
 		slog.Warn("failed to parse resource ref", "error", err)
 	} else {

@@ -13,9 +13,10 @@ import (
 
 // Options for pulling a resource.
 type Options struct {
-	Registry  string        // Hub registry URL.
-	Reference string        // Resource reference (e.g., namespace/resource 1.0.0).
-	Type      resource.Type // Resource type context for parsing.
+	Registry         string        // Hub registry URL.
+	Reference        string        // Resource reference (e.g., namespace/resource 1.0.0).
+	Type             resource.Type // Resource type context for parsing.
+	DefaultNamespace string        // Default namespace for resource identifiers.
 }
 
 // Result contains information about the pull operation.
@@ -37,8 +38,9 @@ type Result struct {
 // (namespace/resource :stable). Channels are resolved to their current version
 // before downloading.
 func Pull(ctx context.Context, opts Options) (*Result, error) {
-	refOpts := &reference.IdentifierOptions{
-		DefaultRegistry: opts.Registry,
+	refOpts, err := reference.NewIdentifierOptions(opts.Registry, opts.DefaultNamespace)
+	if err != nil {
+		return nil, err
 	}
 	ref, err := reference.Parse(opts.Reference, opts.Type, refOpts)
 	if err != nil {

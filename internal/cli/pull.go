@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pull"
 	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crux/pull"
 	"github.com/cruciblehq/crux/resource"
 )
 
@@ -35,9 +35,10 @@ func (c *PullCmd) Run(ctx context.Context) error {
 	reference := strings.Join(c.Reference, " ")
 
 	opts := pull.Options{
-		Registry:  registry,
-		Reference: reference,
-		Type:      resType,
+		Registry:         registry,
+		Reference:        reference,
+		Type:             resType,
+		DefaultNamespace: internal.DefaultNamespace,
 	}
 
 	slog.Info("pulling resource...", "reference", reference, "registry", registry)

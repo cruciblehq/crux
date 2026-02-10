@@ -8,12 +8,6 @@ import (
 	"github.com/cruciblehq/crux/resource"
 )
 
-const (
-
-	// Default namespace for resources in the default registry.
-	DefaultNamespace = "official"
-)
-
 // Resource identifier.
 //
 // An identifier locates a resource without specifying a particular version.
@@ -29,20 +23,23 @@ type Identifier struct {
 // Options for parsing identifiers.
 type IdentifierOptions struct {
 	DefaultRegistry  string // Registry authority when not specified.
-	DefaultNamespace string // Namespace when not specified. Uses [DefaultNamespace] if empty.
+	DefaultNamespace string // Namespace when not specified.
 }
 
-// Returns the registry from options.
-func (o *IdentifierOptions) registry() string {
-	return o.DefaultRegistry
-}
-
-// Returns the namespace, using the package default if not set.
-func (o *IdentifierOptions) namespace() string {
-	if o != nil && o.DefaultNamespace != "" {
-		return o.DefaultNamespace
+// Creates a new [IdentifierOptions] with the given defaults.
+//
+// Both parameters are required. Returns an error if either is empty.
+func NewIdentifierOptions(defaultRegistry, defaultNamespace string) (IdentifierOptions, error) {
+	if defaultRegistry == "" {
+		return IdentifierOptions{}, ErrMissingDefaultRegistry
 	}
-	return DefaultNamespace
+	if defaultNamespace == "" {
+		return IdentifierOptions{}, ErrMissingDefaultNamespace
+	}
+	return IdentifierOptions{
+		DefaultRegistry:  defaultRegistry,
+		DefaultNamespace: defaultNamespace,
+	}, nil
 }
 
 // Parses an identifier string.
@@ -63,12 +60,9 @@ func (o *IdentifierOptions) namespace() string {
 //   - Registry without scheme: registry.example.com/path/to/resource
 //   - Default registry path: namespace/name or just name
 //
-// When using the default registry, the namespace defaults to "official" if
-// not specified. Registry detection relies on the presence of dots in the
-// first path segment.
-//
-// Options can be nil, in which case package defaults are used.
-func ParseIdentifier(s string, contextType resource.Type, options *IdentifierOptions) (*Identifier, error) {
+// When using the default registry, the namespace defaults to the configured
+// default namespace.
+func ParseIdentifier(s string, contextType resource.Type, options IdentifierOptions) (*Identifier, error) {
 	p := &identifierParser{
 		tokens:  strings.Fields(s),
 		options: options,
@@ -81,7 +75,7 @@ func ParseIdentifier(s string, contextType resource.Type, options *IdentifierOpt
 }
 
 // Like [ParseIdentifier], but panics on error.
-func MustParseIdentifier(s string, contextType resource.Type, options *IdentifierOptions) *Identifier {
+func MustParseIdentifier(s string, contextType resource.Type, options IdentifierOptions) *Identifier {
 	id, err := ParseIdentifier(s, contextType, options)
 	if err != nil {
 		panic(err)
@@ -91,10 +85,6 @@ func MustParseIdentifier(s string, contextType resource.Type, options *Identifie
 
 // Creates a new identifier.
 func NewIdentifier(typ resource.Type, registry, namespace, name string) *Identifier {
-	if namespace == "" {
-		namespace = DefaultNamespace
-	}
-
 	return &Identifier{
 		typ:       typ,
 		registry:  registry,

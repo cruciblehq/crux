@@ -7,8 +7,9 @@ import (
 )
 
 func TestParseIdentifier(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.test",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.test",
+		DefaultNamespace: "official",
 	}
 	id, err := ParseIdentifier("namespace/name", resource.TypeTemplate, opts)
 	if err != nil {
@@ -27,7 +28,7 @@ func TestParseIdentifier(t *testing.T) {
 }
 
 func TestParseIdentifier_WithOptions(t *testing.T) {
-	opts := &IdentifierOptions{
+	opts := IdentifierOptions{
 		DefaultRegistry:  "https://custom.registry.io",
 		DefaultNamespace: "crucible",
 	}
@@ -46,15 +47,16 @@ func TestParseIdentifier_WithOptions(t *testing.T) {
 }
 
 func TestParseIdentifier_Error(t *testing.T) {
-	_, err := ParseIdentifier("", resource.TypeTemplate, nil)
+	_, err := ParseIdentifier("", resource.TypeTemplate, IdentifierOptions{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestMustParseIdentifier(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.test",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.test",
+		DefaultNamespace: "official",
 	}
 	id := MustParseIdentifier("namespace/name", resource.TypeTemplate, opts)
 
@@ -70,12 +72,13 @@ func TestMustParseIdentifier_Panic(t *testing.T) {
 		}
 	}()
 
-	MustParseIdentifier("", resource.TypeTemplate, nil)
+	MustParseIdentifier("", resource.TypeTemplate, IdentifierOptions{})
 }
 
 func TestIdentifier_Path_DefaultRegistry(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.test",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.test",
+		DefaultNamespace: "official",
 	}
 	id := MustParseIdentifier("namespace/name", resource.TypeTemplate, opts)
 
@@ -85,8 +88,9 @@ func TestIdentifier_Path_DefaultRegistry(t *testing.T) {
 }
 
 func TestIdentifier_Path_CustomRegistry(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.test",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.test",
+		DefaultNamespace: "official",
 	}
 	id := MustParseIdentifier("myregistry.com/path/to/resource", resource.TypeTemplate, opts)
 
@@ -96,8 +100,9 @@ func TestIdentifier_Path_CustomRegistry(t *testing.T) {
 }
 
 func TestIdentifier_URI(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.crucible.net",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.crucible.net",
+		DefaultNamespace: "official",
 	}
 	id := MustParseIdentifier("namespace/name", resource.TypeTemplate, opts)
 
@@ -108,8 +113,9 @@ func TestIdentifier_URI(t *testing.T) {
 }
 
 func TestIdentifier_String(t *testing.T) {
-	opts := &IdentifierOptions{
-		DefaultRegistry: "https://registry.test",
+	opts := IdentifierOptions{
+		DefaultRegistry:  "https://registry.test",
+		DefaultNamespace: "official",
 	}
 	id := MustParseIdentifier("namespace/name", resource.TypeTemplate, opts)
 

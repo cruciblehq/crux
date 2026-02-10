@@ -8,7 +8,7 @@ import (
 func TestReferenceParser_Parse_NameAndVersion(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"widget", "1.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -30,7 +30,7 @@ func TestReferenceParser_Parse_NameAndVersion(t *testing.T) {
 func TestReferenceParser_Parse_NamespaceNameAndVersion(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", "1.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -49,7 +49,7 @@ func TestReferenceParser_Parse_NamespaceNameAndVersion(t *testing.T) {
 func TestReferenceParser_Parse_WithExplicitType(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"template", "namespace/name", "1.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -68,7 +68,7 @@ func TestReferenceParser_Parse_WithExplicitType(t *testing.T) {
 func TestReferenceParser_Parse_FullURIAndVersion(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"https://myregistry.com/path/to/resource", "1.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -87,7 +87,7 @@ func TestReferenceParser_Parse_FullURIAndVersion(t *testing.T) {
 func TestReferenceParser_Parse_WithChannel(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", ":stable"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -109,7 +109,7 @@ func TestReferenceParser_Parse_WithChannel(t *testing.T) {
 func TestReferenceParser_Parse_WithVersionRange(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", ">=1.0.0", "<2.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -125,7 +125,7 @@ func TestReferenceParser_Parse_WithVersionRange(t *testing.T) {
 func TestReferenceParser_Parse_WithDigest(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", "1.0.0", "sha256:abcd1234"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -141,7 +141,7 @@ func TestReferenceParser_Parse_WithDigest(t *testing.T) {
 func TestReferenceParser_Parse_ChannelWithDigest(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", ":stable", "sha256:abcd1234"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	ref, err := p.parse("template")
@@ -160,7 +160,7 @@ func TestReferenceParser_Parse_ChannelWithDigest(t *testing.T) {
 func TestReferenceParser_Parse_WithOptions(t *testing.T) {
 	p := &referenceParser{
 		tokens: []string{"widget", "1.0.0"},
-		options: &IdentifierOptions{
+		options: IdentifierOptions{
 			DefaultRegistry:  "https://custom.registry.io",
 			DefaultNamespace: "myteam",
 		},
@@ -182,7 +182,7 @@ func TestReferenceParser_Parse_WithOptions(t *testing.T) {
 func TestReferenceParser_Parse_EmptyTokens(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	_, err := p.parse("template")
@@ -198,7 +198,7 @@ func TestReferenceParser_Parse_EmptyTokens(t *testing.T) {
 func TestReferenceParser_Parse_MissingVersion(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	_, err := p.parse("template")
@@ -214,7 +214,7 @@ func TestReferenceParser_Parse_MissingVersion(t *testing.T) {
 func TestReferenceParser_Parse_TypeMismatch(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"plugin", "namespace/name", "1.0.0"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	_, err := p.parse("template")
@@ -230,7 +230,7 @@ func TestReferenceParser_Parse_TypeMismatch(t *testing.T) {
 func TestReferenceParser_Parse_UnexpectedToken(t *testing.T) {
 	p := &referenceParser{
 		tokens:  []string{"namespace/name", "1.0.0", "extra"},
-		options: &IdentifierOptions{DefaultRegistry: "https://registry.test"},
+		options: IdentifierOptions{DefaultRegistry: "https://registry.test", DefaultNamespace: "official"},
 	}
 
 	_, err := p.parse("template")

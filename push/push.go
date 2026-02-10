@@ -16,9 +16,10 @@ import (
 
 // Options for pushing a package to the Hub registry.
 type PushOptions struct {
-	Registry     string // Hub registry URL.
-	Manifestfile string // Path to the manifest file.
-	Package      string // Path to the package archive.
+	Registry         string // Hub registry URL.
+	Manifestfile     string // Path to the manifest file.
+	Package          string // Path to the package archive.
+	DefaultNamespace string // Default namespace for resource identifiers.
 }
 
 // Pushes a resource package to the Hub registry.
@@ -32,7 +33,12 @@ func Push(ctx context.Context, opts PushOptions) error {
 		return err
 	}
 
-	id, err := reference.ParseIdentifier(man.Resource.Ref, man.Resource.Type, nil)
+	refOpts, err := reference.NewIdentifierOptions(opts.Registry, opts.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+
+	id, err := reference.ParseIdentifier(man.Resource.Ref, man.Resource.Type, refOpts)
 	if err != nil {
 		return err
 	}

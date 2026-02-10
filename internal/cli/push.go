@@ -22,9 +22,10 @@ func (c *PushCmd) Run(ctx context.Context) error {
 	}
 
 	opts := push.PushOptions{
-		Registry:     registry,
-		Manifestfile: paths.Manifest("."),
-		Package:      paths.Package("."),
+		Registry:         registry,
+		Manifestfile:     paths.Manifest("."),
+		Package:          paths.Package("."),
+		DefaultNamespace: internal.DefaultNamespace,
 	}
 
 	slog.Info("pushing package...", "registry", registry)
