@@ -38,7 +38,11 @@
 //
 // Importing an OCI image and managing containers:
 //
-//	id, err := reference.ParseIdentifier(ref, resource.TypeService, nil)
+//	opts, err := reference.NewIdentifierOptions(registryURL, namespace)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	id, err := reference.ParseIdentifier(ref, resource.TypeService, opts)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
