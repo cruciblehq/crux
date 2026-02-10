@@ -15,6 +15,7 @@ import (
 )
 
 const (
+
 	// Subdirectory under dist for plan outputs.
 	planOutputSubdir = "plans"
 
@@ -51,9 +52,10 @@ func (c *PlanCmd) Run(ctx context.Context) error {
 	}
 
 	p, err := bp.Execute(ctx, blueprint.ExecuteOptions{
-		State:    c.State,
-		Registry: registryURL,
-		Provider: provider.Type,
+		State:            c.State,
+		Registry:         registryURL,
+		Provider:         provider.Type,
+		DefaultNamespace: internal.DefaultNamespace,
 	})
 	if err != nil {
 		return err

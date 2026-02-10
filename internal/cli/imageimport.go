@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"log/slog"
-	"strings"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
@@ -12,19 +12,23 @@ import (
 
 // Represents the 'crux image import' command.
 type ImageImportCmd struct {
-	Ref  []string `arg:"" required:"" help:"Crucible resource reference (e.g., my-namespace/my-service 1.0.0)."`
-	Path string   `required:"" help:"Path to the OCI image tarball."`
+	Ref     string `arg:"" required:"" help:"Resource path (e.g., my-namespace/my-service)."`
+	Version string `arg:"" required:"" help:"Resource version (e.g., 1.0.0)."`
+	Path    string `required:"" help:"Path to the OCI image tarball."`
 }
 
 // Imports an OCI image tarball into the container runtime's image store.
 func (c *ImageImportCmd) Run(ctx context.Context) error {
-	ref, err := reference.Parse(strings.Join(c.Ref, " "), resource.TypeService, nil)
+	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+	id, err := reference.ParseIdentifier(c.Ref, resource.TypeService, opts)
 	if err != nil {
 		return err
 	}
 
-	id := ref.Identifier
-	img := runtime.NewImage(&id, ref.Version().String())
+	img := runtime.NewImage(id, c.Version)
 
 	slog.Info("importing image...", "image", img)
 

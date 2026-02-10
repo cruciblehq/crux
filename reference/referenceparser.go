@@ -21,7 +21,7 @@ var (
 type referenceParser struct {
 	tokens  []string
 	pos     int
-	options *IdentifierOptions
+	options IdentifierOptions
 }
 
 // Parses the tokens into a Reference.

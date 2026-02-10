@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
@@ -39,10 +40,14 @@ func (c *CacheRemoveCmd) Run(ctx context.Context) error {
 
 // Removes cache entries matching a reference.
 func removeReference(ctx context.Context, c *cache.Cache, refStr string) error {
-	ref, err := reference.Parse(refStr, resource.TypeWidget, nil)
+	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+	ref, err := reference.Parse(refStr, resource.TypeWidget, opts)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).
-			Fallback("Use the format 'namespace/resource version'").
+			Fallback("Use the format 'namespace/resource version'.").
 			Err()
 	}
 

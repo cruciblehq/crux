@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/config"
+	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/plan"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/registry"
@@ -26,9 +26,10 @@ const (
 
 // Options for generating a deployment plan from a blueprint.
 type ExecuteOptions struct {
-	State    string              // Path to existing state for incremental planning (optional).
-	Registry string              // Registry URL for resolving references.
-	Provider config.ProviderType // Provider type.
+	State            string              // Path to existing state for incremental planning (optional).
+	Registry         string              // Registry URL for resolving references.
+	Provider         config.ProviderType // Provider type.
+	DefaultNamespace string              // Default namespace for resource identifiers.
 }
 
 // Generates a deployment plan from the blueprint.
@@ -63,7 +64,7 @@ func (bp *Blueprint) Execute(ctx context.Context, opts ExecuteOptions) (*plan.Pl
 	registryClient := registry.NewClient(opts.Registry, nil)
 
 	// Resolve all service references
-	if err := resolveServiceReferences(ctx, bp, st, registryClient, opts.Registry, p); err != nil {
+	if err := resolveServiceReferences(ctx, bp, st, registryClient, opts.Registry, opts.DefaultNamespace, p); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +78,7 @@ func (bp *Blueprint) Execute(ctx context.Context, opts ExecuteOptions) (*plan.Pl
 }
 
 // Resolves all service references in the blueprint and adds them to the plan.
-func resolveServiceReferences(ctx context.Context, bp *Blueprint, st *state.State, registryClient *registry.Client, registryHost string, p *plan.Plan) error {
+func resolveServiceReferences(ctx context.Context, bp *Blueprint, st *state.State, registryClient *registry.Client, registryHost string, defaultNamespace string, p *plan.Plan) error {
 	slog.Info("resolving service references", "registryHost", registryHost, "serviceCount", len(bp.Services))
 
 	if st != nil {
@@ -87,8 +88,9 @@ func resolveServiceReferences(ctx context.Context, bp *Blueprint, st *state.Stat
 	for i := range bp.Services {
 		service := &bp.Services[i]
 
-		opts := &reference.IdentifierOptions{
-			DefaultRegistry: registryHost,
+		opts, err := reference.NewIdentifierOptions(registryHost, defaultNamespace)
+		if err != nil {
+			return err
 		}
 
 		ref, err := reference.Parse(service.Reference, resource.TypeService, opts)

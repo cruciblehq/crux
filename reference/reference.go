@@ -38,9 +38,8 @@ type Reference struct {
 //   - Registry without scheme: registry.example.com/path/to/resource
 //   - Default registry path: namespace/name or just name
 //
-// When using the default registry, the namespace defaults to "official" if
-// not specified. Registry detection relies on the presence of dots in the
-// first path segment.
+// When using the default registry, the namespace defaults to the configured
+// default namespace.
 //
 // Either a version constraint or a channel is required, but not both. Version
 // constraints may span multiple tokens (e.g., ">=1.0.0 <2.0.0"). Channels are
@@ -49,9 +48,7 @@ type Reference struct {
 // The digest is optional and follows the format algorithm:hash (e.g.,
 // "sha256:abcd1234"). When present, it freezes the reference to a specific
 // content version.
-//
-// Options can be nil, in which case package defaults are used.
-func Parse(s string, contextType resource.Type, options *IdentifierOptions) (*Reference, error) {
+func Parse(s string, contextType resource.Type, options IdentifierOptions) (*Reference, error) {
 	p := &referenceParser{
 		tokens:  strings.Fields(s),
 		options: options,
@@ -64,7 +61,7 @@ func Parse(s string, contextType resource.Type, options *IdentifierOptions) (*Re
 }
 
 // Like [Parse], but panics on error.
-func MustParse(s string, contextType resource.Type, options *IdentifierOptions) *Reference {
+func MustParse(s string, contextType resource.Type, options IdentifierOptions) *Reference {
 	ref, err := Parse(s, contextType, options)
 	if err != nil {
 		panic(err)

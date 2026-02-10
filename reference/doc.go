@@ -18,7 +18,7 @@
 // consisting of namespace and name segments expressed as namespace/name. The
 // namespace groups related resources, while the name identifies a specific
 // resource within that namespace. The namespace can be omitted, in which case
-// it defaults to [DefaultNamespace] ("official"), but only if the registry is
+// it defaults to the configured default namespace, but only if the registry
 // is not specified. Other registries may use different conventions.
 //
 // For example, the following references are equivalent:

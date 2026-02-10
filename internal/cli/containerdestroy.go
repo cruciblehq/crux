@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"log/slog"
-	"strings"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
@@ -12,18 +12,23 @@ import (
 
 // Represents the 'crux container destroy' command.
 type ContainerDestroyCmd struct {
-	Ref []string `arg:"" required:"" help:"Crucible resource reference (e.g., my-namespace/my-service 1.0.0)."`
-	ID  string   `name:"id" optional:"" help:"Container identifier. Defaults to the resource name."`
+	Ref     string `arg:"" required:"" help:"Resource path (e.g., my-namespace/my-service)."`
+	Version string `arg:"" required:"" help:"Resource version (e.g., 1.0.0)."`
+	ID      string `name:"id" optional:"" help:"Container identifier. Defaults to the resource name."`
 }
 
 // Removes a container and its snapshot from the runtime.
 func (c *ContainerDestroyCmd) Run(ctx context.Context) error {
-	ref, err := reference.Parse(strings.Join(c.Ref, " "), resource.TypeService, nil)
+	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+	id, err := reference.ParseIdentifier(c.Ref, resource.TypeService, opts)
 	if err != nil {
 		return err
 	}
 
-	ctr := runtime.NewContainer(ref.Identifier.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Registry(), c.ID)
 
 	slog.Info("destroying container...", "id", c.ID)
 

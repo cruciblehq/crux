@@ -31,9 +31,9 @@ var (
 
 // Whitespace-tokenized identifier string parser.
 type identifierParser struct {
-	tokens  []string           // Tokenized input
-	pos     int                // Parser position in tokens
-	options *IdentifierOptions // Parsing options
+	tokens  []string          // Tokenized input
+	pos     int               // Parser position in tokens
+	options IdentifierOptions // Parsing options
 }
 
 // Parses the tokens into an Identifier.
@@ -47,7 +47,7 @@ func (p *identifierParser) parse(contextType resource.Type) (*Identifier, error)
 	}
 
 	id := &Identifier{
-		registry: p.options.registry(),
+		registry: p.options.DefaultRegistry,
 	}
 
 	if err := p.parseType(id, contextType); err != nil {
@@ -190,7 +190,7 @@ func (p *identifierParser) parseRegistryPath(id *Identifier, registry, path stri
 
 // Parses a default registry path (namespace/name or just name).
 func (p *identifierParser) parseDefaultPath(id *Identifier, tok string) error {
-	id.registry = p.options.registry()
+	id.registry = p.options.DefaultRegistry
 
 	if namespace, name, ok := strings.Cut(tok, "/"); ok {
 		if !namePattern.MatchString(namespace) {
@@ -205,7 +205,7 @@ func (p *identifierParser) parseDefaultPath(id *Identifier, tok string) error {
 		if !namePattern.MatchString(tok) {
 			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidName)
 		}
-		id.namespace = p.options.namespace()
+		id.namespace = p.options.DefaultNamespace
 		id.name = tok
 	}
 
