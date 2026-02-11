@@ -28,7 +28,7 @@ func (c *ContainerStopCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctr := runtime.NewContainer(id.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Hostname(), c.ID)
 
 	slog.Info("stopping container...", "id", c.ID)
 

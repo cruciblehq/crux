@@ -30,7 +30,7 @@ func (c *ContainerUpdateCmd) Run(ctx context.Context) error {
 	}
 
 	img := runtime.NewImage(id, c.Version)
-	ctr := runtime.NewContainer(id.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Hostname(), c.ID)
 
 	slog.Info("updating container...", "id", c.ID)
 

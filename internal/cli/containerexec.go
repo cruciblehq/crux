@@ -34,7 +34,7 @@ func (c *ContainerExecCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctr := runtime.NewContainer(id.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Hostname(), c.ID)
 
 	result, err := ctr.Exec(ctx, c.Command[0], c.Command[1:]...)
 	if err != nil {
