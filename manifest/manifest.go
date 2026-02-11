@@ -56,14 +56,13 @@ type Resource struct {
 	// well as the behavior of Crucible when managing the resource.
 	Type resource.Type `yaml:"type"`
 
-	// The full resource reference.
+	// The qualified resource name.
 	//
-	// Identifies the resource including its registry, using the format
-	// "registry/namespace/name" (e.g. "hub.crucible.sh/official/my-api").
-	// This field is required. It determines where the resource is pushed to,
-	// which containerd namespace isolates its images in the VM, and how the
-	// resource is referenced throughout the system.
-	Ref string `yaml:"ref"`
+	// Identifies the resource including its namespace, using the format
+	// "namespace/name" (e.g. "cruciblehq/my-api"). The registry is not
+	// part of the name; it is resolved from configuration.
+	// This field is required.
+	Name string `yaml:"name"`
 
 	// The version of the resource.
 	//
