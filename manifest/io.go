@@ -52,6 +52,7 @@ func decodeManifest(raw map[string]any, manifest *Manifest) error {
 
 	// Resolve type-specific config
 	configs := map[resource.Type]any{
+		resource.TypeRuntime: &Runtime{},
 		resource.TypeService: &Service{},
 		resource.TypeWidget:  &Widget{},
 	}
@@ -66,6 +67,13 @@ func decodeManifest(raw map[string]any, manifest *Manifest) error {
 		return err
 	}
 
+	// Validate type-specific config
+	if v, ok := target.(validator); ok {
+		if err := v.validate(); err != nil {
+			return err
+		}
+	}
+
 	// Assign to manifest
 	manifest.Config = target
 
@@ -77,6 +85,7 @@ func decodeMap(raw map[string]any, target any) error {
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:  target,
 		TagName: "yaml",
+		Squash:  true,
 	})
 	if err != nil {
 		return err

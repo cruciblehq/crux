@@ -4,6 +4,7 @@ package resource
 type Type string
 
 const (
+	TypeRuntime  Type = "runtime"  // Runtime resource type.
 	TypeService  Type = "service"  // Service resource type.
 	TypeTemplate Type = "template" // Template resource type.
 	TypeWidget   Type = "widget"   // Widget resource type.
@@ -12,7 +13,7 @@ const (
 // Converts a string to a Type, returning an error if invalid.
 func ParseType(s string) (Type, error) {
 	switch Type(s) {
-	case TypeService, TypeTemplate, TypeWidget:
+	case TypeRuntime, TypeService, TypeTemplate, TypeWidget:
 		return Type(s), nil
 	default:
 		return "", ErrInvalidType
