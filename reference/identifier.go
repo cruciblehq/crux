@@ -116,16 +116,20 @@ func (id *Identifier) Type() resource.Type {
 }
 
 // Registry URL.
-func (id *Identifier) Registry() *url.URL {
-	return id.registry
+//
+// Returns a copy; callers cannot mutate the identifier.
+func (id *Identifier) Registry() url.URL {
+	return *id.registry
 }
 
 // Registry host authority, including port if present.
-//
-// This is the host:port portion of the registry URL, suitable for use
-// as a containerd namespace or network address.
 func (id *Identifier) Host() string {
 	return id.registry.Host
+}
+
+// Registry hostname, without port.
+func (id *Identifier) Hostname() string {
+	return id.registry.Hostname()
 }
 
 // Namespace segment of the path. Only used with the default registry.

@@ -146,12 +146,16 @@ func wrapResolveError(err error) error {
 
 // Builds a frozen reference from a resolved version.
 func buildFrozenReference(ref *reference.Reference, namespace, resourceName string, version *registry.Version) (*reference.Reference, error) {
-	id := reference.NewIdentifier(
+	reg := ref.Registry()
+	id, err := reference.NewIdentifier(
 		ref.Type(),
-		ref.Registry(),
+		reg.String(),
 		namespace,
 		resourceName,
 	)
+	if err != nil {
+		return nil, crex.Wrap(ErrCannotCreateReference, err)
+	}
 
 	digest, err := reference.ParseDigest(*version.Digest)
 	if err != nil {

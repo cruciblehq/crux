@@ -38,7 +38,7 @@ func Push(ctx context.Context, opts PushOptions) error {
 		return err
 	}
 
-	id, err := reference.ParseIdentifier(man.Resource.Ref, man.Resource.Type, refOpts)
+	id, err := reference.ParseIdentifier(man.Resource.Name, man.Resource.Type, refOpts)
 	if err != nil {
 		return err
 	}
