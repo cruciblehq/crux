@@ -45,6 +45,8 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 	var builder Builder
 
 	switch man.Resource.Type {
+	case resource.TypeRuntime:
+		builder = NewRuntimeBuilder(opts.Registry, opts.DefaultNamespace)
 	case resource.TypeService:
 		builder = NewServiceBuilder(opts.Registry, opts.DefaultNamespace)
 	case resource.TypeWidget:

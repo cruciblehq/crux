@@ -53,7 +53,7 @@ func (r *Recipe) validate() error {
 // archive. Everything else is parsed as a Crucible runtime reference via
 // [reference.Parse], with the optional "ref" prefix stripped first. A runtime
 // literally named "file" must use the "ref" prefix to avoid ambiguity.
-func (r *Recipe) parseFrom(options reference.IdentifierOptions) (RuntimeSource, error) {
+func (r *Recipe) ParseFrom(options reference.IdentifierOptions) (RuntimeSource, error) {
 	fields := strings.Fields(r.From)
 	if len(fields) == 0 {
 		return RuntimeSource{}, ErrInvalidFromFormat

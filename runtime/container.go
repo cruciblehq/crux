@@ -1,17 +1,12 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"sync/atomic"
 	"syscall"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/cruciblehq/crux/kit/crex"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // A container instance within the container runtime.
@@ -31,9 +26,6 @@ type Container struct {
 func NewContainer(registry, id string) *Container {
 	return &Container{registry: registry, id: id}
 }
-
-// Sequence counter for generating unique exec process identifiers.
-var execSeq uint64
 
 // Stops the container's task.
 //
@@ -105,84 +97,19 @@ func (c *Container) Destroy(ctx context.Context) error {
 
 // Runs a command inside the container and captures its output.
 //
-// The command runs within the container's task as an exec process. The
-// process inherits the container's OCI spec (environment, working
-// directory, capabilities). The container must be running.
+// Equivalent to [Container.ExecWith] with zero-value options. The
+// process inherits the container's OCI spec unchanged.
 func (c *Container) Exec(ctx context.Context, command string, args ...string) (*ExecResult, error) {
-	client, err := newContainerdClient(c.registry)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-	defer client.Close()
-
-	ctr, err := client.LoadContainer(ctx, c.id)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	task, err := ctr.Task(ctx, nil)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	pspec, err := execSpec(ctx, ctr, command, args...)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	return runExec(ctx, task, pspec)
+	return c.ExecWith(ctx, ExecOptions{}, command, args...)
 }
 
-// Builds a process spec for an exec by cloning the container's OCI
-// process configuration and overriding the arguments.
-func execSpec(ctx context.Context, ctr containerd.Container, command string, args ...string) (*specs.Process, error) {
-	spec, err := ctr.Spec(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	pspec := *spec.Process
-	pspec.Terminal = false
-	pspec.Args = append([]string{command}, args...)
-	return &pspec, nil
-}
-
-// Creates an exec process, runs it, and collects its output.
-func runExec(ctx context.Context, task containerd.Task, pspec *specs.Process) (*ExecResult, error) {
-	execID := fmt.Sprintf("exec-%d", atomic.AddUint64(&execSeq, 1))
-
-	var stdout, stderr bytes.Buffer
-	process, err := task.Exec(ctx, execID, pspec, cio.NewCreator(
-		cio.WithStreams(nil, &stdout, &stderr),
-	))
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	statusC, err := process.Wait(ctx)
-	if err != nil {
-		process.Delete(ctx)
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	if err := process.Start(ctx); err != nil {
-		process.Delete(ctx)
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	exitStatus := <-statusC
-	process.Delete(ctx)
-
-	code, _, err := exitStatus.Result()
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-
-	return &ExecResult{
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		ExitCode: int(code),
-	}, nil
+// Runs a command inside the container with custom options.
+//
+// The command runs within the container's task as an exec process.
+// Options override the inherited OCI spec for environment and working
+// directory. The container must be running.
+func (c *Container) ExecWith(ctx context.Context, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
+	return containerExec(ctx, c.registry, c.id, opts, command, args...)
 }
 
 // Queries the current state of the container.
