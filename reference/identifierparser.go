@@ -46,9 +46,7 @@ func (p *identifierParser) parse(contextType resource.Type) (*Identifier, error)
 		return nil, crex.Wrap(ErrInvalidIdentifier, ErrEmptyIdentifier)
 	}
 
-	id := &Identifier{
-		registry: p.options.DefaultRegistry,
-	}
+	id := &Identifier{}
 
 	if err := p.parseType(id, contextType); err != nil {
 		return nil, err
@@ -154,11 +152,10 @@ func (p *identifierParser) parseURI(id *Identifier, scheme, rest string) error {
 		return crex.Wrap(ErrInvalidIdentifier, ErrInvalidPath)
 	}
 
-	u := &url.URL{
+	id.registry = &url.URL{
 		Scheme: scheme,
 		Host:   registry,
 	}
-	id.registry = u.String()
 	id.path = path
 
 	return nil
@@ -178,11 +175,10 @@ func (p *identifierParser) parseRegistryPath(id *Identifier, registry, path stri
 		return crex.Wrap(ErrInvalidIdentifier, ErrInvalidPath)
 	}
 
-	u := &url.URL{
+	id.registry = &url.URL{
 		Scheme: "https",
 		Host:   registry,
 	}
-	id.registry = u.String()
 	id.path = path
 
 	return nil
@@ -190,7 +186,11 @@ func (p *identifierParser) parseRegistryPath(id *Identifier, registry, path stri
 
 // Parses a default registry path (namespace/name or just name).
 func (p *identifierParser) parseDefaultPath(id *Identifier, tok string) error {
-	id.registry = p.options.DefaultRegistry
+	u, err := url.Parse(p.options.DefaultRegistry)
+	if err != nil {
+		return crex.Wrap(ErrInvalidIdentifier, err)
+	}
+	id.registry = u
 
 	if namespace, name, ok := strings.Cut(tok, "/"); ok {
 		if !namePattern.MatchString(namespace) {

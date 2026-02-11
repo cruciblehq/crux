@@ -38,8 +38,8 @@ func TestParseIdentifier_WithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.Registry() != "https://custom.registry.io" {
-		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.Registry())
+	if id.Registry().String() != "https://custom.registry.io" {
+		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.Registry().String())
 	}
 	if id.Namespace() != "crucible" {
 		t.Errorf("expected namespace %q, got %q", "crucible", id.Namespace())

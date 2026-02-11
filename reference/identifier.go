@@ -2,6 +2,7 @@ package reference
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/cruciblehq/crux/kit/crex"
@@ -14,7 +15,7 @@ import (
 // Use [ParseIdentifier] to construct valid identifiers.
 type Identifier struct {
 	typ       resource.Type
-	registry  string
+	registry  *url.URL
 	namespace string
 	name      string
 	path      string
@@ -50,7 +51,7 @@ func NewIdentifierOptions(defaultRegistry, defaultNamespace string) (IdentifierO
 //
 // The expected string format is:
 //
-//	[<type>] [[scheme://]registry/]<path>
+//	[<type>] [[scheme://]host/]<path>
 //
 // The type is optional and must be lowercase alphabetic. When omitted, the
 // context type is used. When present, it must match the context type exactly.
@@ -84,14 +85,29 @@ func MustParseIdentifier(s string, contextType resource.Type, options Identifier
 }
 
 // Creates a new identifier.
-func NewIdentifier(typ resource.Type, registry, namespace, name string) *Identifier {
+//
+// The registry string is parsed as a URL. Returns an error if parsing fails.
+func NewIdentifier(typ resource.Type, registry, namespace, name string) (*Identifier, error) {
+	u, err := url.Parse(registry)
+	if err != nil {
+		return nil, crex.Wrap(ErrInvalidIdentifier, err)
+	}
 	return &Identifier{
 		typ:       typ,
-		registry:  registry,
+		registry:  u,
 		namespace: namespace,
 		name:      name,
 		path:      "",
+	}, nil
+}
+
+// Like [NewIdentifier], but panics on error.
+func MustNewIdentifier(typ resource.Type, registry, namespace, name string) *Identifier {
+	id, err := NewIdentifier(typ, registry, namespace, name)
+	if err != nil {
+		panic(err)
 	}
+	return id
 }
 
 // Resource type (e.g., "widget"). Lowercase alphabetic only.
@@ -99,9 +115,17 @@ func (id *Identifier) Type() resource.Type {
 	return id.typ
 }
 
-// Registry authority (e.g., "registry.crucible.net").
-func (id *Identifier) Registry() string {
+// Registry URL.
+func (id *Identifier) Registry() *url.URL {
 	return id.registry
+}
+
+// Registry host authority, including port if present.
+//
+// This is the host:port portion of the registry URL, suitable for use
+// as a containerd namespace or network address.
+func (id *Identifier) Host() string {
+	return id.registry.Host
 }
 
 // Namespace segment of the path. Only used with the default registry.
@@ -130,7 +154,7 @@ func (id *Identifier) Path() string {
 
 // Returns the full URI, including registry and path.
 func (id *Identifier) URI() string {
-	return fmt.Sprintf("%s/%s", id.Registry(), id.Path())
+	return fmt.Sprintf("%s/%s", id.registry.String(), id.Path())
 }
 
 // Returns the canonical string representation.
