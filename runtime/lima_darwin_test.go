@@ -80,7 +80,9 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		Arch:   "aarch64",
 		CPUs:   2,
 		Memory: "2GiB",
-		Disk:   "10GiB",
+		Disk:          "10GiB",
+		User:          "testuser",
+		ContainerdGID: 999,
 	}
 
 	var buf bytes.Buffer
@@ -113,7 +115,9 @@ func TestConfigTemplate_x86(t *testing.T) {
 		Arch:   "x86_64",
 		CPUs:   4,
 		Memory: "4GiB",
-		Disk:   "20GiB",
+		Disk:          "20GiB",
+		User:          "testuser",
+		ContainerdGID: 999,
 	}
 
 	var buf bytes.Buffer
