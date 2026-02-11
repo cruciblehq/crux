@@ -76,8 +76,8 @@ func TestIdentifierParser_Parse_FullURI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://myregistry.com" {
-		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry)
+	if id.registry.String() != "https://myregistry.com" {
+		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry.String())
 	}
 	if id.path != "path/to/resource" {
 		t.Errorf("expected path %q, got %q", "path/to/resource", id.path)
@@ -95,8 +95,8 @@ func TestIdentifierParser_Parse_RegistryAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://myregistry.com" {
-		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry)
+	if id.registry.String() != "https://myregistry.com" {
+		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry.String())
 	}
 	if id.path != "path/to/resource" {
 		t.Errorf("expected path %q, got %q", "path/to/resource", id.path)
@@ -117,8 +117,8 @@ func TestIdentifierParser_Parse_WithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://custom.registry.io" {
-		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.registry)
+	if id.registry.String() != "https://custom.registry.io" {
+		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.registry.String())
 	}
 	if id.namespace != "myteam" {
 		t.Errorf("expected namespace %q, got %q", "myteam", id.namespace)
@@ -402,8 +402,8 @@ func TestIdentifierParser_ParseURI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://myregistry.com" {
-		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry)
+	if id.registry.String() != "https://myregistry.com" {
+		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry.String())
 	}
 	if id.path != "path/to/resource" {
 		t.Errorf("expected path %q, got %q", "path/to/resource", id.path)
@@ -506,8 +506,8 @@ func TestIdentifierParser_ParseRegistryPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://myregistry.com" {
-		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry)
+	if id.registry.String() != "https://myregistry.com" {
+		t.Errorf("expected registry %q, got %q", "https://myregistry.com", id.registry.String())
 	}
 	if id.path != "path/to/resource" {
 		t.Errorf("expected path %q, got %q", "path/to/resource", id.path)
@@ -617,8 +617,8 @@ func TestIdentifierParser_ParseDefaultPath_WithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if id.registry != "https://custom.registry.io" {
-		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.registry)
+	if id.registry.String() != "https://custom.registry.io" {
+		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", id.registry.String())
 	}
 	if id.namespace != "namespace" {
 		t.Errorf("expected namespace %q, got %q", "namespace", id.namespace)

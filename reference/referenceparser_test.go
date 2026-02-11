@@ -76,8 +76,8 @@ func TestReferenceParser_Parse_FullURIAndVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ref.Registry() != "https://myregistry.com" {
-		t.Errorf("expected registry %q, got %q", "https://myregistry.com", ref.Registry())
+	if ref.Registry().String() != "https://myregistry.com" {
+		t.Errorf("expected registry %q, got %q", "https://myregistry.com", ref.Registry().String())
 	}
 	if ref.Path() != "path/to/resource" {
 		t.Errorf("expected path %q, got %q", "path/to/resource", ref.Path())
@@ -171,8 +171,8 @@ func TestReferenceParser_Parse_WithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ref.Registry() != "https://custom.registry.io" {
-		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", ref.Registry())
+	if ref.Registry().String() != "https://custom.registry.io" {
+		t.Errorf("expected registry %q, got %q", "https://custom.registry.io", ref.Registry().String())
 	}
 	if ref.Namespace() != "myteam" {
 		t.Errorf("expected namespace %q, got %q", "myteam", ref.Namespace())
