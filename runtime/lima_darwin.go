@@ -46,6 +46,10 @@ const (
 	// Default disk size in GiB allocated to the VM.
 	defaultDiskGiB = 10
 
+	// Default GID for the containerd group inside the VM. The containerd
+	// socket is configured with this group so the Lima user can access it.
+	defaultContainerdGID = 999
+
 	// Download URL template for Lima releases.
 	// Placeholders: version, version, OS, arch.
 	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
@@ -169,6 +173,8 @@ type configData struct {
 	Memory         string // Memory allocation with unit suffix (e.g. "2GiB").
 	Disk           string // Disk size with unit suffix (e.g. "10GiB").
 	ContainerdSock string // Host socket path for forwarding the guest containerd socket.
+	User           string // Host username (Lima creates a matching guest user).
+	ContainerdGID  int    // GID for the containerd group (controls socket access).
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -182,6 +188,8 @@ func generateConfig() (string, error) {
 		Memory:         fmt.Sprintf("%dGiB", defaultMemoryGiB),
 		Disk:           fmt.Sprintf("%dGiB", defaultDiskGiB),
 		ContainerdSock: containerdForwardedSocket(),
+		User:           os.Getenv("USER"),
+		ContainerdGID:  defaultContainerdGID,
 	}
 
 	configDir := paths.VM()
