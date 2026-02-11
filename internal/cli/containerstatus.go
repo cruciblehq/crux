@@ -28,7 +28,7 @@ func (c *ContainerStatusCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctr := runtime.NewContainer(id.Registry(), c.ID)
+	ctr := runtime.NewContainer(id.Hostname(), c.ID)
 
 	status, err := ctr.Status(ctx)
 	if err != nil {
