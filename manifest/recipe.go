@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
 )
@@ -74,7 +75,7 @@ func (r *Recipe) ParseFrom(options reference.IdentifierOptions) (RuntimeSource, 
 		value := strings.Join(fields[1:], " ")
 		ref, err := reference.Parse(value, resource.TypeRuntime, options)
 		if err != nil {
-			return RuntimeSource{}, fmt.Errorf("%w: %w", ErrInvalidFromFormat, err)
+			return RuntimeSource{}, crex.Wrap(ErrInvalidFromFormat, err)
 		}
 		return RuntimeSource{Type: RuntimeSourceRef, Value: value, Ref: ref}, nil
 
@@ -82,7 +83,7 @@ func (r *Recipe) ParseFrom(options reference.IdentifierOptions) (RuntimeSource, 
 		value := strings.Join(fields, " ")
 		ref, err := reference.Parse(value, resource.TypeRuntime, options)
 		if err != nil {
-			return RuntimeSource{}, fmt.Errorf("%w: %w", ErrInvalidFromFormat, err)
+			return RuntimeSource{}, crex.Wrap(ErrInvalidFromFormat, err)
 		}
 		return RuntimeSource{Type: RuntimeSourceRef, Value: value, Ref: ref}, nil
 	}
