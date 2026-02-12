@@ -11,13 +11,13 @@ import (
 // A build step in a runtime definition.
 //
 // Fields are either operations or modifiers. Operations are the actions:
-// [Step.Run], [Step.Exec], [Step.Copy]; they are mutually exclusive.
-// Modifiers are [Step.Shell], [Step.Env], [Step.Workdir], [Step.Platform];
-// paired with an operation they apply to that single step, standalone they
-// persist in the image for subsequent steps. Modifiers combine freely with
-// each other. [Step.Platform] with [Step.Steps] creates a group whose
-// children inherit any modifiers set at the group level. Invalid combinations
-// are rejected during validation.
+// [Step.Run], [Step.Copy]; they are mutually exclusive. Modifiers are
+// [Step.Shell], [Step.Env], [Step.Workdir], [Step.Platform]; paired with
+// an operation they apply to that single step, standalone they persist in
+// the image for subsequent steps. Modifiers combine freely with each
+// other. [Step.Platform] with [Step.Steps] creates a group whose children
+// inherit any modifiers set at the group level. Invalid combinations are
+// rejected during validation.
 type Step struct {
 
 	// Executes a command through a shell inside the build container.
@@ -33,12 +33,6 @@ type Step struct {
 	// single command. When set alone or with other modifiers, changes the
 	// default shell for all subsequent run operations. Defaults to /bin/sh.
 	Shell string `yaml:"shell,omitempty"`
-
-	// Executes a binary directly without a shell.
-	//
-	// The first element is the binary path, the rest are arguments. No shell
-	// interpretation is performed.
-	Exec []string `yaml:"exec,omitempty"`
 
 	// Copies a file or directory from the host into the image.
 	//
@@ -115,21 +109,20 @@ func (s *Step) validate() error {
 // not carry child steps.
 func (s *Step) validateStructure() error {
 	hasRun := s.Run != ""
-	hasExec := len(s.Exec) > 0
 	hasCopy := s.Copy != ""
 	hasMod := s.Shell != "" || len(s.Env) > 0 || s.Workdir != "" || s.Platform != ""
 	hasSteps := len(s.Steps) > 0
 
-	if !hasRun && !hasExec && !hasCopy && !hasMod && !hasSteps {
+	if !hasRun && !hasCopy && !hasMod && !hasSteps {
 		return ErrEmptyStep
 	}
-	if (hasRun && hasExec) || (hasRun && hasCopy) || (hasExec && hasCopy) {
+	if hasRun && hasCopy {
 		return ErrMultipleOperations
 	}
 	if hasSteps && s.Platform == "" {
 		return ErrStepsWithoutPlatform
 	}
-	if (hasRun || hasExec || hasCopy) && hasSteps {
+	if (hasRun || hasCopy) && hasSteps {
 		return ErrOperationWithSteps
 	}
 	return nil
@@ -137,16 +130,13 @@ func (s *Step) validateStructure() error {
 
 // Validates modifier compatibility with the current operation.
 //
-// Rejects [Step.Shell] when paired with [Step.Exec] or [Step.Copy], and
-// [Step.Env] when paired with [Step.Copy].
+// Rejects [Step.Shell] when paired with [Step.Copy], and [Step.Env] when
+// paired with [Step.Copy].
 func (s *Step) validateModifiers() error {
 	hasCopy := s.Copy != ""
 	hasShell := s.Shell != ""
 	hasEnv := len(s.Env) > 0
 
-	if hasShell && len(s.Exec) > 0 {
-		return ErrShellWithExec
-	}
 	if hasShell && hasCopy {
 		return ErrShellWithCopy
 	}
@@ -158,12 +148,9 @@ func (s *Step) validateModifiers() error {
 
 // Validates individual field values.
 //
-// Checks that [Step.Exec] has a non-empty first element, that [Step.Copy] is
-// in valid "src dest" format, and that [Step.Platform] is a known platform.
+// Checks that [Step.Copy] is in valid "src dest" format and that
+// [Step.Platform] is a known platform.
 func (s *Step) validateValues() error {
-	if len(s.Exec) > 0 && s.Exec[0] == "" {
-		return ErrExecEmpty
-	}
 	if s.Copy != "" {
 		if _, _, err := s.parseCopy(); err != nil {
 			return err
