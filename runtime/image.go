@@ -36,10 +36,11 @@ var containerPlatform = "linux/" + goruntime.GOARCH
 // resource reference, providing isolation between registries. The image is
 // tagged as "namespace/name:version".
 type Image struct {
-	registry  string // Containerd namespace (from registry).
-	namespace string // Resource namespace.
-	name      string // Resource name.
-	version   string // Image version.
+	client    *containerd.Client // Shared containerd gRPC connection.
+	registry  string             // Containerd namespace (from registry).
+	namespace string             // Resource namespace.
+	name      string             // Resource name.
+	version   string             // Image version.
 }
 
 // Returns the image reference as "namespace/name".
@@ -59,11 +60,13 @@ func (img *Image) filter() string {
 
 // Creates an [Image] from a parsed resource identifier and version.
 //
-// The registry component of the identifier is used as the containerd
-// namespace. The image name is derived from the identifier's namespace
-// and name.
-func NewImage(id *reference.Identifier, version string) *Image {
+// The client is a shared containerd gRPC connection whose lifecycle is
+// managed by the caller. The registry component of the identifier is
+// used as the containerd namespace. The image name is derived from the
+// identifier's namespace and name.
+func NewImage(client *containerd.Client, id *reference.Identifier, version string) *Image {
 	return &Image{
+		client:    client,
 		registry:  id.Hostname(),
 		namespace: id.Namespace(),
 		name:      id.Name(),
@@ -86,13 +89,7 @@ func (img *Image) Import(ctx context.Context, path string) error {
 	}
 	defer f.Close()
 
-	c, err := newContainerdClient(img.registry)
-	if err != nil {
-		return crex.Wrap(ErrImageImport, err)
-	}
-	defer c.Close()
-
-	imported, err := c.Import(ctx, f)
+	imported, err := img.client.Import(ctx, f)
 	if err != nil {
 		return crex.Wrap(ErrImageImport, err)
 	}
@@ -102,11 +99,11 @@ func (img *Image) Import(ctx context.Context, path string) error {
 		return err
 	}
 
-	if err := img.retag(ctx, c, rec); err != nil {
+	if err := img.retag(ctx, rec); err != nil {
 		return err
 	}
 
-	return img.unpack(ctx, c)
+	return img.unpack(ctx)
 }
 
 // Validates that the import produced exactly one image record.
@@ -128,8 +125,8 @@ func validateImport(imported []images.Image) (images.Image, error) {
 // that's what's used for container creation and lookup. This creates a new
 // image record pointing at the same target descriptor, then removes the
 // original reference.
-func (img *Image) retag(ctx context.Context, c *containerd.Client, rec images.Image) error {
-	is := c.ImageService()
+func (img *Image) retag(ctx context.Context, rec images.Image) error {
+	is := img.client.ImageService()
 	tag := img.tag()
 
 	if _, err := is.Create(ctx, images.Image{
@@ -149,8 +146,8 @@ func (img *Image) retag(ctx context.Context, c *containerd.Client, rec images.Im
 
 // Unpacks the image layers into the snapshotter so they are ready for
 // container creation.
-func (img *Image) unpack(ctx context.Context, c *containerd.Client) error {
-	tagged, err := c.GetImage(ctx, img.tag())
+func (img *Image) unpack(ctx context.Context) error {
+	tagged, err := img.client.GetImage(ctx, img.tag())
 	if err != nil {
 		return crex.Wrap(ErrImageImport, err)
 	}
@@ -166,13 +163,7 @@ func (img *Image) unpack(ctx context.Context, c *containerd.Client) error {
 // Containers created from this image are discovered by querying containerd
 // and destroyed first. The image is then removed from the image store.
 func (img *Image) Destroy(ctx context.Context) error {
-	c, err := newContainerdClient(img.registry)
-	if err != nil {
-		return crex.Wrap(ErrImageDestroy, err)
-	}
-	defer c.Close()
-
-	ctrs, err := c.Containers(ctx, img.filter())
+	ctrs, err := img.client.Containers(ctx, img.filter())
 	if err != nil {
 		return crex.Wrap(ErrImageDestroy, err)
 	}
@@ -187,7 +178,7 @@ func (img *Image) Destroy(ctx context.Context) error {
 		}
 	}
 
-	if err := c.ImageService().Delete(ctx, img.tag()); err != nil && !errdefs.IsNotFound(err) {
+	if err := img.client.ImageService().Delete(ctx, img.tag()); err != nil && !errdefs.IsNotFound(err) {
 		return crex.Wrap(ErrImageDestroy, err)
 	}
 
@@ -204,20 +195,14 @@ func (img *Image) Start(ctx context.Context, id string) (*Container, error) {
 		id = img.name
 	}
 
-	client, err := newContainerdClient(img.registry)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerStart, err)
-	}
-	defer client.Close()
+	cleanupStaleContainer(ctx, img.client, id)
 
-	cleanupStaleContainer(ctx, client, id)
-
-	image, err := client.GetImage(ctx, img.tag())
+	image, err := img.client.GetImage(ctx, img.tag())
 	if err != nil {
 		return nil, crex.Wrap(ErrContainerStart, err)
 	}
 
-	ctr, err := createContainer(ctx, client, id, image)
+	ctr, err := createContainer(ctx, img.client, id, image)
 	if err != nil {
 		return nil, crex.Wrap(ErrContainerStart, err)
 	}
@@ -227,7 +212,7 @@ func (img *Image) Start(ctx context.Context, id string) (*Container, error) {
 		return nil, crex.Wrap(ErrContainerStart, err)
 	}
 
-	return NewContainer(img.registry, id), nil
+	return NewContainer(img.client, img.registry, id), nil
 }
 
 // Stops the container, re-imports the image from a new tarball, and restarts
@@ -255,13 +240,9 @@ func (img *Image) Export(ctx context.Context, path string) error {
 	}
 	defer f.Close()
 
-	c, err := newContainerdClient(img.registry)
-	if err != nil {
-		return crex.Wrap(ErrImageExport, err)
-	}
-	defer c.Close()
+	opt := archive.WithImage(img.client.ImageService(), img.tag())
 
-	if err := c.Export(ctx, f, archive.WithImage(c.ImageService(), img.tag())); err != nil {
+	if err := img.client.Export(ctx, f, opt); err != nil {
 		return crex.Wrap(ErrImageExport, err)
 	}
 

@@ -16,13 +16,7 @@ import (
 //
 // On Linux the containerd client and shim share the same kernel, so the
 // standard Task.Exec API works directly with in-process FIFO IO.
-func containerExec(ctx context.Context, registry, id string, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
-	client, err := newContainerdClient(registry)
-	if err != nil {
-		return nil, crex.Wrap(ErrContainerExec, err)
-	}
-	defer client.Close()
-
+func containerExec(ctx context.Context, client *containerd.Client, _, id string, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
 	ctr, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return nil, crex.Wrap(ErrContainerExec, err)

@@ -3,7 +3,6 @@ package build
 import (
 	"context"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -62,12 +61,18 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 		DefaultNamespace: sb.defaultNamespace,
 	})
 	if err != nil {
-		slog.Warn("failed to parse resource name", "error", err)
-	} else {
-		img := runtime.NewImage(id, m.Resource.Version)
-		if err := img.Import(ctx, destImage); err != nil {
-			slog.Warn("failed to import image into runtime", "error", err)
-		}
+		return nil, err
+	}
+
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	img := runtime.NewImage(client, id, m.Resource.Version)
+	if err := img.Import(ctx, destImage); err != nil {
+		return nil, err
 	}
 
 	return &Result{Output: output}, nil

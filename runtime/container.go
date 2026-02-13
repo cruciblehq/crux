@@ -22,17 +22,19 @@ import (
 // Use [NewContainer] to construct a handle for an existing container, or
 // [Image.Start] to create and start one.
 type Container struct {
-	registry string // Containerd namespace.
-	id       string // Container identifier.
+	client   *containerd.Client // Shared containerd gRPC connection.
+	registry string             // Containerd namespace.
+	id       string             // Container identifier.
 }
 
 // Creates a [Container] handle for an existing container.
 //
-// The registry is the containerd namespace (the registry host authority).
-// The id is the container identifier within that namespace.
-// This does not create or start anything in the runtime.
-func NewContainer(registry, id string) *Container {
-	return &Container{registry: registry, id: id}
+// The client is a shared containerd gRPC connection whose lifecycle is
+// managed by the caller. The registry is the containerd namespace (the
+// registry host authority). The id is the container identifier within
+// that namespace. This does not create or start anything in the runtime.
+func NewContainer(client *containerd.Client, registry, id string) *Container {
+	return &Container{client: client, registry: registry, id: id}
 }
 
 // Stops the container's task.
@@ -41,13 +43,7 @@ func NewContainer(registry, id string) *Container {
 // preserved. Stop is idempotent; calling it on an already-stopped
 // container is not an error.
 func (c *Container) Stop(ctx context.Context) error {
-	client, err := newContainerdClient(c.registry)
-	if err != nil {
-		return crex.Wrap(ErrContainerStop, err)
-	}
-	defer client.Close()
-
-	ctr, err := client.LoadContainer(ctx, c.id)
+	ctr, err := c.client.LoadContainer(ctx, c.id)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return nil
@@ -77,13 +73,7 @@ func (c *Container) Stop(ctx context.Context) error {
 // with its snapshot. The image is not affected. After destruction the
 // container cannot be restarted.
 func (c *Container) Destroy(ctx context.Context) error {
-	client, err := newContainerdClient(c.registry)
-	if err != nil {
-		return crex.Wrap(ErrContainerDestroy, err)
-	}
-	defer client.Close()
-
-	ctr, loadErr := client.LoadContainer(ctx, c.id)
+	ctr, loadErr := c.client.LoadContainer(ctx, c.id)
 	if loadErr != nil {
 		if errdefs.IsNotFound(loadErr) {
 			return nil
@@ -117,7 +107,7 @@ func (c *Container) Exec(ctx context.Context, command string, args ...string) (*
 // Options override the inherited OCI spec for environment and working
 // directory. The container must be running.
 func (c *Container) ExecWith(ctx context.Context, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
-	return containerExec(ctx, c.registry, c.id, opts, command, args...)
+	return containerExec(ctx, c.client, c.registry, c.id, opts, command, args...)
 }
 
 // Queries the current state of the container.
@@ -126,13 +116,7 @@ func (c *Container) ExecWith(ctx context.Context, opts ExecOptions, command stri
 // container exists but has no running task, or [StateNotCreated] if the
 // container does not exist.
 func (c *Container) Status(ctx context.Context) (State, error) {
-	client, err := newContainerdClient(c.registry)
-	if err != nil {
-		return StateNotCreated, crex.Wrap(ErrContainerStatus, err)
-	}
-	defer client.Close()
-
-	ctr, err := client.LoadContainer(ctx, c.id)
+	ctr, err := c.client.LoadContainer(ctx, c.id)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return StateNotCreated, nil
@@ -170,13 +154,7 @@ func (c *Container) Status(ctx context.Context) (State, error) {
 // The container should be stopped before committing to ensure all filesystem
 // writes have completed.
 func (c *Container) Commit(ctx context.Context) error {
-	client, err := newContainerdClient(c.registry)
-	if err != nil {
-		return crex.Wrap(ErrContainerCommit, err)
-	}
-	defer client.Close()
-
-	ctr, err := client.LoadContainer(ctx, c.id)
+	ctr, err := c.client.LoadContainer(ctx, c.id)
 	if err != nil {
 		return crex.Wrap(ErrContainerCommit, err)
 	}
@@ -186,7 +164,7 @@ func (c *Container) Commit(ctx context.Context) error {
 		return crex.Wrap(ErrContainerCommit, err)
 	}
 
-	if err := commitSnapshot(ctx, client, info); err != nil {
+	if err := commitSnapshot(ctx, c.client, info); err != nil {
 		return crex.Wrap(ErrContainerCommit, err)
 	}
 

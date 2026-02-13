@@ -28,7 +28,13 @@ func (c *ContainerDestroyCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctr := runtime.NewContainer(id.Hostname(), c.ID)
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	ctr := runtime.NewContainer(client, id.Hostname(), c.ID)
 
 	slog.Info("destroying container...", "id", c.ID)
 

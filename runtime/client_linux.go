@@ -17,6 +17,6 @@ func containerdAddress() string {
 // Creates a containerd client connected to the local containerd socket.
 //
 // The namespace parameter is used as the containerd namespace.
-func newContainerdClient(namespace string) (*containerd.Client, error) {
+func NewContainerdClient(namespace string) (*containerd.Client, error) {
 	return containerd.New(containerdAddress(), containerd.WithDefaultNamespace(namespace))
 }
