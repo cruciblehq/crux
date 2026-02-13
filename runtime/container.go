@@ -1,12 +1,20 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"syscall"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/rootfs"
 	"github.com/containerd/errdefs"
 	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // A container instance within the container runtime.
@@ -151,4 +159,141 @@ func (c *Container) Status(ctx context.Context) (State, error) {
 	default:
 		return StateStopped, nil
 	}
+}
+
+// Commits the container's filesystem changes to its image.
+//
+// The diff between the container's active snapshot and its parent is computed
+// by the containerd diff service and stored in the content store as a new
+// compressed layer blob. The image manifest and config are then updated to
+// include the new layer, and the image record is pointed at the new manifest.
+// The container should be stopped before committing to ensure all filesystem
+// writes have completed.
+func (c *Container) Commit(ctx context.Context) error {
+	client, err := newContainerdClient(c.registry)
+	if err != nil {
+		return crex.Wrap(ErrContainerCommit, err)
+	}
+	defer client.Close()
+
+	ctr, err := client.LoadContainer(ctx, c.id)
+	if err != nil {
+		return crex.Wrap(ErrContainerCommit, err)
+	}
+
+	info, err := ctr.Info(ctx)
+	if err != nil {
+		return crex.Wrap(ErrContainerCommit, err)
+	}
+
+	if err := commitSnapshot(ctx, client, info); err != nil {
+		return crex.Wrap(ErrContainerCommit, err)
+	}
+
+	return nil
+}
+
+// Computes the snapshot diff, appends it as a new layer to the image
+// manifest and config, and updates the image record.
+func commitSnapshot(ctx context.Context, client *containerd.Client, info containers.Container) error {
+	diffDesc, err := rootfs.CreateDiff(ctx,
+		info.SnapshotKey,
+		client.SnapshotService(info.Snapshotter),
+		client.DiffService(),
+	)
+	if err != nil {
+		return err
+	}
+
+	diffID, err := images.GetDiffID(ctx, client.ContentStore(), diffDesc)
+	if err != nil {
+		return err
+	}
+
+	return appendLayer(ctx, client, info.Image, diffDesc, diffID)
+}
+
+// Reads the image's manifest and config, appends the layer descriptor
+// and diff ID, writes the updated blobs, and points the image record
+// at the new manifest.
+func appendLayer(ctx context.Context, client *containerd.Client, imageName string, layer ocispec.Descriptor, diffID digest.Digest) error {
+	cs := client.ContentStore()
+	is := client.ImageService()
+
+	img, err := is.Get(ctx, imageName)
+	if err != nil {
+		return err
+	}
+
+	manifest, err := readManifest(ctx, cs, img.Target)
+	if err != nil {
+		return err
+	}
+
+	config, err := readConfig(ctx, cs, manifest.Config)
+	if err != nil {
+		return err
+	}
+
+	config.RootFS.DiffIDs = append(config.RootFS.DiffIDs, diffID)
+	manifest.Layers = append(manifest.Layers, layer)
+
+	newConfigDesc, err := writeJSON(ctx, cs, manifest.Config.MediaType, config, imageName+"-config")
+	if err != nil {
+		return err
+	}
+	manifest.Config = newConfigDesc
+
+	newManifestDesc, err := writeJSON(ctx, cs, img.Target.MediaType, manifest, imageName+"-manifest")
+	if err != nil {
+		return err
+	}
+
+	img.Target = newManifestDesc
+	_, err = is.Update(ctx, img, "target")
+	return err
+}
+
+// Reads and unmarshals an OCI manifest from the content store.
+func readManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (ocispec.Manifest, error) {
+	b, err := content.ReadBlob(ctx, cs, desc)
+	if err != nil {
+		return ocispec.Manifest{}, err
+	}
+	var m ocispec.Manifest
+	if err := json.Unmarshal(b, &m); err != nil {
+		return ocispec.Manifest{}, err
+	}
+	return m, nil
+}
+
+// Reads and unmarshals an OCI image config from the content store.
+func readConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (ocispec.Image, error) {
+	b, err := content.ReadBlob(ctx, cs, desc)
+	if err != nil {
+		return ocispec.Image{}, err
+	}
+	var img ocispec.Image
+	if err := json.Unmarshal(b, &img); err != nil {
+		return ocispec.Image{}, err
+	}
+	return img, nil
+}
+
+// Marshals a value to JSON and writes it to the content store, returning
+// a descriptor for the written blob.
+func writeJSON(ctx context.Context, cs content.Store, mediaType string, v any, ref string) (ocispec.Descriptor, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	desc := ocispec.Descriptor{
+		MediaType: mediaType,
+		Digest:    digest.FromBytes(b),
+		Size:      int64(len(b)),
+	}
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), desc); err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	return desc, nil
 }
