@@ -37,6 +37,7 @@ var (
 	ErrImageEmpty         = errors.New("archive contains no images")
 	ErrImageMultiple      = errors.New("archive contains multiple images")
 	ErrImageDestroy       = errors.New("failed to destroy image")
+	ErrImageExport        = errors.New("failed to export image")
 
 	// Container errors.
 	ErrContainerStart   = errors.New("failed to start container")
@@ -44,6 +45,7 @@ var (
 	ErrContainerDestroy = errors.New("failed to destroy container")
 	ErrContainerExec    = errors.New("failed to execute command in container")
 	ErrContainerStatus  = errors.New("failed to query container status")
+	ErrContainerCommit  = errors.New("failed to commit container")
 )
 
 // A failed runtime command.

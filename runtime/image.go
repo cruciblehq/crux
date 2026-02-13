@@ -9,6 +9,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
@@ -240,6 +241,31 @@ func (img *Image) Update(ctx context.Context, c *Container, path string) error {
 	}
 	_, err := img.Start(ctx, c.id)
 	return err
+}
+
+// Exports the image as an OCI tar archive.
+//
+// The archive is written to the specified path in OCI image layout format,
+// containing all layers, the manifest, and the config. The resulting file
+// is suitable for distribution or import into another runtime.
+func (img *Image) Export(ctx context.Context, path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return crex.Wrap(ErrImageExport, err)
+	}
+	defer f.Close()
+
+	c, err := newContainerdClient(img.registry)
+	if err != nil {
+		return crex.Wrap(ErrImageExport, err)
+	}
+	defer c.Close()
+
+	if err := c.Export(ctx, f, archive.WithImage(c.ImageService(), img.tag())); err != nil {
+		return crex.Wrap(ErrImageExport, err)
+	}
+
+	return nil
 }
 
 // Creates a container with a fresh snapshot and OCI spec from the image.

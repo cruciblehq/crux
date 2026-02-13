@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/pack"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/runtime"
 )
@@ -41,7 +43,17 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 		return nil, err
 	}
 
-	// TODO: commit container snapshot and export as OCI tarball to output.
+	if err := ctr.Stop(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := ctr.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := img.Export(ctx, filepath.Join(output, pack.ImageFile)); err != nil {
+		return nil, err
+	}
 
 	return &Result{Output: output, Manifest: &m}, nil
 }
