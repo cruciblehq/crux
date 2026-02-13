@@ -8,8 +8,8 @@ import (
 
 	"github.com/cruciblehq/crux/kit/archive"
 	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/crux/resource"
 )
 
@@ -73,6 +73,17 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		Fallback("Please report this issue to the Crucible team.")
 
 	switch man.Resource.Type {
+	case resource.TypeRuntime:
+		if _, ok := man.Config.(*manifest.Runtime); !ok {
+			return mismatch.Err()
+		}
+		if err := validateImageStructure(dist); err != nil {
+			return crex.UserError("runtime build output not found", "build/image.tar does not exist").
+				Fallback("Run 'crux build' to prepare the runtime image.").
+				Cause(err).
+				Err()
+		}
+
 	case resource.TypeService:
 		if _, ok := man.Config.(*manifest.Service); !ok {
 			return mismatch.Err()
