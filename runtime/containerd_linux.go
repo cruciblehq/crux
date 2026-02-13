@@ -22,9 +22,6 @@ const (
 	// Directory name used for containerd data and state.
 	containerdDir = "containerd"
 
-	// Socket filename for the containerd gRPC endpoint.
-	containerdSock = "containerd.sock"
-
 	// Configuration filename written to the containerd data directory.
 	containerdConfigFile = "config.toml"
 )

@@ -57,12 +57,12 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
-	id, err := reference.ParseIdentifier(m.Resource.Ref, resource.TypeService, reference.IdentifierOptions{
+	id, err := reference.ParseIdentifier(m.Resource.Name, resource.TypeService, reference.IdentifierOptions{
 		DefaultRegistry:  sb.registry,
 		DefaultNamespace: sb.defaultNamespace,
 	})
 	if err != nil {
-		slog.Warn("failed to parse resource ref", "error", err)
+		slog.Warn("failed to parse resource name", "error", err)
 	} else {
 		img := runtime.NewImage(id, m.Resource.Version)
 		if err := img.Import(ctx, destImage); err != nil {

@@ -51,7 +51,7 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 // For file sources the local OCI tarball is imported directly. Ref sources
 // are not yet implemented.
 func resolveSource(ctx context.Context, m manifest.Manifest, source manifest.RuntimeSource, options reference.IdentifierOptions) (*runtime.Image, error) {
-	id, err := reference.ParseIdentifier(m.Resource.Ref, m.Resource.Type, options)
+	id, err := reference.ParseIdentifier(m.Resource.Name, m.Resource.Type, options)
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +83,10 @@ func executeSteps(ctx context.Context, ctr *runtime.Container, steps []manifest.
 	return nil
 }
 
-// Executes a single step, dispatching to operation execution, group
-// recursion, or state mutation depending on the step's fields.
+// Executes a single step, dispatching to operation execution, group recursion,
+// or state mutation depending on the step's fields.
 func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState) error {
-	hasOp := step.Run != "" || len(step.Exec) > 0 || step.Copy != ""
+	hasOp := step.Run != "" || step.Copy != ""
 
 	// Platform group: apply group-level modifiers and recurse.
 	if len(step.Steps) > 0 {
@@ -104,10 +104,10 @@ func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step
 	return nil
 }
 
-// Executes a run, exec, or copy operation with scoped modifier overrides.
+// Executes a run or copy operation with scoped modifier overrides.
 //
-// Step-level modifiers override the persistent state for this operation
-// only. The persistent state is not modified.
+// Step-level modifiers override the persistent state for this operation only.
+// The persistent state is not modified.
 func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState) error {
 	shell, opts := state.resolve(step)
 
@@ -115,16 +115,6 @@ func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest
 	case step.Run != "":
 		slog.Debug("run", "command", step.Run, "shell", shell)
 		result, err := ctr.ExecWith(ctx, opts, shell, "-c", step.Run)
-		if err != nil {
-			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("command failed (exit %d): %s", result.ExitCode, result.Stderr)
-		}
-
-	case len(step.Exec) > 0:
-		slog.Debug("exec", "argv", step.Exec)
-		result, err := ctr.ExecWith(ctx, opts, step.Exec[0], step.Exec[1:]...)
 		if err != nil {
 			return err
 		}

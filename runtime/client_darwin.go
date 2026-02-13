@@ -14,7 +14,7 @@ import (
 // Lima's portForwards configuration tunnels the guest socket at
 // /run/containerd/containerd.sock to this host path.
 func containerdForwardedSocket() string {
-	return filepath.Join(paths.VM(), "containerd.sock")
+	return filepath.Join(paths.VM(), containerdSock)
 }
 
 // Creates a containerd client connected to the Lima-forwarded socket.
