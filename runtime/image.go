@@ -132,8 +132,16 @@ func (img *Image) retag(ctx context.Context, rec images.Image) error {
 	if _, err := is.Create(ctx, images.Image{
 		Name:   tag,
 		Target: rec.Target,
-	}); err != nil && !errdefs.IsAlreadyExists(err) {
-		return crex.Wrap(ErrImageImport, err)
+	}); err != nil {
+		if !errdefs.IsAlreadyExists(err) {
+			return crex.Wrap(ErrImageImport, err)
+		}
+		if _, err := is.Update(ctx, images.Image{
+			Name:   tag,
+			Target: rec.Target,
+		}, "target"); err != nil {
+			return crex.Wrap(ErrImageImport, err)
+		}
 	}
 
 	// Remove the original reference if it differs from our tag.

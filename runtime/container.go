@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"syscall"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -191,9 +192,8 @@ func commitSnapshot(ctx context.Context, client *containerd.Client, info contain
 	return appendLayer(ctx, client, info.Image, diffDesc, diffID)
 }
 
-// Reads the image's manifest and config, appends the layer descriptor
-// and diff ID, writes the updated blobs, and points the image record
-// at the new manifest.
+// Reads the image's manifest and config, appends the layer descriptor and diff
+// ID, writes the updated blobs, and points the image record at the new manifest.
 func appendLayer(ctx context.Context, client *containerd.Client, imageName string, layer ocispec.Descriptor, diffID digest.Digest) error {
 	cs := client.ContentStore()
 	is := client.ImageService()
@@ -222,7 +222,8 @@ func appendLayer(ctx context.Context, client *containerd.Client, imageName strin
 	}
 	manifest.Config = newConfigDesc
 
-	newManifestDesc, err := writeJSON(ctx, cs, img.Target.MediaType, manifest, imageName+"-manifest")
+	manifestLabels := manifestGCLabels(manifest)
+	newManifestDesc, err := writeJSON(ctx, cs, img.Target.MediaType, manifest, imageName+"-manifest", content.WithLabels(manifestLabels))
 	if err != nil {
 		return err
 	}
@@ -260,7 +261,7 @@ func readConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) 
 
 // Marshals a value to JSON and writes it to the content store, returning
 // a descriptor for the written blob.
-func writeJSON(ctx context.Context, cs content.Store, mediaType string, v any, ref string) (ocispec.Descriptor, error) {
+func writeJSON(ctx context.Context, cs content.Store, mediaType string, v any, ref string, opts ...content.Opt) (ocispec.Descriptor, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return ocispec.Descriptor{}, err
@@ -270,8 +271,26 @@ func writeJSON(ctx context.Context, cs content.Store, mediaType string, v any, r
 		Digest:    digest.FromBytes(b),
 		Size:      int64(len(b)),
 	}
-	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), desc); err != nil {
+	if err := content.WriteBlob(ctx, cs, ref, bytes.NewReader(b), desc, opts...); err != nil {
 		return ocispec.Descriptor{}, err
 	}
 	return desc, nil
+}
+
+// Computes containerd GC reference labels for a manifest's children.
+//
+// These labels allow containerd's garbage collector to trace reachability from
+// the manifest blob to its config and layer blobs. Without them, content
+// written by [appendLayer] would be eligible for collection as soon as any
+// concurrent GC pass runs. The label format mirrors what containerd's own
+// import handler ([images.SetChildrenLabels]) produces.
+func manifestGCLabels(m ocispec.Manifest) map[string]string {
+	labels := map[string]string{
+		"containerd.io/gc.ref.content.config": m.Config.Digest.String(),
+	}
+	for i, layer := range m.Layers {
+		key := fmt.Sprintf("containerd.io/gc.ref.content.l.%d", i)
+		labels[key] = layer.Digest.String()
+	}
+	return labels
 }

@@ -40,6 +40,12 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 	}
 	defer client.Close()
 
+	ctx, done, err := client.WithLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done(ctx)
+
 	img, err := resolveSource(ctx, client, m, id, source)
 	if err != nil {
 		return nil, err
