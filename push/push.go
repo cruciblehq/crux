@@ -107,7 +107,7 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 	var regErr *registry.Error
 	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
 		return crex.UserError("namespace not found", fmt.Sprintf("namespace '%s' does not exist", namespace)).
-			Fallback("Create the namespace first using the Hub administration tools.").
+			Fallback("Create the namespace first.").
 			Err()
 	}
 
