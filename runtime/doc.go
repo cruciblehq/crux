@@ -1,11 +1,23 @@
 // Package runtime manages the container runtime environment for Crucible.
 //
-// On macOS, containers run inside a Lima virtual machine with containerd.
-// The containerd socket is forwarded from the guest to the host via Lima's
-// portForwards, allowing the Go client to connect directly. On Linux,
-// containers run natively via a vendored containerd. The package exposes a
-// platform-agnostic API; platform-specific details are handled internally.
-// Calling any function on an unsupported platform returns [ErrUnsupportedPlatform].
+// The package exposes a platform-agnostic API over containerd. On macOS,
+// containers run inside a Lima virtual machine whose containerd socket is
+// forwarded to the host. On Linux, containers run natively via a vendored
+// containerd. Platform-specific details are handled internally; calling any
+// function on an unsupported platform returns [ErrUnsupportedPlatform].
+//
+// There are two levels of abstraction. The package-level functions ([Start],
+// [Stop], [Status], [Destroy], [Exec]) manage the runtime itself (the VM
+// on macOS, and the containerd process on Linux). [Image] and [Container]
+// manage individual OCI images and their containers within that runtime.
+//
+// Container exec uses containerd's Task.Exec API with FIFO-based IO. On
+// Linux the client and shim share the same kernel, so FIFOs work directly.
+// On macOS the shim runs inside the Lima VM while the Go client runs on
+// the host; FIFOs do not work across the VM boundary because pipe buffers
+// are kernel-local objects. To work around this, macOS exec routes through
+// limactl to invoke ctr inside the guest, where the shim, FIFOs, and
+// client all share the same kernel. See [containerExec] for details.
 //
 // Starting and stopping the runtime:
 //
@@ -17,52 +29,26 @@
 // Querying the runtime status:
 //
 //	status, err := runtime.Status()
-//	if err != nil {
-//		log.Fatal(err)
-//	}
 //	fmt.Println(status) // "running", "stopped", or "not created"
 //
-// Executing a command inside the runtime:
+// Importing an OCI image and starting a container:
 //
-//	result, err := runtime.Exec("uname", "-a")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	fmt.Println(result.Stdout)
-//
-// Tearing down the runtime and its resources:
-//
-//	if err := runtime.Destroy(); err != nil {
-//		log.Fatal(err)
-//	}
-//
-// Importing an OCI image and managing containers:
-//
-//	opts, err := reference.NewIdentifierOptions(registryURL, namespace)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	id, err := reference.ParseIdentifier(ref, resource.TypeService, opts)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
 //	img := runtime.NewImage(id, version)
 //	if err := img.Import(ctx, "build/image.tar"); err != nil {
 //		log.Fatal(err)
 //	}
-//
 //	c, err := img.Start(ctx, "my-service")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //	defer c.Stop(ctx)
 //
-// Constructing a handle for an existing container:
+// Executing a command inside a container:
 //
-//	ctr := runtime.NewContainer(id.Registry(), "my-service")
-//	status, err := ctr.Status(ctx)
+//	result, err := c.Exec(ctx, "uname", "-a")
+//	fmt.Println(result.Stdout)
 //
-// Updating a container with a new image:
+// Updating a running container with a new image:
 //
 //	if err := img.Update(ctx, ctr, "build/image.tar"); err != nil {
 //		log.Fatal(err)

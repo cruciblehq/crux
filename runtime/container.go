@@ -20,8 +20,8 @@ type Container struct {
 
 // Creates a [Container] handle for an existing container.
 //
-// The registry is the containerd namespace (typically the Crucible registry
-// authority). The id is the container identifier within that namespace.
+// The registry is the containerd namespace (the registry host authority).
+// The id is the container identifier within that namespace.
 // This does not create or start anything in the runtime.
 func NewContainer(registry, id string) *Container {
 	return &Container{registry: registry, id: id}

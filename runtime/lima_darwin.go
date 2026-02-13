@@ -22,52 +22,43 @@ import (
 
 const (
 
-	// Lima version to use for the crux VM.
-	limaVersion = "2.0.3"
+	// Lima configuration.
+	limaVersion      = "2.0.3"     // Lima version to use for the crux VM.
+	limaInstanceName = "crux"      // Lima instance name used for the crux VM.
+	limaConfigFile   = "lima.yaml" // Configuration file name written to paths.VM().
 
-	// Lima instance name used for the crux VM.
-	limaInstanceName = "crux"
+	// VM states returned by limaStatus.
+	limaStatusRunning = "Running" // Status string returned by limactl when the VM is running.
+	limaStatusStopped = "Stopped" // Status string returned by limactl when the VM is stopped.
 
-	// Configuration file name written to paths.VM().
-	limaConfigFile = "lima.yaml"
-
-	// Status string returned by limactl when the VM is running.
-	limaStatusRunning = "Running"
-
-	// Status string returned by limactl when the VM is stopped.
-	limaStatusStopped = "Stopped"
-
-	// Default number of virtual CPUs allocated to the VM.
-	defaultCPUs = 2
-
-	// Default memory in GiB allocated to the VM.
-	defaultMemoryGiB = 2
-
-	// Default disk size in GiB allocated to the VM.
-	defaultDiskGiB = 10
+	// Resource constraints for the VM.
+	defaultCPUs      = 2  // Default number of virtual CPUs allocated to the VM.
+	defaultMemoryGiB = 2  // Default memory in GiB allocated to the VM.
+	defaultDiskGiB   = 10 // Default disk size in GiB allocated to the VM.
 
 	// Default GID for the containerd group inside the VM. The containerd
 	// socket is configured with this group so the Lima user can access it.
-	defaultContainerdGID = 999
+	// Alpine reserves GID 999 for the ping group, so we use 990.
+	defaultContainerdGID = 990
 
-	// Download URL template for Lima releases.
-	// Placeholders: version, version, OS, arch.
+	// Download URL template for Lima releases. Uses placeholders for version,
+	// OS, and architecture.
 	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
 
 	// Binary name for the Lima CLI.
 	limactlBin = "limactl"
 
 	// Go GOARCH values.
-	goarchARM64 = "arm64"
-	goarchAMD64 = "amd64"
+	goarchARM64 = "arm64" // Apple Silicon
+	goarchAMD64 = "amd64" // Intel
 
 	// Architecture identifiers used in Lima YAML configuration.
-	limaArchARM64 = "aarch64"
-	limaArchAMD64 = "x86_64"
+	limaArchARM64 = "aarch64" // ARM64 (Lima uses aarch64)
+	limaArchAMD64 = "x86_64"  // AMD64 (Lima uses x86_64)
 
 	// Architecture identifiers used in Darwin release asset filenames.
-	downloadArchARM64 = "arm64"
-	downloadArchAMD64 = "x86_64"
+	downloadArchARM64 = "arm64"  // Apple Silicon
+	downloadArchAMD64 = "x86_64" // Intel
 )
 
 // Lima architecture identifier for the YAML config.
