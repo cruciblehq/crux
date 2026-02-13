@@ -5,6 +5,7 @@ package runtime
 import (
 	"context"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/cruciblehq/crux/kit/crex"
 )
 
@@ -21,7 +22,7 @@ const (
 // boundary. Instead of using the containerd API, this routes through limactl
 // to invoke `ctr task exec` inside the guest where the shim, FIFOs, and client
 // all share the same kernel.
-func containerExec(_ context.Context, registry, id string, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
+func containerExec(_ context.Context, _ *containerd.Client, registry, id string, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
 	l, err := newLima()
 	if err != nil {
 		return nil, crex.Wrap(ErrContainerExec, err)

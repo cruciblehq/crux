@@ -34,7 +34,13 @@ func (c *ContainerExecCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctr := runtime.NewContainer(id.Hostname(), c.ID)
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	ctr := runtime.NewContainer(client, id.Hostname(), c.ID)
 
 	result, err := ctr.Exec(ctx, c.Command[0], c.Command[1:]...)
 	if err != nil {

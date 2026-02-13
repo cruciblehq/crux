@@ -29,8 +29,14 @@ func (c *ContainerUpdateCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	img := runtime.NewImage(id, c.Version)
-	ctr := runtime.NewContainer(id.Hostname(), c.ID)
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	img := runtime.NewImage(client, id, c.Version)
+	ctr := runtime.NewContainer(client, id.Hostname(), c.ID)
 
 	slog.Info("updating container...", "id", c.ID)
 

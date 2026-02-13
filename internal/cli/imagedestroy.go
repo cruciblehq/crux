@@ -27,7 +27,13 @@ func (c *ImageDestroyCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	img := runtime.NewImage(id, c.Version)
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	img := runtime.NewImage(client, id, c.Version)
 
 	slog.Info("destroying image...", "image", img)
 

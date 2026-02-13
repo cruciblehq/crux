@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/pack"
 	"github.com/cruciblehq/crux/reference"
@@ -28,7 +29,18 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 		return nil, err
 	}
 
-	img, err := resolveSource(ctx, m, source, options)
+	id, err := reference.ParseIdentifier(m.Resource.Name, m.Resource.Type, options)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := runtime.NewContainerdClient(id.Hostname())
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	img, err := resolveSource(ctx, client, m, id, source)
 	if err != nil {
 		return nil, err
 	}
@@ -62,13 +74,8 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 //
 // For file sources the local OCI tarball is imported directly. Ref sources
 // are not yet implemented.
-func resolveSource(ctx context.Context, m manifest.Manifest, source manifest.RuntimeSource, options reference.IdentifierOptions) (*runtime.Image, error) {
-	id, err := reference.ParseIdentifier(m.Resource.Name, m.Resource.Type, options)
-	if err != nil {
-		return nil, err
-	}
-
-	img := runtime.NewImage(id, m.Resource.Version)
+func resolveSource(ctx context.Context, client *containerd.Client, m manifest.Manifest, id *reference.Identifier, source manifest.RuntimeSource) (*runtime.Image, error) {
+	img := runtime.NewImage(client, id, m.Resource.Version)
 
 	switch source.Type {
 	case manifest.RuntimeSourceFile:

@@ -20,6 +20,6 @@ func containerdForwardedSocket() string {
 // Creates a containerd client connected to the Lima-forwarded socket.
 //
 // The namespace parameter is used as the containerd namespace.
-func newContainerdClient(namespace string) (*containerd.Client, error) {
+func NewContainerdClient(namespace string) (*containerd.Client, error) {
 	return containerd.New(containerdForwardedSocket(), containerd.WithDefaultNamespace(namespace))
 }
