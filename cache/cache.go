@@ -156,8 +156,8 @@ func (c *Cache) Get(ctx context.Context, namespace, resource, version string) (*
 
 // Returns a reader for a cached archive.
 //
-// The caller is responsible for closing the returned reader.
-// Returns ErrNotFound if the entry doesn't exist or has no archive.
+// The caller is responsible for closing the returned reader. Returns
+// ErrNotFound if the entry doesn't exist or has no archive.
 func (c *Cache) OpenArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

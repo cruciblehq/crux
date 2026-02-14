@@ -4,29 +4,39 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/kit/archive"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/pack"
+	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/pull"
 	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/crux/runtime"
 )
+
+// Holds shared state for building all stages of a recipe.
+type recipeBuild struct {
+	client  *containerd.Client          // Shared containerd gRPC connection.
+	id      *reference.Identifier       // Parsed resource identifier.
+	version string                      // Resource version from the manifest, used as the base for stage image versions.
+	options reference.IdentifierOptions // Options for parsing references in the recipe.
+	output  string                      // Output directory for the final build artifact.
+}
 
 // Builds a recipe end-to-end against the container runtime.
 //
 // This is the shared pipeline for all resource types that embed a recipe.
-// It resolves the base image from the recipe's from field, starts a build
-// container, executes every step in order, and returns the result.
+// All stages are built in declaration order. The non-transient stage is
+// exported as the final image.
 func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output string) (*Result, error) {
 	options := reference.IdentifierOptions{
 		DefaultRegistry:  registry,
 		DefaultNamespace: defaultNamespace,
-	}
-
-	source, err := recipe.ParseFrom(options)
-	if err != nil {
-		return nil, err
 	}
 
 	id, err := reference.ParseIdentifier(m.Resource.Name, m.Resource.Type, options)
@@ -46,56 +56,140 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 	}
 	defer done(ctx)
 
-	img, err := resolveSource(ctx, client, m, id, source)
-	if err != nil {
-		return nil, err
+	rb := &recipeBuild{
+		client:  client,
+		id:      id,
+		version: m.Resource.Version,
+		options: options,
+		output:  output,
 	}
 
-	ctr, err := img.Start(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	defer ctr.Destroy(ctx)
-
-	if err := executeSteps(ctx, ctr, recipe.Steps, newRecipeState()); err != nil {
-		return nil, err
-	}
-
-	if err := ctr.Stop(ctx); err != nil {
-		return nil, err
-	}
-
-	if err := ctr.Commit(ctx); err != nil {
-		return nil, err
-	}
-
-	if err := img.Export(ctx, filepath.Join(output, pack.ImageFile)); err != nil {
-		return nil, err
+	for i, stage := range recipe.Stages {
+		if err := rb.buildStage(ctx, stage, i); err != nil {
+			return nil, fmt.Errorf("stage %s: %w", stageLabel(stage.Name, i), err)
+		}
 	}
 
 	return &Result{Output: output, Manifest: &m}, nil
 }
 
-// Resolves a recipe source into an imported container image.
+// Builds a single stage of a recipe.
 //
-// For file sources the local OCI tarball is imported directly. Ref sources
-// are not yet implemented.
-func resolveSource(ctx context.Context, client *containerd.Client, m manifest.Manifest, id *reference.Identifier, source manifest.RuntimeSource) (*runtime.Image, error) {
-	img := runtime.NewImage(client, id, m.Resource.Version)
+// Resolves the stage's base image, starts a build container, executes the
+// stage's steps, then commits the result. Non-transient stages are exported
+// to the output directory.
+func (rb *recipeBuild) buildStage(ctx context.Context, stage manifest.Stage, index int) error {
+	label := stageLabel(stage.Name, index)
+	slog.Info("building stage", "stage", label)
 
-	switch source.Type {
-	case manifest.RuntimeSourceFile:
-		if err := img.Import(ctx, source.Value); err != nil {
-			return nil, err
-		}
-	case manifest.RuntimeSourceRef:
-		// TODO: pull archive via registry.Client.DownloadArchive (or pull.Pull
-		// for caching), extract image.tar from the tar.zst archive, then call
-		// img.Import with the extracted path.
-		return nil, fmt.Errorf("ref source not yet implemented")
+	source, err := parseFrom(stage.From, rb.options)
+	if err != nil {
+		return err
 	}
 
-	return img, nil
+	version := rb.version
+	if !stage.Transient {
+		version = stageVersion(version, label)
+	}
+	img := runtime.NewImage(rb.client, rb.id, version)
+
+	if err := rb.resolveSource(ctx, img, source); err != nil {
+		return err
+	}
+
+	ctr, err := img.Start(ctx, "")
+	if err != nil {
+		return err
+	}
+	defer ctr.Destroy(ctx)
+
+	if err := executeSteps(ctx, ctr, stage.Steps, newRecipeState()); err != nil {
+		return err
+	}
+
+	if err := ctr.Stop(ctx); err != nil {
+		return err
+	}
+
+	if err := ctr.Commit(ctx); err != nil {
+		return err
+	}
+
+	if !stage.Transient {
+		return img.Export(ctx, filepath.Join(rb.output, pack.ImageFile))
+	}
+
+	return nil
+}
+
+// Resolves a recipe source into an imported container image.
+//
+// For file sources the local OCI tarball is imported directly. For ref
+// sources the runtime archive is pulled from the registry (with caching),
+// extracted to a temporary directory, and the contained image.tar is
+// imported.
+func (rb *recipeBuild) resolveSource(ctx context.Context, img *runtime.Image, src source) error {
+	switch src.Type {
+	case sourceFile:
+		return img.Import(ctx, src.Value)
+	case sourceRef:
+		return rb.resolveRefSource(ctx, img, src)
+	}
+	return nil
+}
+
+// Pulls a runtime archive from the registry, extracts image.tar, and imports
+// it into the container runtime.
+func (rb *recipeBuild) resolveRefSource(ctx context.Context, img *runtime.Image, src source) error {
+	result, err := pull.Pull(ctx, pull.Options{
+		Registry:         rb.options.DefaultRegistry,
+		Reference:        src.Value,
+		Type:             resource.TypeRuntime,
+		DefaultNamespace: rb.options.DefaultNamespace,
+	})
+	if err != nil {
+		return err
+	}
+
+	localCache, err := cache.Open(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer localCache.Close()
+
+	archiveReader, err := localCache.OpenArchive(ctx, result.Namespace, result.Resource, result.Version)
+	if err != nil {
+		return err
+	}
+	defer archiveReader.Close()
+
+	extractDir, err := os.MkdirTemp("", "crux-runtime-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(extractDir)
+
+	if err := archive.ExtractFromReader(archiveReader, extractDir, archive.Zstd); err != nil {
+		return err
+	}
+
+	imagePath := filepath.Join(paths.BuildDir(extractDir), pack.ImageFile)
+	return img.Import(ctx, imagePath)
+}
+
+// Returns a version string for a transient stage image, distinguishing it
+// from the output image.
+func stageVersion(version, label string) string {
+	return fmt.Sprintf("%s-stage-%s", version, label)
+}
+
+// Returns a human-readable label for a stage, preferring the name when
+// available and falling back to the 1-based index.
+func stageLabel(name string, index int) string {
+	if name != "" {
+		return fmt.Sprintf("%q", name)
+	}
+	return fmt.Sprintf("%d", index+1)
 }
 
 // Executes a list of steps in order against the build container.
