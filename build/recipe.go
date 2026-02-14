@@ -12,7 +12,6 @@ import (
 	"github.com/cruciblehq/crux/kit/archive"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/pack"
-	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/crux/pull"
 	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/resource"
@@ -173,7 +172,7 @@ func (rb *recipeBuild) resolveRefSource(ctx context.Context, img *runtime.Image,
 		return err
 	}
 
-	imagePath := filepath.Join(paths.BuildDir(extractDir), pack.ImageFile)
+	imagePath := filepath.Join(extractDir, pack.ImageFile)
 	return img.Import(ctx, imagePath)
 }
 
