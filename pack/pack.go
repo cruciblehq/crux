@@ -142,9 +142,8 @@ func createArchive(outputPath, manifestfile, dist string) error {
 		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
-	// Copy dist/ directory
-	distDest := filepath.Join(tmpDir, filepath.Base(dist))
-	if err := copyDir(dist, distDest); err != nil {
+	// Copy dist/ contents into the archive root
+	if err := copyDir(dist, tmpDir); err != nil {
 		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 
