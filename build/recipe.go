@@ -229,6 +229,10 @@ func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step
 func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState) error {
 	shell, opts := state.resolve(step)
 
+	if err := ensureDir(ctx, ctr, opts.Workdir); err != nil {
+		return err
+	}
+
 	switch {
 	case step.Run != "":
 		slog.Debug("run", "command", step.Run, "shell", shell)
@@ -245,5 +249,20 @@ func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest
 		slog.Warn("copy not yet implemented", "copy", step.Copy)
 	}
 
+	return nil
+}
+
+// Creates a directory inside the container. No-op if dir is empty.
+func ensureDir(ctx context.Context, ctr *runtime.Container, dir string) error {
+	if dir == "" {
+		return nil
+	}
+	result, err := ctr.Exec(ctx, "mkdir", "-p", dir)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to create workdir %q (exit %d): %s", dir, result.ExitCode, result.Stderr)
+	}
 	return nil
 }
