@@ -39,17 +39,21 @@ provision:
         apk add --no-cache containerd containerd-ctr
         rc-update add containerd default
       fi
-      # Create a containerd group and add the Lima user to it so the SSH port
+      # Create a containerd group and add the Lima user so the SSH port
       # forward can relay traffic from the host.
       if ! getent group containerd >/dev/null 2>&1; then
         addgroup -g {{ .ContainerdGID }} -S containerd
       fi
       addgroup {{ .User }} containerd 2>/dev/null || true
-      service containerd start || true
-      # Grant the containerd group write access so that ctr (running as the
-      # Lima user) can create FIFO directories under /run/containerd/.
+      # Create /run/containerd with the containerd group before starting the
+      # service. containerd uses MkdirAll internally, which is a no-op on an
+      # existing directory. Without this, containerd creates the directory as
+      # root:root 0711 and the Lima user cannot create FIFO directories for
+      # task exec IO.
+      mkdir -p /run/containerd
       chgrp containerd /run/containerd
       chmod 775 /run/containerd
+      rc-service containerd start --ifnotstarted
 portForwards:
   - guestSocket: "/run/containerd/containerd.sock"
     hostSocket: "{{ .ContainerdSock }}"
