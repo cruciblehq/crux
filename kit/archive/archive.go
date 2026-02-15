@@ -117,7 +117,7 @@ const (
 // (see [Format]). The archive contains all files and directories under src
 // with paths stored relative to src. Paths in the archive use forward slashes
 // regardless of the host operating system. Only regular files and directories
-// are allowed. Symlinks and other special file types such as devices and
+// are stored. Symlinks and other special file types such as devices and
 // sockets will cause the function to return [ErrUnsupportedFileType]. If
 // creation fails, the partially written archive is removed.
 func Create(src, dest string) (err error) {
@@ -156,14 +156,16 @@ func Create(src, dest string) (err error) {
 
 // Extracts a compressed tar archive to a directory.
 //
-// The compression format is detected from the src filename extension
-// (see [Format]). File permissions are preserved from the archive headers
-// with special bits stripped. Directories are created with [DirMode]. Returns
-// [ErrExtractFailed] wrapping [os.ErrExist] if dest already exists. Only
-// regular files and directories are allowed. Symlinks and other special file
-// types return [ErrUnsupportedFileType]. Absolute paths and path traversal
-// attempts (e.g., "../etc/passwd") return [ErrInvalidPath]. If extraction
-// fails, the destination directory and its contents are removed.
+// The compression format is detected from the src filename extension (see
+// [Format]). File permissions are preserved from the archive headers with
+// special bits stripped. Directories are created with [DirMode]. Returns
+// [ErrExtractFailed] wrapping [os.ErrExist] if dest already exists. Regular
+// files, directories, symlinks, and hard links are supported. Symlinks and
+// hard links are validated to ensure they do not escape the destination tree.
+// PAX extended headers are skipped transparently. Other entry types such as
+// devices and sockets return [ErrUnsupportedFileType]. Absolute paths and
+// path traversal attempts (e.g., "../etc/passwd") return [ErrInvalidPath].
+// If extraction fails, the destination directory and its contents are removed.
 func Extract(src, dest string) (err error) {
 	fmt, err := detect(src)
 	if err != nil {
@@ -194,8 +196,11 @@ func Extract(src, dest string) (err error) {
 // Creates dest if it does not exist and extracts all entries into it. The
 // compression format must be supplied explicitly because there is no filename
 // to detect from. File permissions are preserved from the archive headers
-// with special bits stripped. Unlike [Extract], this function does not check
-// whether dest already exists and does not clean up on failure.
+// with special bits stripped. Supports the same entry types as [Extract]:
+// regular files, directories, symlinks, and hard links (all validated
+// against directory escape). PAX headers are skipped. Unlike [Extract],
+// this function does not check whether dest already exists and does not
+// clean up on failure.
 func ExtractFromReader(r io.Reader, dest string, f Format) error {
 	dr, err := newDecompressReader(r, f)
 	if err != nil {
@@ -308,7 +313,11 @@ func readTar(tr *tar.Reader, dest string) error {
 			return err
 		}
 
-		if err := extractEntry(header, tr, target); err != nil {
+		if target == "" {
+			continue
+		}
+
+		if err := extractEntry(header, tr, dest, target); err != nil {
 			return err
 		}
 	}
@@ -316,10 +325,20 @@ func readTar(tr *tar.Reader, dest string) error {
 
 // Validates and joins an archive path with the destination directory.
 //
-// Uses [filepath.Localize] to convert slash-separated paths to OS format, then
-// [filepath.IsLocal] to ensure the path is local (not absolute, no ".." traversal,
-// no reserved names on Windows). Returns the validated path joined with dest.
+// Strips leading "./" prefixes common in tar archives, then uses
+// [filepath.Localize] to convert slash-separated paths to OS format and
+// [filepath.IsLocal] to ensure the path is local (not absolute, no ".."
+// traversal, no reserved names on Windows). Returns the validated path
+// joined with dest, or ("", nil) for root entries like "./" that resolve
+// to the destination itself.
 func validateAndJoinPath(dest, name string) (string, error) {
+	name = strings.TrimPrefix(name, "./")
+	name = strings.TrimRight(name, "/")
+
+	if name == "." || name == "" {
+		return "", nil
+	}
+
 	localName, err := filepath.Localize(name)
 	if err != nil {
 		return "", ErrInvalidPath
@@ -335,9 +354,10 @@ func validateAndJoinPath(dest, name string) (string, error) {
 
 // Extracts a single tar entry to target.
 //
-// Handles directories and regular files. Returns [ErrUnsupportedFileType]
-// for all other entry types including symlinks.
-func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
+// Handles directories, regular files, symlinks, and hard links. PAX extended
+// headers are skipped. Returns [ErrUnsupportedFileType] for all other entry
+// types (devices, FIFOs, etc.).
+func extractEntry(header *tar.Header, tr *tar.Reader, dest, target string) error {
 	switch header.Typeflag {
 	case tar.TypeDir:
 		return os.MkdirAll(target, DirMode)
@@ -345,9 +365,62 @@ func extractEntry(header *tar.Header, tr *tar.Reader, target string) error {
 	case tar.TypeReg:
 		return extractFile(tr, target, os.FileMode(header.Mode)&0777)
 
+	case tar.TypeSymlink:
+		if err := validateSymlink(dest, target, header.Linkname); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), DirMode); err != nil {
+			return err
+		}
+		return os.Symlink(header.Linkname, target)
+
+	case tar.TypeLink:
+		linkTarget, err := validateHardlink(dest, header.Linkname)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), DirMode); err != nil {
+			return err
+		}
+		return os.Link(linkTarget, target)
+
+	case tar.TypeXHeader, tar.TypeXGlobalHeader, tar.TypeGNULongName, tar.TypeGNULongLink:
+		return nil
+
 	default:
 		return ErrUnsupportedFileType
 	}
+}
+
+// Rejects symlinks whose resolved target escapes the destination tree.
+func validateSymlink(dest, target, linkname string) error {
+	resolved := linkname
+	if !filepath.IsAbs(resolved) {
+		resolved = filepath.Join(filepath.Dir(target), resolved)
+	}
+	resolved = filepath.Clean(resolved)
+	cleanDest := filepath.Clean(dest)
+	if resolved != cleanDest && !strings.HasPrefix(resolved, cleanDest+string(filepath.Separator)) {
+		return ErrInvalidPath
+	}
+	return nil
+}
+
+// Rejects hard links whose target would escape the destination tree.
+//
+// Hard link Linkname in a tar archive is an archive-relative path to a
+// previously extracted entry. It is validated and joined with dest the
+// same way regular entry names are, ensuring the resolved target stays
+// within the destination tree.
+func validateHardlink(dest, linkname string) (string, error) {
+	target, err := validateAndJoinPath(dest, linkname)
+	if err != nil {
+		return "", err
+	}
+	if target == "" {
+		return "", ErrInvalidPath
+	}
+	return target, nil
 }
 
 // Extracts a regular file from r to target with the given mode.
