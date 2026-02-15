@@ -43,6 +43,10 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 		return nil, err
 	}
 
+	if err := ensureRuntime(); err != nil {
+		return nil, err
+	}
+
 	client, err := runtime.NewContainerdClient(id.Hostname())
 	if err != nil {
 		return nil, err
@@ -265,4 +269,17 @@ func ensureDir(ctx context.Context, ctr *runtime.Container, dir string) error {
 		return fmt.Errorf("failed to create workdir %q (exit %d): %s", dir, result.ExitCode, result.Stderr)
 	}
 	return nil
+}
+
+// Starts the container runtime if it is not already running.
+func ensureRuntime() error {
+	status, err := runtime.Status()
+	if err != nil {
+		return err
+	}
+	if status == runtime.StateRunning {
+		return nil
+	}
+	slog.Info("starting runtime")
+	return runtime.Start()
 }
