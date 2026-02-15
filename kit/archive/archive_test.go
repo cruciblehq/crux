@@ -691,3 +691,162 @@ func TestExtractGzipPathTraversal(t *testing.T) {
 		t.Fatalf("expected ErrInvalidPath, got: %v", err)
 	}
 }
+
+func TestExtractSkipsPAXHeaders(t *testing.T) {
+	// Archive with a PAX extended header followed by a regular file.
+	var buf bytes.Buffer
+	zw, _ := zstd.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+
+	// PAX extended header entry.
+	tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeXHeader,
+		Name:     "PaxHeaders.0/file.txt",
+		Size:     0,
+	})
+
+	// PAX global header entry.
+	tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeXGlobalHeader,
+		Name:     "GlobalHead.0",
+		Size:     0,
+	})
+
+	content := []byte("hello")
+	tw.WriteHeader(&tar.Header{
+		Name:     "file.txt",
+		Size:     int64(len(content)),
+		Mode:     0644,
+		Typeflag: tar.TypeReg,
+	})
+	tw.Write(content)
+
+	tw.Close()
+	zw.Close()
+
+	dest := filepath.Join(t.TempDir(), "extracted")
+	if err := ExtractFromReader(bytes.NewReader(buf.Bytes()), dest, Zstd); err != nil {
+		t.Fatalf("ExtractFromReader: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(dest, "file.txt"), "hello")
+}
+
+func TestExtractHardLink(t *testing.T) {
+	var buf bytes.Buffer
+	zw, _ := zstd.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+
+	// Write the original file.
+	content := []byte("linked content")
+	tw.WriteHeader(&tar.Header{
+		Name:     "original.txt",
+		Size:     int64(len(content)),
+		Mode:     0644,
+		Typeflag: tar.TypeReg,
+	})
+	tw.Write(content)
+
+	// Write a hard link to the original.
+	tw.WriteHeader(&tar.Header{
+		Name:     "subdir/link.txt",
+		Typeflag: tar.TypeLink,
+		Linkname: "original.txt",
+	})
+
+	tw.Close()
+	zw.Close()
+
+	dest := filepath.Join(t.TempDir(), "extracted")
+	if err := ExtractFromReader(bytes.NewReader(buf.Bytes()), dest, Zstd); err != nil {
+		t.Fatalf("ExtractFromReader: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(dest, "original.txt"), "linked content")
+	assertFileContent(t, filepath.Join(dest, "subdir", "link.txt"), "linked content")
+}
+
+func TestExtractHardLinkWithDotSlashPrefix(t *testing.T) {
+	var buf bytes.Buffer
+	zw, _ := zstd.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+
+	content := []byte("gnu-style content")
+	tw.WriteHeader(&tar.Header{
+		Name:     "./original.txt",
+		Size:     int64(len(content)),
+		Mode:     0644,
+		Typeflag: tar.TypeReg,
+	})
+	tw.Write(content)
+
+	// Hard link with ./ prefix on both name and linkname.
+	tw.WriteHeader(&tar.Header{
+		Name:     "./link.txt",
+		Typeflag: tar.TypeLink,
+		Linkname: "./original.txt",
+	})
+
+	tw.Close()
+	zw.Close()
+
+	dest := filepath.Join(t.TempDir(), "extracted")
+	if err := ExtractFromReader(bytes.NewReader(buf.Bytes()), dest, Zstd); err != nil {
+		t.Fatalf("ExtractFromReader: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(dest, "original.txt"), "gnu-style content")
+	assertFileContent(t, filepath.Join(dest, "link.txt"), "gnu-style content")
+}
+
+func TestExtractHardLinkEscape(t *testing.T) {
+	var buf bytes.Buffer
+	zw, _ := zstd.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+
+	// Hard link targeting a path outside the destination.
+	tw.WriteHeader(&tar.Header{
+		Name:     "evil.txt",
+		Typeflag: tar.TypeLink,
+		Linkname: "../etc/passwd",
+	})
+
+	tw.Close()
+	zw.Close()
+
+	dest := filepath.Join(t.TempDir(), "extracted")
+	err := ExtractFromReader(bytes.NewReader(buf.Bytes()), dest, Zstd)
+	if err == nil {
+		t.Fatal("expected error for hard link escape")
+	}
+
+	if !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got: %v", err)
+	}
+}
+
+func TestExtractHardLinkAbsolutePath(t *testing.T) {
+	var buf bytes.Buffer
+	zw, _ := zstd.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+
+	// Hard link with an absolute linkname.
+	tw.WriteHeader(&tar.Header{
+		Name:     "evil.txt",
+		Typeflag: tar.TypeLink,
+		Linkname: "/etc/passwd",
+	})
+
+	tw.Close()
+	zw.Close()
+
+	dest := filepath.Join(t.TempDir(), "extracted")
+	err := ExtractFromReader(bytes.NewReader(buf.Bytes()), dest, Zstd)
+	if err == nil {
+		t.Fatal("expected error for hard link with absolute path")
+	}
+
+	if !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got: %v", err)
+	}
+}
