@@ -3,6 +3,7 @@ package build
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/manifest"
@@ -42,13 +43,15 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
 
+	context := filepath.Dir(opts.Manifest)
+
 	var builder Builder
 
 	switch man.Resource.Type {
 	case resource.TypeRuntime:
-		builder = NewRuntimeBuilder(opts.Registry, opts.DefaultNamespace)
+		builder = NewRuntimeBuilder(opts.Registry, opts.DefaultNamespace, context)
 	case resource.TypeService:
-		builder = NewServiceBuilder(opts.Registry, opts.DefaultNamespace)
+		builder = NewServiceBuilder(opts.Registry, opts.DefaultNamespace, context)
 	case resource.TypeWidget:
 		builder = NewWidgetBuilder()
 	default:

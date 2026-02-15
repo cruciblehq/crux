@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"syscall"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -109,6 +110,14 @@ func (c *Container) Exec(ctx context.Context, command string, args ...string) (*
 // directory. The container must be running.
 func (c *Container) ExecWith(ctx context.Context, opts ExecOptions, command string, args ...string) (*ExecResult, error) {
 	return containerExec(ctx, c.client, c.registry, c.id, opts, command, args...)
+}
+
+// Copies a tar stream into the container's filesystem.
+//
+// The reader must produce a tar archive whose entries are extracted at
+// destDir inside the container. The container must be running.
+func (c *Container) CopyTo(ctx context.Context, r io.Reader, destDir string) error {
+	return containerCopy(ctx, c.client, c.registry, c.id, r, destDir)
 }
 
 // Queries the current state of the container.
