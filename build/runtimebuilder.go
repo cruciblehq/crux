@@ -14,13 +14,15 @@ import (
 type RuntimeBuilder struct {
 	registry         string // Hub registry URL for resolving references.
 	defaultNamespace string // Default namespace for resolving references.
+	context          string // Directory containing the manifest, root for resolving copy sources.
 }
 
 // Creates a new instance of [RuntimeBuilder].
-func NewRuntimeBuilder(registry, defaultNamespace string) *RuntimeBuilder {
+func NewRuntimeBuilder(registry, defaultNamespace, context string) *RuntimeBuilder {
 	return &RuntimeBuilder{
 		registry:         registry,
 		defaultNamespace: defaultNamespace,
+		context:          context,
 	}
 }
 
@@ -37,5 +39,5 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output)
+	return buildRecipe(ctx, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context)
 }

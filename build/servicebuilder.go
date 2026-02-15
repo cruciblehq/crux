@@ -9,15 +9,17 @@ import (
 
 // Builder for Crucible services.
 type ServiceBuilder struct {
-	registry         string
-	defaultNamespace string
+	registry         string // Hub registry URL for resolving references.
+	defaultNamespace string // Default namespace for resolving references.
+	context          string // Project directory, containing the manifest.
 }
 
 // Creates a new instance of [ServiceBuilder].
-func NewServiceBuilder(registry, defaultNamespace string) *ServiceBuilder {
+func NewServiceBuilder(registry, defaultNamespace, context string) *ServiceBuilder {
 	return &ServiceBuilder{
 		registry:         registry,
 		defaultNamespace: defaultNamespace,
+		context:          context,
 	}
 }
 
@@ -34,5 +36,5 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output)
+	return buildRecipe(ctx, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output, sb.context)
 }
