@@ -30,8 +30,8 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	// Build first (don't wait for changes)
 	result, err := build.Build(ctx, build.Options{
-		Manifest:         paths.Manifest("."),
-		Output:           paths.BuildDir("."),
+		Manifest:         paths.Manifest(RootCmd.Context),
+		Output:           paths.BuildDir(RootCmd.Context),
 		Registry:         registry,
 		DefaultNamespace: internal.DefaultNamespace,
 	})
@@ -67,8 +67,8 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 		// Rebuild
 		if _, err := build.Build(ctx, build.Options{
-			Manifest:         paths.Manifest("."),
-			Output:           paths.BuildDir("."),
+			Manifest:         paths.Manifest(RootCmd.Context),
+			Output:           paths.BuildDir(RootCmd.Context),
 			Registry:         registry,
 			DefaultNamespace: internal.DefaultNamespace,
 		}); err != nil {
@@ -82,7 +82,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 	}
 
 	// Watch
-	if _, err := watch.WatchRecursive(".", callback); err != nil {
+	if _, err := watch.WatchRecursive(RootCmd.Context, callback); err != nil {
 		return err
 	}
 

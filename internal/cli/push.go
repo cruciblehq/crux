@@ -23,8 +23,8 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	opts := push.PushOptions{
 		Registry:         registry,
-		Manifestfile:     paths.Manifest("."),
-		Package:          paths.Package("."),
+		Manifestfile:     paths.Manifest(RootCmd.Context),
+		Package:          paths.Package(RootCmd.Context),
 		DefaultNamespace: internal.DefaultNamespace,
 	}
 
