@@ -14,8 +14,9 @@ import (
 var RootCmd struct {
 
 	// Global flags
-	Verbose bool `short:"v" help:"Enable verbose output."`
-	Debug   bool `short:"d" help:"Enable debug output."`
+	Context string `short:"C" help:"Run as if crux was started in the given directory." default:"."`
+	Verbose bool   `short:"v" help:"Enable verbose output."`
+	Debug   bool   `short:"d" help:"Enable debug output."`
 
 	// Subcommands
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
