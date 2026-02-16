@@ -30,6 +30,7 @@ type recipeBuild struct {
 	options    reference.IdentifierOptions   // Options for parsing references in the recipe.
 	output     string                        // Output directory for the final build artifact.
 	context    string                        // Directory containing the manifest, root for resolving copy sources.
+	entrypoint []string                      // OCI entrypoint to set on the output image (services only).
 	containers []*runtime.Container          // All stage containers, destroyed after the build completes.
 	stages     map[string]*runtime.Container // Named stage containers for cross-stage copy lookups.
 }
@@ -39,7 +40,7 @@ type recipeBuild struct {
 // This is the shared pipeline for all resource types that embed a recipe.
 // All stages are built in declaration order. The non-transient stage is
 // exported as the final image.
-func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output, context string) (*Result, error) {
+func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output, context string, entrypoint []string) (*Result, error) {
 	options := reference.IdentifierOptions{
 		DefaultRegistry:  registry,
 		DefaultNamespace: defaultNamespace,
@@ -67,13 +68,14 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 	defer done(ctx)
 
 	rb := &recipeBuild{
-		client:  client,
-		id:      id,
-		version: m.Resource.Version,
-		options: options,
-		output:  output,
-		context: context,
-		stages:  make(map[string]*runtime.Container),
+		client:     client,
+		id:         id,
+		version:    m.Resource.Version,
+		options:    options,
+		output:     output,
+		context:    context,
+		entrypoint: entrypoint,
+		stages:     make(map[string]*runtime.Container),
 	}
 	defer rb.destroyContainers(ctx)
 
@@ -127,6 +129,10 @@ func (rb *recipeBuild) buildStage(ctx context.Context, stage manifest.Stage, ind
 		}
 
 		if err := ctr.Commit(ctx); err != nil {
+			return err
+		}
+
+		if err := img.SetEntrypoint(ctx, rb.entrypoint); err != nil {
 			return err
 		}
 

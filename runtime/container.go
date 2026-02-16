@@ -250,6 +250,49 @@ func appendLayer(ctx context.Context, client *containerd.Client, imageName strin
 	return err
 }
 
+// Reads the image's manifest and config, applies a mutation function to the
+// config, and writes the updated config and manifest back to the content store.
+func updateImageConfig(ctx context.Context, client *containerd.Client, imageName string, mutate func(*ocispec.Image)) error {
+	cs := client.ContentStore()
+	is := client.ImageService()
+
+	img, err := is.Get(ctx, imageName)
+	if err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+
+	manifest, err := readManifest(ctx, cs, img.Target)
+	if err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+
+	config, err := readConfig(ctx, cs, manifest.Config)
+	if err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+
+	mutate(&config)
+
+	newConfigDesc, err := writeJSON(ctx, cs, manifest.Config.MediaType, config, imageName+"-config")
+	if err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+	manifest.Config = newConfigDesc
+
+	manifestLabels := manifestGCLabels(manifest)
+	newManifestDesc, err := writeJSON(ctx, cs, img.Target.MediaType, manifest, imageName+"-manifest", content.WithLabels(manifestLabels))
+	if err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+
+	img.Target = newManifestDesc
+	if _, err := is.Update(ctx, img, "target"); err != nil {
+		return crex.Wrap(ErrImageConfig, err)
+	}
+
+	return nil
+}
+
 // Reads and unmarshals an OCI manifest from the content store.
 func readManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (ocispec.Manifest, error) {
 	b, err := content.ReadBlob(ctx, cs, desc)
