@@ -39,5 +39,5 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context)
+	return buildRecipe(ctx, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context, nil)
 }

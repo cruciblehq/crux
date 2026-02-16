@@ -32,12 +32,13 @@ var (
 	ErrContainerdExited   = errors.New("containerd exited unexpectedly")
 
 	// Image errors.
-	ErrImageFileOpen      = errors.New("failed to open image file")
-	ErrImageImport        = errors.New("failed to import image into containerd")
-	ErrImageEmpty         = errors.New("archive contains no images")
-	ErrImageMultiple      = errors.New("archive contains multiple images")
-	ErrImageDestroy       = errors.New("failed to destroy image")
-	ErrImageExport        = errors.New("failed to export image")
+	ErrImageFileOpen = errors.New("failed to open image file")
+	ErrImageImport   = errors.New("failed to import image into containerd")
+	ErrImageEmpty    = errors.New("archive contains no images")
+	ErrImageMultiple = errors.New("archive contains multiple images")
+	ErrImageDestroy  = errors.New("failed to destroy image")
+	ErrImageExport   = errors.New("failed to export image")
+	ErrImageConfig   = errors.New("failed to update image config")
 
 	// Container errors.
 	ErrContainerStart   = errors.New("failed to start container")

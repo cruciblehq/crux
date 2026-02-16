@@ -36,5 +36,5 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output, sb.context)
+	return buildRecipe(ctx, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output, sb.context, cfg.Entrypoint)
 }

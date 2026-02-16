@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/reference"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -28,6 +29,11 @@ const (
 )
 
 // OCI platform for the build container.
+//
+// Currently hardcoded to the host architecture. Multi-architecture image
+// support (building for both amd64 and arm64 via QEMU/Rosetta emulation
+// and producing an OCI image index) is not yet implemented. All images
+// are single-platform for the architecture of the machine running the build.
 var containerPlatform = "linux/" + goruntime.GOARCH
 
 // An OCI image within the container runtime's image store.
@@ -234,6 +240,24 @@ func (img *Image) Update(ctx context.Context, c *Container, path string) error {
 	}
 	_, err := img.Start(ctx, c.id)
 	return err
+}
+
+// Sets the entrypoint on the image's OCI config.
+//
+// The image manifest and config are read from the content store, the
+// entrypoint is updated, and the modified config and manifest are written
+// back. The image record is then pointed at the new manifest. The
+// container must be committed before calling this method. If entrypoint
+// is nil or empty, no changes are made.
+func (img *Image) SetEntrypoint(ctx context.Context, entrypoint []string) error {
+	if len(entrypoint) == 0 {
+		return nil
+	}
+
+	return updateImageConfig(ctx, img.client, img.tag(), func(config *ocispec.Image) {
+		config.Config.Entrypoint = entrypoint
+		config.Config.Cmd = nil
+	})
 }
 
 // Exports the image as an OCI tar archive.
