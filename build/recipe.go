@@ -24,12 +24,14 @@ import (
 
 // Holds shared state for building all stages of a recipe.
 type recipeBuild struct {
-	client  *containerd.Client          // Shared containerd gRPC connection.
-	id      *reference.Identifier       // Parsed resource identifier.
-	version string                      // Resource version from the manifest, used as the base for stage image versions.
-	options reference.IdentifierOptions // Options for parsing references in the recipe.
-	output  string                      // Output directory for the final build artifact.
-	context string                      // Directory containing the manifest, root for resolving copy sources.
+	client     *containerd.Client            // Shared containerd gRPC connection.
+	id         *reference.Identifier         // Parsed resource identifier.
+	version    string                        // Resource version from the manifest, used as the base for stage image versions.
+	options    reference.IdentifierOptions   // Options for parsing references in the recipe.
+	output     string                        // Output directory for the final build artifact.
+	context    string                        // Directory containing the manifest, root for resolving copy sources.
+	containers []*runtime.Container          // All stage containers, destroyed after the build completes.
+	stages     map[string]*runtime.Container // Named stage containers for cross-stage copy lookups.
 }
 
 // Builds a recipe end-to-end against the container runtime.
@@ -71,7 +73,9 @@ func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Reci
 		options: options,
 		output:  output,
 		context: context,
+		stages:  make(map[string]*runtime.Container),
 	}
+	defer rb.destroyContainers(ctx)
 
 	for i, stage := range recipe.Stages {
 		if err := rb.buildStage(ctx, stage, i); err != nil {
@@ -110,25 +114,44 @@ func (rb *recipeBuild) buildStage(ctx context.Context, stage manifest.Stage, ind
 	if err != nil {
 		return err
 	}
-	defer ctr.Destroy(ctx)
 
-	if err := executeSteps(ctx, ctr, stage.Steps, newRecipeState(), rb.context); err != nil {
-		return err
-	}
+	rb.addContainer(stage.Name, ctr)
 
-	if err := ctr.Stop(ctx); err != nil {
-		return err
-	}
-
-	if err := ctr.Commit(ctx); err != nil {
+	if err := executeSteps(ctx, ctr, stage.Steps, newRecipeState(), rb.context, rb.stages); err != nil {
 		return err
 	}
 
 	if !stage.Transient {
+		if err := ctr.Stop(ctx); err != nil {
+			return err
+		}
+
+		if err := ctr.Commit(ctx); err != nil {
+			return err
+		}
+
 		return img.Export(ctx, filepath.Join(rb.output, pack.ImageFile))
 	}
 
 	return nil
+}
+
+// Registers a stage container for cleanup.
+//
+// All containers are destroyed when the recipe build completes. Named
+// containers are also indexed for cross-stage copy lookups.
+func (rb *recipeBuild) addContainer(name string, ctr *runtime.Container) {
+	rb.containers = append(rb.containers, ctr)
+	if name != "" {
+		rb.stages[name] = ctr
+	}
+}
+
+// Destroys all stage containers.
+func (rb *recipeBuild) destroyContainers(ctx context.Context) {
+	for _, ctr := range rb.containers {
+		ctr.Destroy(ctx)
+	}
 }
 
 // Resolves a recipe source into an imported container image.
@@ -202,9 +225,9 @@ func stageLabel(name string, index int) string {
 }
 
 // Executes a list of steps in order against the build container.
-func executeSteps(ctx context.Context, ctr *runtime.Container, steps []manifest.Step, state *recipeState, context string) error {
+func executeSteps(ctx context.Context, ctr *runtime.Container, steps []manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
 	for i, step := range steps {
-		if err := executeStep(ctx, ctr, step, state, context); err != nil {
+		if err := executeStep(ctx, ctr, step, state, context, stages); err != nil {
 			return fmt.Errorf("step %d: %w", i+1, err)
 		}
 	}
@@ -213,18 +236,18 @@ func executeSteps(ctx context.Context, ctr *runtime.Container, steps []manifest.
 
 // Executes a single step, dispatching to operation execution, group recursion,
 // or state mutation depending on the step's fields.
-func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string) error {
+func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
 	hasOp := step.Run != "" || step.Copy != ""
 
 	// Platform group: apply group-level modifiers and recurse.
 	if len(step.Steps) > 0 {
 		state.apply(step)
-		return executeSteps(ctx, ctr, step.Steps, state, context)
+		return executeSteps(ctx, ctr, step.Steps, state, context, stages)
 	}
 
 	// Operation with optional scoped modifiers.
 	if hasOp {
-		return executeOperation(ctx, ctr, step, state, context)
+		return executeOperation(ctx, ctr, step, state, context, stages)
 	}
 
 	// Standalone modifier(s): persist in state.
@@ -236,7 +259,7 @@ func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step
 //
 // Step-level modifiers override the persistent state for this operation only.
 // The persistent state is not modified.
-func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string) error {
+func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
 	shell, opts := state.resolve(step)
 
 	if err := ensureDir(ctx, ctr, opts.Workdir); err != nil {
@@ -255,7 +278,7 @@ func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest
 		}
 
 	case step.Copy != "":
-		if err := executeCopy(ctx, ctr, step.Copy, opts.Workdir, context); err != nil {
+		if err := executeCopy(ctx, ctr, step.Copy, opts.Workdir, context, stages); err != nil {
 			return err
 		}
 	}
@@ -263,19 +286,33 @@ func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest
 	return nil
 }
 
-// Executes a copy operation, transferring host files into the container.
+// Executes a copy operation, transferring files into the container.
 //
-// The copy string has the format "src dest", where src is a path on the host
-// resolved relative to context and dest is an absolute path inside the
-// container. The source can be a file or directory; directories are copied
-// recursively. The source is streamed into the container as a tar archive
-// via [runtime.Container.CopyTo].
-func executeCopy(ctx context.Context, ctr *runtime.Container, copyStr, workdir, context string) error {
+// The copy string has the format "src dest" for host copies, or "stage:src
+// dest" for cross-stage copies. Host sources are resolved relative to context.
+// Cross-stage sources are read from a named stage container's filesystem.
+// The source is streamed as a tar archive via [runtime.Container.CopyTo].
+func executeCopy(ctx context.Context, ctr *runtime.Container, copyStr, workdir, context string, stages map[string]*runtime.Container) error {
 	src, dest, err := parseCopy(copyStr, workdir)
 	if err != nil {
 		return crex.Wrap(ErrCopy, err)
 	}
 
+	// Ensure the destination parent directory exists.
+	if err := ensureDir(ctx, ctr, filepath.Dir(dest)); err != nil {
+		return crex.Wrap(ErrCopy, err)
+	}
+
+	// Cross-stage copy: "stage:path".
+	if stage, path, ok := parseStageCopy(src); ok {
+		return executeStageCopy(ctx, ctr, stages, stage, path, dest)
+	}
+
+	return executeHostCopy(ctx, ctr, src, dest, context)
+}
+
+// Copies a file or directory from the host into the container.
+func executeHostCopy(ctx context.Context, ctr *runtime.Container, src, dest, context string) error {
 	// Resolve source relative to the manifest directory.
 	if !filepath.IsAbs(src) {
 		src = filepath.Join(context, src)
@@ -287,11 +324,6 @@ func executeCopy(ctx context.Context, ctr *runtime.Container, copyStr, workdir, 
 	}
 
 	slog.Debug("copy", "src", src, "dest", dest, "dir", info.IsDir())
-
-	// Ensure the destination parent directory exists.
-	if err := ensureDir(ctx, ctr, filepath.Dir(dest)); err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
 
 	pr, pw := io.Pipe()
 
@@ -314,6 +346,55 @@ func executeCopy(ctx context.Context, ctr *runtime.Container, copyStr, workdir, 
 	}
 
 	return nil
+}
+
+// Copies a path from a named stage container into the target container.
+//
+// The tar stream is piped directly from the source container's CopyFrom
+// to the target container's CopyTo.
+func executeStageCopy(ctx context.Context, ctr *runtime.Container, stages map[string]*runtime.Container, stage, path, dest string) error {
+	srcCtr, ok := stages[stage]
+	if !ok {
+		return crex.Wrap(ErrCopy, fmt.Errorf("unknown stage %q", stage))
+	}
+
+	slog.Debug("cross-stage copy", "stage", stage, "src", path, "dest", dest)
+
+	pr, pw := io.Pipe()
+
+	errc := make(chan error, 1)
+	go func() {
+		errc <- srcCtr.CopyFrom(ctx, pw, path)
+		pw.Close()
+	}()
+
+	if err := ctr.CopyTo(ctx, pr, filepath.Dir(dest)); err != nil {
+		return crex.Wrap(ErrCopy, err)
+	}
+
+	if err := <-errc; err != nil {
+		return crex.Wrap(ErrCopy, err)
+	}
+
+	return nil
+}
+
+// Parses a cross-stage copy source of the form "stage:path".
+//
+// Returns the stage name, the path within the stage, and true if the source
+// matches the cross-stage format. Returns false if it is a regular host path.
+func parseStageCopy(src string) (stage, path string, ok bool) {
+	i := strings.IndexByte(src, ':')
+	if i < 1 {
+		return "", "", false
+	}
+
+	// A colon after a path separator is not a stage prefix (e.g. "/foo:bar").
+	if strings.ContainsRune(src[:i], '/') {
+		return "", "", false
+	}
+
+	return src[:i], src[i+1:], true
 }
 
 // Parses a copy string into source and destination paths.
