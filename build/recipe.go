@@ -110,7 +110,7 @@ func (rb *recipeBuild) buildStage(ctx context.Context, stage manifest.Stage, ind
 		return err
 	}
 
-	ctr, err := img.Start(ctx, "")
+	ctr, err := img.Start(ctx, rb.containerID(stage.Name, index))
 	if err != nil {
 		return err
 	}
@@ -152,6 +152,14 @@ func (rb *recipeBuild) destroyContainers(ctx context.Context) {
 	for _, ctr := range rb.containers {
 		ctr.Destroy(ctx)
 	}
+}
+
+// Returns a unique container ID for a stage, scoped to this resource.
+func (rb *recipeBuild) containerID(name string, index int) string {
+	if name != "" {
+		return fmt.Sprintf("%s-stage-%s", rb.id.Name(), name)
+	}
+	return fmt.Sprintf("%s-stage-%d", rb.id.Name(), index+1)
 }
 
 // Resolves a recipe source into an imported container image.
