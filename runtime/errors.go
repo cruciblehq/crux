@@ -45,6 +45,7 @@ var (
 	ErrContainerDestroy = errors.New("failed to destroy container")
 	ErrContainerExec    = errors.New("failed to execute command in container")
 	ErrContainerCopy    = errors.New("failed to copy into container")
+	ErrContainerCopyOut = errors.New("failed to copy from container")
 	ErrContainerStatus  = errors.New("failed to query container status")
 	ErrContainerCommit  = errors.New("failed to commit container")
 )

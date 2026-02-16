@@ -13,3 +13,8 @@ import (
 func containerCopy(_ context.Context, _ *containerd.Client, _, _ string, _ io.Reader, _ string) error {
 	return ErrUnsupportedPlatform
 }
+
+// Returns [ErrUnsupportedPlatform].
+func containerCopyOut(_ context.Context, _ *containerd.Client, _, _ string, _ io.Writer, _ string) error {
+	return ErrUnsupportedPlatform
+}

@@ -3,9 +3,11 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os/exec"
+	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/cruciblehq/crux/kit/crex"
@@ -45,6 +47,46 @@ func containerCopy(_ context.Context, _ *containerd.Client, registry, id string,
 			})
 		}
 		return crex.Wrap(ErrContainerCopy, err)
+	}
+
+	return nil
+}
+
+// Copies a path from a running container as a tar stream.
+//
+// On macOS the tar stream is read via limactl shell piping the container's
+// stdout through ctr task exec running tar inside the container.
+func containerCopyOut(_ context.Context, _ *containerd.Client, registry, id string, w io.Writer, path string) error {
+	l, err := newLima()
+	if err != nil {
+		return crex.Wrap(ErrContainerCopyOut, err)
+	}
+
+	ctrArgs := []string{
+		"-n", registry,
+		"-a", containerdGuestSock,
+		"task", "exec",
+		"--exec-id", nextExecID(),
+		id, "tar", "cf", "-", "-C", filepath.Dir(path), filepath.Base(path),
+	}
+
+	shellArgs := append([]string{"shell", limaInstanceName, "ctr"}, ctrArgs...)
+	cmd := exec.Command(l.limactl, shellArgs...)
+	cmd.Stdout = w
+	cmd.Env = l.env()
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return crex.Wrap(ErrContainerCopyOut, &commandError{
+				subcommand: "ctr task exec tar",
+				exitCode:   exitErr.ExitCode(),
+				output:     stderr.String(),
+			})
+		}
+		return crex.Wrap(ErrContainerCopyOut, err)
 	}
 
 	return nil

@@ -120,6 +120,14 @@ func (c *Container) CopyTo(ctx context.Context, r io.Reader, destDir string) err
 	return containerCopy(ctx, c.client, c.registry, c.id, r, destDir)
 }
 
+// Copies a path from the container's filesystem as a tar stream.
+//
+// The writer receives a tar archive containing the file or directory at
+// path inside the container. The container must be running.
+func (c *Container) CopyFrom(ctx context.Context, w io.Writer, path string) error {
+	return containerCopyOut(ctx, c.client, c.registry, c.id, w, path)
+}
+
 // Queries the current state of the container.
 //
 // Returns [StateRunning] if the task is running, [StateStopped] if the
