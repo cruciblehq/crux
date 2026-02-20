@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/cli"
-	"github.com/cruciblehq/crex"
 )
 
 // The entry point for the Crux CLI application.

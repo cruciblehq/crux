@@ -25,11 +25,6 @@ func NewClient() *Client {
 	return &Client{socketPath: paths.DaemonSocket()}
 }
 
-// Creates a new daemon client targeting the given socket path.
-func NewClientWithSocket(socketPath string) *Client {
-	return &Client{socketPath: socketPath}
-}
-
 // Sends a build request to the daemon and waits for the result.
 func (c *Client) Build(ctx context.Context, req *protocol.BuildRequest) (*protocol.BuildResult, error) {
 	data, err := c.send(ctx, protocol.CmdBuild, req)
