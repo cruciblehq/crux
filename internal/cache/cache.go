@@ -11,8 +11,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/registry"
 )
 
 const (

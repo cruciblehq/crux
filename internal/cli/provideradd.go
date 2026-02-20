@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cruciblehq/crux/config"
+	"github.com/cruciblehq/crux/internal/config"
 	"github.com/cruciblehq/crex"
 )
 

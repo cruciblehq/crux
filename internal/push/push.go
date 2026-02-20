@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/cache"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/internal/cache"
+	"github.com/cruciblehq/crux/internal/registry"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
 )

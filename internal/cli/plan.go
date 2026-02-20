@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/blueprint"
-	"github.com/cruciblehq/crux/config"
+	"github.com/cruciblehq/crux/internal/blueprint"
+	"github.com/cruciblehq/crux/internal/config"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/paths"
 	spec "github.com/cruciblehq/spec/blueprint"
 )
 

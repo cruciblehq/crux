@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Represents the 'crux runtime destroy' command.

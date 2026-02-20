@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Represents the 'crux runtime status' command.

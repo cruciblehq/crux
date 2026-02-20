@@ -16,8 +16,8 @@ import (
 	"text/template"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/paths"
 	spec "github.com/cruciblehq/spec/paths"
 )
 

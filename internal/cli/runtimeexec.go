@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Represents the 'crux runtime exec' command.

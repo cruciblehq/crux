@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/config"
+	"github.com/cruciblehq/crux/internal/config"
 )
 
 // Represents the 'crux provider list' command.
