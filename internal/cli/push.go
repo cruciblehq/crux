@@ -6,7 +6,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/crux/internal/push"
+	"github.com/cruciblehq/crux/internal/resource"
 )
 
 // Represents the 'crux push' command.
@@ -21,7 +21,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 		registry = internal.DefaultRegistryURL
 	}
 
-	opts := push.PushOptions{
+	opts := resource.PushOptions{
 		Registry:         registry,
 		Manifestfile:     paths.Manifest(RootCmd.Context),
 		Package:          paths.Package(RootCmd.Context),
@@ -30,7 +30,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	slog.Info("pushing package...", "registry", registry)
 
-	if err := push.Push(ctx, opts); err != nil {
+	if err := resource.Push(ctx, opts); err != nil {
 		return err
 	}
 

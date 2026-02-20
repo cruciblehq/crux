@@ -1,4 +1,4 @@
-package pack
+package resource
 
 import (
 	"context"
@@ -13,14 +13,14 @@ import (
 )
 
 // Options for packaging a Crucible resource.
-type Options struct {
+type PackOptions struct {
 	Manifest string // Path to the manifest file.
 	Dist     string // Directory where built artifacts are located.
 	Output   string // Output archive path.
 }
 
 // Result of packaging a Crucible resource.
-type Result struct {
+type PackResult struct {
 	Output string // Path where the package was written.
 }
 
@@ -28,7 +28,7 @@ type Result struct {
 //
 // Creates a zstd-compressed tar archive containing the manifest and build
 // artifacts from the directory specified by opts.Dist.
-func Pack(ctx context.Context, opts Options) (*Result, error) {
+func Pack(ctx context.Context, opts PackOptions) (*PackResult, error) {
 	data, err := os.ReadFile(opts.Manifest)
 	if err != nil {
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
@@ -55,7 +55,7 @@ func Pack(ctx context.Context, opts Options) (*Result, error) {
 		return nil, err
 	}
 
-	return &Result{Output: opts.Output}, nil
+	return &PackResult{Output: opts.Output}, nil
 }
 
 // Validates that the build/ directory exists.

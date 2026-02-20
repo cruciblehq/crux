@@ -1,4 +1,4 @@
-package pack
+package resource
 
 import (
 	"os"
@@ -26,7 +26,7 @@ func validateImageStructure(distDir string) error {
 }
 
 // Checks that a widget's build/ directory contains required files.
-func validateWidgetStructure(distDir string, m *manifest.Widget) error {
+func validateWidgetStructure(distDir string, _ *manifest.Widget) error {
 	widgetMain := filepath.Join(distDir, WidgetMainFile)
 	if _, err := os.Stat(widgetMain); os.IsNotExist(err) {
 		return ErrInvalidStructure
