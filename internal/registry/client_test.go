@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	specregistry "github.com/cruciblehq/spec/registry"
 )
 
 func TestClient_CreateNamespace(t *testing.T) {
@@ -28,7 +30,7 @@ func TestClient_CreateNamespace(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ns, err := client.CreateNamespace(context.Background(), NamespaceInfo{
+	ns, err := client.CreateNamespace(context.Background(), specregistry.NamespaceInfo{
 		Name:        "test",
 		Description: "",
 	})
@@ -77,7 +79,7 @@ func TestClient_UpdateNamespace(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ns, err := client.UpdateNamespace(context.Background(), "test", NamespaceInfo{
+	ns, err := client.UpdateNamespace(context.Background(), "test", specregistry.NamespaceInfo{
 		Name:        "test",
 		Description: "updated",
 	})
@@ -146,7 +148,7 @@ func TestClient_CreateResource(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	res, err := client.CreateResource(context.Background(), "test", ResourceInfo{
+	res, err := client.CreateResource(context.Background(), "test", specregistry.ResourceInfo{
 		Name:        "myres",
 		Type:        "widget",
 		Description: "",
@@ -196,7 +198,7 @@ func TestClient_UpdateResource(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	res, err := client.UpdateResource(context.Background(), "test", "myres", ResourceInfo{
+	res, err := client.UpdateResource(context.Background(), "test", "myres", specregistry.ResourceInfo{
 		Name:        "myres",
 		Type:        "widget",
 		Description: "updated",
@@ -266,7 +268,7 @@ func TestClient_CreateVersion(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ver, err := client.CreateVersion(context.Background(), "test", "myres", VersionInfo{
+	ver, err := client.CreateVersion(context.Background(), "test", "myres", specregistry.VersionInfo{
 		String: "1.0.0",
 	})
 	if err != nil {
@@ -314,7 +316,7 @@ func TestClient_UpdateVersion(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ver, err := client.UpdateVersion(context.Background(), "test", "myres", "1.0.0", VersionInfo{
+	ver, err := client.UpdateVersion(context.Background(), "test", "myres", "1.0.0", specregistry.VersionInfo{
 		String: "1.0.0",
 	})
 	if err != nil {
@@ -375,7 +377,7 @@ func TestClient_UploadArchive(t *testing.T) {
 		if r.URL.Path != "/namespaces/test/resources/myres/versions/1.0.0/archive" {
 			t.Errorf("expected /namespaces/test/resources/myres/versions/1.0.0/archive, got %s", r.URL.Path)
 		}
-		if ct := r.Header.Get("Content-Type"); ct != string(MediaTypeArchive) {
+		if ct := r.Header.Get("Content-Type"); ct != string(specregistry.MediaTypeArchive) {
 			t.Errorf("expected archive content type, got %s", ct)
 		}
 		w.Header().Set("Content-Type", "application/vnd.crucible.version.v0+json")
@@ -402,7 +404,7 @@ func TestClient_DownloadArchive(t *testing.T) {
 		if r.URL.Path != "/namespaces/test/resources/myres/versions/1.0.0/archive" {
 			t.Errorf("expected /namespaces/test/resources/myres/versions/1.0.0/archive, got %s", r.URL.Path)
 		}
-		w.Header().Set("Content-Type", string(MediaTypeArchive))
+		w.Header().Set("Content-Type", string(specregistry.MediaTypeArchive))
 		w.Write([]byte("fake archive data"))
 	}))
 	defer server.Close()
@@ -438,7 +440,7 @@ func TestClient_CreateChannel(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ch, err := client.CreateChannel(context.Background(), "test", "myres", ChannelInfo{
+	ch, err := client.CreateChannel(context.Background(), "test", "myres", specregistry.ChannelInfo{
 		Name:        "stable",
 		Version:     "1.0.0",
 		Description: "",
@@ -491,7 +493,7 @@ func TestClient_UpdateChannel(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, nil)
-	ch, err := client.UpdateChannel(context.Background(), "test", "myres", "stable", ChannelInfo{
+	ch, err := client.UpdateChannel(context.Background(), "test", "myres", "stable", specregistry.ChannelInfo{
 		Name:        "stable",
 		Version:     "1.0.1",
 		Description: "updated",
@@ -563,11 +565,11 @@ func TestClient_ErrorHandling(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	regErr, ok := err.(*Error)
+	regErr, ok := err.(*specregistry.Error)
 	if !ok {
-		t.Fatalf("expected *Error, got %T", err)
+		t.Fatalf("expected *specregistry.Error, got %T", err)
 	}
-	if regErr.Code != ErrorCodeNotFound {
+	if regErr.Code != specregistry.ErrorCodeNotFound {
 		t.Errorf("expected not_found, got %s", regErr.Code)
 	}
 }

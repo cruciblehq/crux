@@ -17,7 +17,6 @@ require (
 	github.com/evanw/esbuild v0.27.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/klauspost/compress v1.18.2
-	github.com/mattn/go-sqlite3 v1.14.33
 	gopkg.in/yaml.v3 v3.0.1
 )
 

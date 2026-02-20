@@ -10,6 +10,7 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
+	specregistry "github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
 )
@@ -112,8 +113,8 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 		return nil // Namespace exists
 	}
 
-	var regErr *registry.Error
-	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+	var regErr *specregistry.Error
+	if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeNotFound {
 		return crex.UserError("namespace not found", fmt.Sprintf("namespace '%s' does not exist", namespace)).
 			Fallback("Create the namespace first.").
 			Err()
@@ -134,14 +135,14 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 		return nil // Resource exists
 	}
 
-	var regErr *registry.Error
-	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
+	var regErr *specregistry.Error
+	if !errors.As(err, &regErr) || regErr.Code != specregistry.ErrorCodeNotFound {
 		return crex.UserError("failed to check resource", err.Error()).
 			Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
 			Err()
 	}
 
-	resInfo := registry.ResourceInfo{
+	resInfo := specregistry.ResourceInfo{
 		Name:        resource,
 		Type:        string(man.Resource.Type),
 		Description: "",
@@ -162,14 +163,14 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 // already exists, an error is returned prompting the user to increment the
 // version in the manifest.
 func createVersion(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
-	versionInfo := registry.VersionInfo{
+	versionInfo := specregistry.VersionInfo{
 		String: version,
 	}
 
 	_, err := client.CreateVersion(ctx, namespace, resource, versionInfo)
 	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists {
+		var regErr *specregistry.Error
+		if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeVersionExists {
 			return crex.UserError("version already exists", fmt.Sprintf("version %s already exists", version)).
 				Fallback("Increment the version in crucible.yaml and rebuild.").
 				Err()

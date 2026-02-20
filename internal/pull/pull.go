@@ -7,6 +7,7 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
+	specregistry "github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
 )
@@ -93,8 +94,8 @@ func handleResolveError(err error) error {
 			Err()
 	}
 
-	var regErr *registry.Error
-	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+	var regErr *specregistry.Error
+	if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeNotFound {
 		return crex.UserError("not found", regErr.Message).
 			Fallback("Check the resource name and try again.").
 			Err()
@@ -106,7 +107,7 @@ func handleResolveError(err error) error {
 }
 
 // Returns a cached result if the entry exists with matching digest.
-func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, ver *registry.Version, expectedDigest string) (*Result, bool) {
+func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*Result, bool) {
 	entry, err := c.Get(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, false
@@ -128,7 +129,7 @@ func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, v
 }
 
 // Downloads the archive and stores it in the cache.
-func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cache, ref *reference.Reference, ver *registry.Version, expectedDigest string) (*Result, error) {
+func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*Result, error) {
 	archiveReader, err := client.DownloadArchive(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, crex.UserError("failed to download archive", err.Error()).
