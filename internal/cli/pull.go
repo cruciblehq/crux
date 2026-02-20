@@ -7,7 +7,7 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/internal/pull"
+	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
 )
 
@@ -34,7 +34,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	reference := strings.Join(c.Reference, " ")
 
-	opts := pull.Options{
+	opts := resource.PullOptions{
 		Registry:         registry,
 		Reference:        reference,
 		Type:             resType,
@@ -43,7 +43,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	slog.Info("pulling resource...", "reference", reference, "registry", registry)
 
-	result, err := pull.Pull(ctx, opts)
+	result, err := resource.Pull(ctx, opts)
 	if err != nil {
 		return err
 	}

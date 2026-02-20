@@ -1,4 +1,4 @@
-package pull
+package resource
 
 import (
 	"context"
@@ -7,21 +7,21 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
-	specregistry "github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
+	specregistry "github.com/cruciblehq/spec/registry"
 )
 
 // Options for pulling a resource.
-type Options struct {
+type PullOptions struct {
 	Registry         string                // Hub registry URL.
 	Reference        string                // Resource reference (e.g., namespace/resource 1.0.0).
 	Type             manifest.ResourceType // Resource type context for parsing.
 	DefaultNamespace string                // Default namespace for resource identifiers.
 }
 
-// Result contains information about the pull operation.
-type Result struct {
+// Result of pulling a resource.
+type PullResult struct {
 	Namespace string // Namespace name.
 	Resource  string // Resource name.
 	Version   string // Version string.
@@ -38,7 +38,7 @@ type Result struct {
 // based references (namespace/resource 1.0.0) and channel-based references
 // (namespace/resource :stable). Channels are resolved to their current version
 // before downloading.
-func Pull(ctx context.Context, opts Options) (*Result, error) {
+func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 	refOpts, err := reference.NewIdentifierOptions(opts.Registry, opts.DefaultNamespace)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func handleResolveError(err error) error {
 }
 
 // Returns a cached result if the entry exists with matching digest.
-func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*Result, bool) {
+func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*PullResult, bool) {
 	entry, err := c.Get(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, false
@@ -118,7 +118,7 @@ func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, v
 		return nil, false
 	}
 
-	return &Result{
+	return &PullResult{
 		Namespace: ref.Namespace(),
 		Resource:  ref.Name(),
 		Version:   ver.String,
@@ -129,7 +129,7 @@ func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, v
 }
 
 // Downloads the archive and stores it in the cache.
-func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*Result, error) {
+func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*PullResult, error) {
 	archiveReader, err := client.DownloadArchive(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, crex.UserError("failed to download archive", err.Error()).
@@ -148,7 +148,7 @@ func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cac
 		return nil, crex.Wrap(ErrCacheOperation, err)
 	}
 
-	return &Result{
+	return &PullResult{
 		Namespace: ref.Namespace(),
 		Resource:  ref.Name(),
 		Version:   ver.String,

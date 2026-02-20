@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/internal/pack"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/resource"
 )
 
 // Represents the 'crux pack' command.
@@ -22,7 +22,7 @@ func (c *PackCmd) Run(ctx context.Context) error {
 	slog.Info("packaging resource...", "output", paths.Package(RootCmd.Context))
 
 	// Package the built resource
-	result, err := pack.Pack(ctx, pack.Options{
+	result, err := resource.Pack(ctx, resource.PackOptions{
 		Manifest: paths.Manifest(RootCmd.Context),
 		Dist:     paths.BuildDir(RootCmd.Context),
 		Output:   paths.Package(RootCmd.Context),

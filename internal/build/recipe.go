@@ -11,8 +11,7 @@ import (
 	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/daemon"
-	"github.com/cruciblehq/crux/internal/pack"
-	"github.com/cruciblehq/crux/internal/pull"
+	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/protocol"
 	"github.com/cruciblehq/spec/reference"
@@ -110,7 +109,7 @@ func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, options ref
 // temporary directory, and returns the path to the image file within the
 // extracted archive. The caller must clean up the temporary directory.
 func resolveRefSource(ctx context.Context, ref string, options reference.IdentifierOptions) (imagePath, extractDir string, err error) {
-	result, err := pull.Pull(ctx, pull.Options{
+	result, err := resource.Pull(ctx, resource.PullOptions{
 		Registry:         options.DefaultRegistry,
 		Reference:        ref,
 		Type:             manifest.TypeRuntime,
@@ -142,7 +141,7 @@ func resolveRefSource(ctx context.Context, ref string, options reference.Identif
 		return "", "", err
 	}
 
-	return filepath.Join(extractDir, pack.ImageFile), extractDir, nil
+	return filepath.Join(extractDir, resource.ImageFile), extractDir, nil
 }
 
 // Returns a label for a stage, preferring the name when available and falling

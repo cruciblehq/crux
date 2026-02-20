@@ -1,4 +1,4 @@
-package push
+package resource
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
-	specregistry "github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
+	specregistry "github.com/cruciblehq/spec/registry"
 )
 
 // Options for pushing a package to the Hub registry.
