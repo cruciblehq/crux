@@ -30,8 +30,8 @@ runs:
         STAGE=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
         STAGE="${STAGE:-}"
 
-        # Git commit hash
-        COMMIT=$(git rev-parse HEAD 2>/dev/null || true)
+        # Git commit hash (short)
+        COMMIT=$(git rev-parse --short HEAD 2>/dev/null || true)
         COMMIT="${COMMIT:-}"
 
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
