@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/adrg/xdg"
+	specpaths "github.com/cruciblehq/spec/paths"
 )
 
 const (
@@ -131,20 +132,18 @@ func Runtime() string {
 
 // Path to the cruxd daemon Unix socket.
 //
-// This matches the socket path used by the cruxd daemon, allowing the
-// CLI to connect to it.
+// On Linux this returns the canonical system path defined by the spec
+// package. On macOS (development) it returns a host-local path where
+// Lima forwards the guest socket.
 //
-//	Linux:   $XDG_RUNTIME_DIR/cruxd/cruxd.sock
+//	Linux:   /run/cruxd/cruxd.sock
 //	macOS:   ~/Library/Caches/cruxd/run/cruxd.sock
 func DaemonSocket() string {
-	const daemonName = "cruxd"
-	var dir string
-	if xdg.RuntimeDir != "" {
-		dir = filepath.Join(xdg.RuntimeDir, daemonName)
-	} else {
-		dir = filepath.Join(xdg.CacheHome, daemonName, "run")
+	if runtime.GOOS == "linux" {
+		return specpaths.Socket()
 	}
-	return filepath.Join(dir, daemonName+".sock")
+	// macOS: host-side path for the Lima-forwarded socket.
+	return filepath.Join(xdg.CacheHome, "cruxd", "run", "cruxd.sock")
 }
 
 // Path to the directory for log files.

@@ -4,9 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/spec/reference"
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/spec/protocol"
 )
 
 // Represents the 'crux image start' command.
@@ -18,31 +17,17 @@ type ImageStartCmd struct {
 
 // Starts a new container from the image.
 func (c *ImageStartCmd) Run(ctx context.Context) error {
-	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
-	if err != nil {
-		return err
-	}
-	id, err := reference.ParseIdentifier(c.Ref, "service", opts)
-	if err != nil {
-		return err
-	}
+	slog.Info("starting container...", "ref", c.Ref, "version", c.Version, "id", c.ID)
 
-	client, err := runtime.NewContainerdClient(id.Hostname())
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	img := runtime.NewImage(client, id, c.Version)
-
-	slog.Info("starting container...", "image", img, "id", c.ID)
-
-	ctr, err := img.Start(ctx, c.ID)
-	if err != nil {
+	client := daemon.NewClient()
+	if err := client.ImageStart(ctx, &protocol.ImageStartRequest{
+		Ref:     c.Ref,
+		Version: c.Version,
+		ID:      c.ID,
+	}); err != nil {
 		return err
 	}
 
-	_ = ctr
 	slog.Info("container started")
 	return nil
 }

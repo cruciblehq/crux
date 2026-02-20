@@ -4,9 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/spec/reference"
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/spec/protocol"
 )
 
 // Represents the 'crux image import' command.
@@ -18,26 +17,14 @@ type ImageImportCmd struct {
 
 // Imports an OCI image tarball into the container runtime's image store.
 func (c *ImageImportCmd) Run(ctx context.Context) error {
-	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
-	if err != nil {
-		return err
-	}
-	id, err := reference.ParseIdentifier(c.Ref, "service", opts)
-	if err != nil {
-		return err
-	}
+	slog.Info("importing image...", "ref", c.Ref, "version", c.Version)
 
-	client, err := runtime.NewContainerdClient(id.Hostname())
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	img := runtime.NewImage(client, id, c.Version)
-
-	slog.Info("importing image...", "image", img)
-
-	if err := img.Import(ctx, c.Path); err != nil {
+	client := daemon.NewClient()
+	if err := client.ImageImport(ctx, &protocol.ImageImportRequest{
+		Ref:     c.Ref,
+		Version: c.Version,
+		Path:    c.Path,
+	}); err != nil {
 		return err
 	}
 

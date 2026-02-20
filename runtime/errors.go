@@ -20,35 +20,6 @@ var (
 
 	// Lima errors (macOS only).
 	ErrLimaDownload = errors.New("failed to download lima")
-
-	// Containerd errors.
-	ErrContainerd         = errors.New("failed to connect to containerd")
-	ErrContainerdDownload = errors.New("failed to download containerd")
-	ErrContainerdNotFound = errors.New("containerd binary not found in archive")
-	ErrContainerdConfig   = errors.New("failed to generate containerd configuration")
-	ErrContainerdStart    = errors.New("failed to start containerd")
-	ErrContainerdStop     = errors.New("failed to stop containerd")
-	ErrContainerdTimeout  = errors.New("timed out waiting for containerd to start")
-	ErrContainerdExited   = errors.New("containerd exited unexpectedly")
-
-	// Image errors.
-	ErrImageFileOpen = errors.New("failed to open image file")
-	ErrImageImport   = errors.New("failed to import image into containerd")
-	ErrImageEmpty    = errors.New("archive contains no images")
-	ErrImageMultiple = errors.New("archive contains multiple images")
-	ErrImageDestroy  = errors.New("failed to destroy image")
-	ErrImageExport   = errors.New("failed to export image")
-	ErrImageConfig   = errors.New("failed to update image config")
-
-	// Container errors.
-	ErrContainerStart   = errors.New("failed to start container")
-	ErrContainerStop    = errors.New("failed to stop container")
-	ErrContainerDestroy = errors.New("failed to destroy container")
-	ErrContainerExec    = errors.New("failed to execute command in container")
-	ErrContainerCopy    = errors.New("failed to copy into container")
-	ErrContainerCopyOut = errors.New("failed to copy from container")
-	ErrContainerStatus  = errors.New("failed to query container status")
-	ErrContainerCommit  = errors.New("failed to commit container")
 )
 
 // A failed runtime command.

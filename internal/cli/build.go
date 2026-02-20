@@ -34,7 +34,6 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 		Output:           paths.BuildDir(RootCmd.Context),
 		Registry:         registry,
 		DefaultNamespace: internal.DefaultNamespace,
-		SocketPath:       paths.DaemonSocket(),
 	})
 	if err != nil {
 		return err
@@ -72,7 +71,6 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 			Output:           paths.BuildDir(RootCmd.Context),
 			Registry:         registry,
 			DefaultNamespace: internal.DefaultNamespace,
-			SocketPath:       paths.DaemonSocket(),
 		}); err != nil {
 			slog.Error(err.Error())
 			return nil

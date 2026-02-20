@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/paths"
 	"github.com/cruciblehq/spec/protocol"
 )
 
@@ -19,8 +20,13 @@ type Client struct {
 	socketPath string
 }
 
+// Creates a new daemon client using the default socket path.
+func NewClient() *Client {
+	return &Client{socketPath: paths.DaemonSocket()}
+}
+
 // Creates a new daemon client targeting the given socket path.
-func NewClient(socketPath string) *Client {
+func NewClientWithSocket(socketPath string) *Client {
 	return &Client{socketPath: socketPath}
 }
 
@@ -57,6 +63,72 @@ func (c *Client) Status(ctx context.Context) (*protocol.StatusResult, error) {
 // Sends a shutdown request to the daemon.
 func (c *Client) Shutdown(ctx context.Context) error {
 	_, err := c.send(ctx, protocol.CmdShutdown, nil)
+	return err
+}
+
+// Sends an image-import request to the daemon.
+func (c *Client) ImageImport(ctx context.Context, req *protocol.ImageImportRequest) error {
+	_, err := c.send(ctx, protocol.CmdImageImport, req)
+	return err
+}
+
+// Sends an image-start request to the daemon.
+func (c *Client) ImageStart(ctx context.Context, req *protocol.ImageStartRequest) error {
+	_, err := c.send(ctx, protocol.CmdImageStart, req)
+	return err
+}
+
+// Sends an image-destroy request to the daemon.
+func (c *Client) ImageDestroy(ctx context.Context, req *protocol.ImageDestroyRequest) error {
+	_, err := c.send(ctx, protocol.CmdImageDestroy, req)
+	return err
+}
+
+// Sends a container-stop request to the daemon.
+func (c *Client) ContainerStop(ctx context.Context, req *protocol.ContainerStopRequest) error {
+	_, err := c.send(ctx, protocol.CmdContainerStop, req)
+	return err
+}
+
+// Sends a container-destroy request to the daemon.
+func (c *Client) ContainerDestroy(ctx context.Context, req *protocol.ContainerDestroyRequest) error {
+	_, err := c.send(ctx, protocol.CmdContainerDestroy, req)
+	return err
+}
+
+// Sends a container-status request to the daemon and returns the result.
+func (c *Client) ContainerStatus(ctx context.Context, req *protocol.ContainerStatusRequest) (*protocol.ContainerStatusResult, error) {
+	data, err := c.send(ctx, protocol.CmdContainerStatus, req)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := protocol.DecodePayload[protocol.ContainerStatusResult](data)
+	if err != nil {
+		return nil, crex.Wrap(ErrRequest, err)
+	}
+
+	return result, nil
+}
+
+// Sends a container-exec request to the daemon and returns the result.
+func (c *Client) ContainerExec(ctx context.Context, req *protocol.ContainerExecRequest) (*protocol.ContainerExecResult, error) {
+	data, err := c.send(ctx, protocol.CmdContainerExec, req)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := protocol.DecodePayload[protocol.ContainerExecResult](data)
+	if err != nil {
+		return nil, crex.Wrap(ErrRequest, err)
+	}
+
+	return result, nil
+}
+
+// Sends a container-update request to the daemon.
+func (c *Client) ContainerUpdate(ctx context.Context, req *protocol.ContainerUpdateRequest) error {
+	_, err := c.send(ctx, protocol.CmdContainerUpdate, req)
 	return err
 }
 

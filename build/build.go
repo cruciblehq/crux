@@ -17,7 +17,6 @@ type Options struct {
 	Output           string // Directory where built artifacts are placed.
 	Registry         string // Hub registry URL (required for services to fetch runtimes).
 	DefaultNamespace string // Default namespace for resource identifiers.
-	SocketPath       string // Path to the cruxd Unix socket. Required for recipe-based builds.
 }
 
 // Result of building a Crucible resource.
@@ -53,10 +52,10 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 
 	switch man.Resource.Type {
 	case manifest.TypeRuntime:
-		client := daemon.NewClient(opts.SocketPath)
+		client := daemon.NewClient()
 		builder = NewRuntimeBuilder(client, opts.Registry, opts.DefaultNamespace, context)
 	case manifest.TypeService:
-		client := daemon.NewClient(opts.SocketPath)
+		client := daemon.NewClient()
 		builder = NewServiceBuilder(client, opts.Registry, opts.DefaultNamespace, context)
 	case manifest.TypeWidget:
 		builder = NewWidgetBuilder()

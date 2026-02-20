@@ -18,6 +18,7 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/paths"
+	spec "github.com/cruciblehq/spec/paths"
 )
 
 const (
@@ -159,13 +160,14 @@ var configTemplate = template.Must(template.New("lima").Parse(configTemplateSour
 
 // Values injected into the Lima YAML template.
 type configData struct {
-	Arch           string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs           int    // Number of virtual CPUs.
-	Memory         string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk           string // Disk size with unit suffix (e.g. "10GiB").
-	ContainerdSock string // Host socket path for forwarding the guest containerd socket.
-	User           string // Host username (Lima creates a matching guest user).
-	ContainerdGID  int    // GID for the containerd group (controls socket access).
+	Arch          string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs          int    // Number of virtual CPUs.
+	Memory        string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk          string // Disk size with unit suffix (e.g. "10GiB").
+	GuestSocket   string // Guest socket path where cruxd listens.
+	HostSocket    string // Host socket path for forwarding the guest cruxd socket.
+	User          string // Host username (Lima creates a matching guest user).
+	ContainerdGID int    // GID for the containerd group (controls socket access).
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -174,13 +176,14 @@ type configData struct {
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
 	data := configData{
-		Arch:           limaArch(),
-		CPUs:           defaultCPUs,
-		Memory:         fmt.Sprintf("%dGiB", defaultMemoryGiB),
-		Disk:           fmt.Sprintf("%dGiB", defaultDiskGiB),
-		ContainerdSock: containerdForwardedSocket(),
-		User:           os.Getenv("USER"),
-		ContainerdGID:  defaultContainerdGID,
+		Arch:          limaArch(),
+		CPUs:          defaultCPUs,
+		Memory:        fmt.Sprintf("%dGiB", defaultMemoryGiB),
+		Disk:          fmt.Sprintf("%dGiB", defaultDiskGiB),
+		GuestSocket:   spec.Socket(),
+		HostSocket:    paths.DaemonSocket(),
+		User:          os.Getenv("USER"),
+		ContainerdGID: defaultContainerdGID,
 	}
 
 	configDir := paths.VM()
