@@ -18,16 +18,24 @@ import (
 	"github.com/cruciblehq/spec/reference"
 )
 
+// Shared state for recipe-based builders.
+type recipeBuilder struct {
+	client           *daemon.Client // Daemon client for sending build requests.
+	registry         string         // Hub registry URL for resolving references.
+	defaultNamespace string         // Default namespace for resolving references.
+	context          string         // Directory containing the manifest, root for resolving copy sources.
+}
+
 // Builds a recipe by resolving sources and delegating execution to cruxd.
 //
 // All stage sources are resolved to local file paths (pulling and extracting
 // remote references as needed). The resolved recipe is sent to the daemon
 // as a [protocol.BuildRequest]. The daemon handles container creation, step
 // execution, and image export.
-func buildRecipe(ctx context.Context, client *daemon.Client, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output, root string, entrypoint []string) (*Result, error) {
+func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (*Result, error) {
 	options := reference.IdentifierOptions{
-		DefaultRegistry:  registry,
-		DefaultNamespace: defaultNamespace,
+		DefaultRegistry:  b.registry,
+		DefaultNamespace: b.defaultNamespace,
 	}
 
 	resolved, cleanup, err := resolveAllSources(ctx, recipe, options)
@@ -40,13 +48,13 @@ func buildRecipe(ctx context.Context, client *daemon.Client, m manifest.Manifest
 		Recipe:     resolved,
 		Resource:   m.Resource.Name,
 		Output:     output,
-		Root:       root,
+		Root:       b.context,
 		Entrypoint: entrypoint,
 	}
 
 	slog.Info("sending build request to daemon")
 
-	result, err := client.Build(ctx, req)
+	result, err := b.client.Build(ctx, req)
 	if err != nil {
 		return nil, err
 	}

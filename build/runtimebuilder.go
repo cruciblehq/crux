@@ -13,19 +13,18 @@ import (
 // Extracts the runtime configuration from the manifest and delegates to the
 // shared recipe pipeline.
 type RuntimeBuilder struct {
-	client           *daemon.Client // Daemon client for sending build requests.
-	registry         string         // Hub registry URL for resolving references.
-	defaultNamespace string         // Default namespace for resolving references.
-	context          string         // Directory containing the manifest, root for resolving copy sources.
+	recipeBuilder
 }
 
 // Creates a new instance of [RuntimeBuilder].
 func NewRuntimeBuilder(client *daemon.Client, registry, defaultNamespace, context string) *RuntimeBuilder {
 	return &RuntimeBuilder{
-		client:           client,
-		registry:         registry,
-		defaultNamespace: defaultNamespace,
-		context:          context,
+		recipeBuilder: recipeBuilder{
+			client:           client,
+			registry:         registry,
+			defaultNamespace: defaultNamespace,
+			context:          context,
+		},
 	}
 }
 
@@ -42,5 +41,5 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, rb.client, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context, nil)
+	return rb.build(ctx, m, &cfg.Recipe, output, nil)
 }

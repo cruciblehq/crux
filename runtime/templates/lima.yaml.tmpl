@@ -55,8 +55,8 @@ provision:
       chmod 775 /run/containerd
       rc-service containerd start --ifnotstarted
 portForwards:
-  - guestSocket: "/run/containerd/containerd.sock"
-    hostSocket: "{{ .ContainerdSock }}"
+  - guestSocket: "{{ .GuestSocket }}"
+    hostSocket: "{{ .HostSocket }}"
 probes:
   - mode: readiness
     description: containerd to be running

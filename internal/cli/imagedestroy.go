@@ -4,9 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/spec/reference"
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/spec/protocol"
 )
 
 // Represents the 'crux image destroy' command.
@@ -17,26 +16,13 @@ type ImageDestroyCmd struct {
 
 // Removes an image and all its containers from the runtime.
 func (c *ImageDestroyCmd) Run(ctx context.Context) error {
-	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
-	if err != nil {
-		return err
-	}
-	id, err := reference.ParseIdentifier(c.Ref, "service", opts)
-	if err != nil {
-		return err
-	}
+	slog.Info("destroying image...", "ref", c.Ref, "version", c.Version)
 
-	client, err := runtime.NewContainerdClient(id.Hostname())
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	img := runtime.NewImage(client, id, c.Version)
-
-	slog.Info("destroying image...", "image", img)
-
-	if err := img.Destroy(ctx); err != nil {
+	client := daemon.NewClient()
+	if err := client.ImageDestroy(ctx, &protocol.ImageDestroyRequest{
+		Ref:     c.Ref,
+		Version: c.Version,
+	}); err != nil {
 		return err
 	}
 

@@ -77,10 +77,12 @@ func TestExtractLima(t *testing.T) {
 
 func TestConfigTemplate_IsValid(t *testing.T) {
 	data := configData{
-		Arch:   "aarch64",
-		CPUs:   2,
-		Memory: "2GiB",
+		Arch:          "aarch64",
+		CPUs:          2,
+		Memory:        "2GiB",
 		Disk:          "10GiB",
+		GuestSocket:   "/run/cruxd/cruxd.sock",
+		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
 		ContainerdGID: 999,
 	}
@@ -100,8 +102,9 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"containerd:",
 		"system: false",
 		"user: false",
-		"containerd.sock",
 		"apk add --no-cache containerd",
+		"/run/cruxd/cruxd.sock",
+		"/tmp/test/cruxd.sock",
 	}
 	for _, s := range required {
 		if !strings.Contains(output, s) {
@@ -112,10 +115,12 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 
 func TestConfigTemplate_x86(t *testing.T) {
 	data := configData{
-		Arch:   "x86_64",
-		CPUs:   4,
-		Memory: "4GiB",
+		Arch:          "x86_64",
+		CPUs:          4,
+		Memory:        "4GiB",
 		Disk:          "20GiB",
+		GuestSocket:   "/run/cruxd/cruxd.sock",
+		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
 		ContainerdGID: 999,
 	}
