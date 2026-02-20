@@ -7,7 +7,7 @@ import (
 	"net"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/protocol"
 )
 

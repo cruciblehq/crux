@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/internal/cache"
 )
 
 // Represents the 'crux cache list' command.

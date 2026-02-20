@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/archive"
+	"github.com/cruciblehq/crux/internal/archive"
 )
 
 func TestArchiveDirectoryPath(t *testing.T) {

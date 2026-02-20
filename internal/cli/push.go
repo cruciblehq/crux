@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/push"
+	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/push"
 )
 
 // Represents the 'crux push' command.

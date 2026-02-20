@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/manifest"
 )
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/pack"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/pack"
+	"github.com/cruciblehq/crux/internal/paths"
 )
 
 // Represents the 'crux pack' command.

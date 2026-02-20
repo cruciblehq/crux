@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/crux/internal/daemon"
 	"github.com/cruciblehq/spec/manifest"
 )
 

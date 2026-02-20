@@ -7,7 +7,7 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/pull"
+	"github.com/cruciblehq/crux/internal/pull"
 	"github.com/cruciblehq/spec/manifest"
 )
 

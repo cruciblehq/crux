@@ -9,8 +9,8 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/config"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/internal/config"
+	"github.com/cruciblehq/crux/internal/registry"
 	spec "github.com/cruciblehq/spec/blueprint"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/plan"

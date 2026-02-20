@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/crux/internal/daemon"
 	"github.com/cruciblehq/spec/protocol"
 )
 

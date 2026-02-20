@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/paths"
 )
 
 const (

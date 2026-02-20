@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/build"
+	"github.com/cruciblehq/crux/internal/build"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/watch"
+	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/watch"
 )
 
 // Represents the 'crux build' command.

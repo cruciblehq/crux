@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/spec/reference"
