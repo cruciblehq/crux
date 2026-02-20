@@ -1,23 +1,26 @@
-// Package registry defines types and interfaces for the Crucible artifact registry.
+// Package registry provides an HTTP client for the Crucible artifact registry.
 //
-// The registry stores versioned artifacts organized into namespaces and
-// resources. A namespace groups related resources, each of which can have
-// multiple immutable versions and mutable channels. Channels act as named
-// pointers to versions (e.g., "stable", "latest"), letting consumers track a
-// release stream without pinning to a specific version number.
+// [Client] implements the [Registry] interface from [github.com/cruciblehq/spec/registry]
+// as an HTTP client against the Hub API, using vendor-specific media types
+// (application/vnd.crucible.{name}.v0) in Content-Type and Accept headers.
 //
-// Every entity has three type variants. Info types carry mutable fields and are
-// used in create and update requests. Summary types include statistics and
-// metadata and appear in list responses and nested contexts. Full types include
-// the complete nested data and are used in single-entity detail responses.
+// [ResolveVersion] maps a [reference.Reference] to a concrete version by
+// resolving either a channel to its pointed-to version or a semver constraint
+// to the highest matching version.
 //
-// The [Registry] interface defines the full set of CRUD operations. [Client]
-// implements it as an HTTP client against the Hub API, using vendor-specific
-// media types (application/vnd.crucible.{name}.v0) in Content-Type and Accept
-// headers. [SQLRegistry] implements it with a SQL database and file-based
-// archive storage, using file locks for safe concurrent access.
+// Creating a client and reading a namespace:
 //
-// [Resolve] maps a [reference.Reference] to a concrete version by resolving
-// either a channel to its pointed-to version or a semver constraint to the
-// highest matching version.
+//	client := registry.NewClient("https://hub.example.com", nil)
+//	ns, err := client.ReadNamespace(ctx, "my-namespace")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// Resolving a version reference:
+//
+//	ver, err := registry.ResolveVersion(ctx, client, ref)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(ver.String, *ver.Digest)
 package registry

@@ -11,6 +11,7 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/config"
 	"github.com/cruciblehq/crux/internal/registry"
+	specregistry "github.com/cruciblehq/spec/registry"
 	spec "github.com/cruciblehq/spec/blueprint"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/plan"
@@ -144,8 +145,8 @@ func wrapResolveError(err error) error {
 		return crex.Wrap(ErrNoMatchingVersion, err)
 	}
 
-	var regErr *registry.Error
-	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+	var regErr *specregistry.Error
+	if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeNotFound {
 		return crex.Wrap(ErrChannelNotFound, err)
 	}
 
@@ -153,7 +154,7 @@ func wrapResolveError(err error) error {
 }
 
 // Builds a frozen reference from a resolved version.
-func buildFrozenReference(ref *reference.Reference, namespace, resourceName string, version *registry.Version) (*reference.Reference, error) {
+func buildFrozenReference(ref *reference.Reference, namespace, resourceName string, version *specregistry.Version) (*reference.Reference, error) {
 	reg := ref.Registry()
 	id, err := reference.NewIdentifier(
 		ref.Type(),

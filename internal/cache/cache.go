@@ -2,41 +2,44 @@ package cache
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
-
-	_ "github.com/mattn/go-sqlite3"
+	"time"
 
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/crux/internal/registry"
+	"github.com/cruciblehq/spec/registry"
 )
 
 const (
 
-	// The database filename within the cache directory.
-	databaseFilename = "cache.db"
-
 	// The lock filename within the cache directory.
 	lockFilename = "cache.lock"
 
-	// The archives subdirectory within the cache directory.
-	archivesDir = "archives"
+	// The data subdirectory within the cache directory.
+	dataDir = "data"
+
+	// Metadata filename within each version directory.
+	metaFilename = "meta.json"
+
+	// Archive filename within each version directory.
+	archiveFilename = "archive.tar.zst"
 )
 
-// Provides thread-safe and process-safe access to the local registry.
+// Provides thread-safe and process-safe access to the local cache.
 //
-// Operations are protected by both an in-process mutex and a file lock. The
-// cache must be closed when no longer needed to release the file lock.
+// Stores cached artifacts as files organized into <namespace>/<resource>/<version>
+// directories. Operations are protected by both an in-process mutex and a file
+// lock. The cache must be closed when no longer needed to release the file lock.
 type Cache struct {
-	root     string                // Cache root directory
-	registry *registry.SQLRegistry // Underlying registry
-	db       *sql.DB               // Database connection (for cleanup)
-	lockFile *os.File              // File lock handle
-	mu       sync.RWMutex          // In-process mutex
+	root string       // Cache root directory
+	lock *os.File     // File lock handle
+	mu   sync.RWMutex // Mutex for in-process synchronization
 }
 
 // Opens the local cache, creating it if necessary.
@@ -48,7 +51,7 @@ func Open(ctx context.Context, _ any) (*Cache, error) {
 }
 
 // Opens a cache at the specified directory.
-func OpenAt(ctx context.Context, root string) (*Cache, error) {
+func OpenAt(_ context.Context, root string) (*Cache, error) {
 	if err := os.MkdirAll(root, paths.DefaultDirMode); err != nil {
 		return nil, err
 	}
@@ -59,78 +62,38 @@ func OpenAt(ctx context.Context, root string) (*Cache, error) {
 		return nil, err
 	}
 
-	// Acquire exclusive lock (blocks until available)
 	if err := lockFile(lf); err != nil {
 		lf.Close()
 		return nil, err
 	}
 
-	// Open SQLite database
-	dbPath := filepath.Join(root, databaseFilename)
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
-	if err != nil {
-		unlockFile(lf)
-		lf.Close()
-		return nil, err
-	}
-
-	// Create registry with archives directory
-	archivesPath := filepath.Join(root, archivesDir)
-	reg, err := registry.NewSQLRegistry(ctx, db, archivesPath, nil)
-	if err != nil {
-		db.Close()
-		unlockFile(lf)
-		lf.Close()
-		return nil, err
-	}
-
-	return &Cache{
-		root:     root,
-		registry: reg,
-		db:       db,
-		lockFile: lf,
-	}, nil
+	return &Cache{root: root, lock: lf}, nil
 }
 
-// Releases the file lock and closes the database connection.
+// Releases the file lock.
 func (c *Cache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var errs []error
-
-	if c.db != nil {
-		if err := c.db.Close(); err != nil {
-			errs = append(errs, err)
-		}
-		c.db = nil
-	}
-
-	if c.lockFile != nil {
-		unlockFile(c.lockFile)
-		if err := c.lockFile.Close(); err != nil {
-			errs = append(errs, err)
-		}
-		c.lockFile = nil
-	}
-
-	if len(errs) > 0 {
-		return errs[0]
+	if c.lock != nil {
+		unlockFile(c.lock)
+		err := c.lock.Close()
+		c.lock = nil
+		return err
 	}
 	return nil
 }
 
 // Checks whether an entry exists in the cache.
-func (c *Cache) Has(ctx context.Context, namespace, resource, version string) (bool, error) {
+func (c *Cache) Has(_ context.Context, namespace, resource, version string) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	_, err := c.registry.ReadVersion(ctx, namespace, resource, version)
+	_, err := os.Stat(c.metaPath(namespace, resource, version))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
-			return false, nil
-		}
 		return false, err
 	}
 	return true, nil
@@ -139,62 +102,38 @@ func (c *Cache) Has(ctx context.Context, namespace, resource, version string) (b
 // Retrieves version metadata from the cache.
 //
 // Returns ErrNotFound if the entry doesn't exist.
-func (c *Cache) Get(ctx context.Context, namespace, resource, version string) (*registry.Version, error) {
+func (c *Cache) Get(_ context.Context, namespace, resource, version string) (*registry.Version, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	ver, err := c.registry.ReadVersion(ctx, namespace, resource, version)
-	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	return ver, nil
+	return c.readMeta(namespace, resource, version)
 }
 
 // Returns a reader for a cached archive.
 //
 // The caller is responsible for closing the returned reader. Returns
 // ErrNotFound if the entry doesn't exist or has no archive.
-func (c *Cache) OpenArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
+func (c *Cache) OpenArchive(_ context.Context, namespace, resource, version string) (io.ReadCloser, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	reader, err := c.registry.DownloadArchive(ctx, namespace, resource, version)
-	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
-			return nil, ErrNotFound
-		}
-		return nil, err
+	archivePath := c.archivePath(namespace, resource, version)
+	f, err := os.Open(archivePath)
+	if os.IsNotExist(err) {
+		return nil, ErrNotFound
 	}
-	return reader, nil
+	return f, err
 }
 
 // Stores an entry in the cache.
 //
-// Creates the namespace, resource, and version if they don't exist, then
-// uploads the archive. If an entry already exists for the same
-// namespace/resource/version, the archive is replaced.
-func (c *Cache) Put(ctx context.Context, namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
+// Creates the directory structure and writes the archive and metadata. If an
+// entry already exists for the same namespace/resource/version, it is replaced.
+func (c *Cache) Put(_ context.Context, namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if err := c.ensureNamespace(ctx, namespace); err != nil {
-		return nil, err
-	}
-
-	if err := c.ensureResource(ctx, namespace, resource); err != nil {
-		return nil, err
-	}
-
-	if err := c.ensureVersion(ctx, namespace, resource, version); err != nil {
-		return nil, err
-	}
-
-	return c.registry.UploadArchive(ctx, namespace, resource, version, archive)
+	return c.writeEntry(namespace, resource, version, archive)
 }
 
 // Stores an entry in the cache, verifying the digest.
@@ -208,7 +147,8 @@ func (c *Cache) PutWithDigest(ctx context.Context, namespace, resource, version,
 	}
 
 	if ver.Digest != nil && *ver.Digest != expectedDigest {
-		c.registry.DeleteVersion(ctx, namespace, resource, version)
+		// Remove the bad entry
+		os.RemoveAll(c.versionDir(namespace, resource, version))
 		return nil, ErrDigestMismatch
 	}
 
@@ -218,51 +158,48 @@ func (c *Cache) PutWithDigest(ctx context.Context, namespace, resource, version,
 // Removes an entry from the cache.
 //
 // Returns nil if the entry doesn't exist (idempotent).
-func (c *Cache) Delete(ctx context.Context, namespace, resource, version string) error {
+func (c *Cache) Delete(_ context.Context, namespace, resource, version string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	err := c.registry.DeleteVersion(ctx, namespace, resource, version)
-	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
-			return nil
-		}
-		return err
+	dir := c.versionDir(namespace, resource, version)
+	err := os.RemoveAll(dir)
+	if os.IsNotExist(err) {
+		return nil
 	}
-	return nil
+
+	// Clean up empty parent directories.
+	c.pruneEmpty(c.resourceDir(namespace, resource))
+	c.pruneEmpty(c.namespaceDir(namespace))
+	return err
 }
 
 // Returns all versions across all namespaces and resources.
-func (c *Cache) List(ctx context.Context) ([]*registry.Version, error) {
+func (c *Cache) List(_ context.Context) ([]*registry.Version, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	var versions []*registry.Version
+	root := filepath.Join(c.root, dataDir)
 
-	nsList, err := c.registry.ListNamespaces(ctx)
+	namespaces, err := listSubdirs(root)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	for _, ns := range nsList.Namespaces {
-		resList, err := c.registry.ListResources(ctx, ns.Name)
-		if err != nil {
-			continue
-		}
-
-		for _, res := range resList.Resources {
-			verList, err := c.registry.ListVersions(ctx, ns.Name, res.Name)
-			if err != nil {
-				continue
-			}
-
-			for _, verSum := range verList.Versions {
-				ver, err := c.registry.ReadVersion(ctx, ns.Name, res.Name, verSum.String)
+	for _, ns := range namespaces {
+		resources, _ := listSubdirs(filepath.Join(root, ns))
+		for _, res := range resources {
+			versionDirs, _ := listSubdirs(filepath.Join(root, ns, res))
+			for _, ver := range versionDirs {
+				v, err := c.readMeta(ns, res, ver)
 				if err != nil {
 					continue
 				}
-				versions = append(versions, ver)
+				versions = append(versions, v)
 			}
 		}
 	}
@@ -271,111 +208,141 @@ func (c *Cache) List(ctx context.Context) ([]*registry.Version, error) {
 }
 
 // Removes all entries from the cache.
-func (c *Cache) Clear(ctx context.Context) error {
+func (c *Cache) Clear(_ context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	nsList, err := c.registry.ListNamespaces(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, ns := range nsList.Namespaces {
-		resList, err := c.registry.ListResources(ctx, ns.Name)
-		if err != nil {
-			continue
-		}
-
-		for _, res := range resList.Resources {
-			verList, err := c.registry.ListVersions(ctx, ns.Name, res.Name)
-			if err != nil {
-				continue
-			}
-
-			for _, ver := range verList.Versions {
-				c.registry.DeleteVersion(ctx, ns.Name, res.Name, ver.String)
-			}
-
-			c.registry.DeleteResource(ctx, ns.Name, res.Name)
-		}
-
-		c.registry.DeleteNamespace(ctx, ns.Name)
-	}
-
-	return nil
-}
-
-// Ensures a namespace exists, creating it if necessary.
-func (c *Cache) ensureNamespace(ctx context.Context, namespace string) error {
-	_, err := c.registry.ReadNamespace(ctx, namespace)
-	if err == nil {
-		return nil
-	}
-
-	var regErr *registry.Error
-	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
-		return err
-	}
-
-	_, err = c.registry.CreateNamespace(ctx, registry.NamespaceInfo{
-		Name: namespace,
-	})
-	if err != nil {
-		var createErr *registry.Error
-		if errors.As(err, &createErr) && createErr.Code == registry.ErrorCodeNamespaceExists {
-			return nil // Race condition: another process created it
-		}
+	root := filepath.Join(c.root, dataDir)
+	if err := os.RemoveAll(root); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Ensures a resource exists, creating it if necessary.
-func (c *Cache) ensureResource(ctx context.Context, namespace, resource string) error {
-	_, err := c.registry.ReadResource(ctx, namespace, resource)
-	if err == nil {
-		return nil
-	}
-
-	var regErr *registry.Error
-	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
-		return err
-	}
-
-	_, err = c.registry.CreateResource(ctx, namespace, registry.ResourceInfo{
-		Name: resource,
-	})
-	if err != nil {
-		var createErr *registry.Error
-		if errors.As(err, &createErr) && createErr.Code == registry.ErrorCodeResourceExists {
-			return nil
-		}
-		return err
-	}
-	return nil
+// Returns the data/<namespace> directory path.
+func (c *Cache) namespaceDir(namespace string) string {
+	return filepath.Join(c.root, dataDir, namespace)
 }
 
-// Ensures a version exists, creating it if necessary.
-func (c *Cache) ensureVersion(ctx context.Context, namespace, resource, version string) error {
-	_, err := c.registry.ReadVersion(ctx, namespace, resource, version)
-	if err == nil {
-		return nil
-	}
+// Returns the data/<namespace>/<resource> directory path.
+func (c *Cache) resourceDir(namespace, resource string) string {
+	return filepath.Join(c.root, dataDir, namespace, resource)
+}
 
-	var regErr *registry.Error
-	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
-		return err
-	}
+// Returns the data/<namespace>/<resource>/<version> directory path.
+func (c *Cache) versionDir(namespace, resource, version string) string {
+	return filepath.Join(c.root, dataDir, namespace, resource, version)
+}
 
-	_, err = c.registry.CreateVersion(ctx, namespace, resource, registry.VersionInfo{
-		String: version,
-	})
+// Returns the path to the metadata file for a version.
+func (c *Cache) metaPath(namespace, resource, version string) string {
+	return filepath.Join(c.versionDir(namespace, resource, version), metaFilename)
+}
+
+// Returns the path to the archive file for a version.
+func (c *Cache) archivePath(namespace, resource, version string) string {
+	return filepath.Join(c.versionDir(namespace, resource, version), archiveFilename)
+}
+
+// Reads and parses the metadata file for a version.
+func (c *Cache) readMeta(namespace, resource, version string) (*registry.Version, error) {
+	data, err := os.ReadFile(c.metaPath(namespace, resource, version))
+	if os.IsNotExist(err) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		var createErr *registry.Error
-		if errors.As(err, &createErr) && createErr.Code == registry.ErrorCodeVersionExists {
-			return nil
-		}
-		return err
+		return nil, err
 	}
-	return nil
+
+	var ver registry.Version
+	if err := json.Unmarshal(data, &ver); err != nil {
+		return nil, err
+	}
+	return &ver, nil
+}
+
+// Writes an archive and its metadata to the version directory. Returns the
+// populated Version with digest and size.
+func (c *Cache) writeEntry(namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
+	dir := c.versionDir(namespace, resource, version)
+	if err := os.MkdirAll(dir, paths.DefaultDirMode); err != nil {
+		return nil, err
+	}
+
+	archivePath := c.archivePath(namespace, resource, version)
+
+	// Write archive to a temp file first, computing digest as we go.
+	tmpFile, err := os.CreateTemp(dir, ".archive-*.tmp")
+	if err != nil {
+		return nil, err
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath) // Clean up on failure.
+
+	h := sha256.New()
+	w := io.MultiWriter(tmpFile, h)
+
+	size, err := io.Copy(w, archive)
+	if err != nil {
+		tmpFile.Close()
+		return nil, err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, err
+	}
+
+	// Atomic rename.
+	if err := os.Rename(tmpPath, archivePath); err != nil {
+		return nil, err
+	}
+
+	digest := fmt.Sprintf("sha256:%s", hex.EncodeToString(h.Sum(nil)))
+	now := time.Now().Unix()
+	archiveStr := archiveFilename
+
+	ver := &registry.Version{
+		Namespace: namespace,
+		Resource:  resource,
+		String:    version,
+		Archive:   &archiveStr,
+		Size:      &size,
+		Digest:    &digest,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Write metadata.
+	meta, err := json.Marshal(ver)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(c.metaPath(namespace, resource, version), meta, paths.DefaultFileMode); err != nil {
+		return nil, err
+	}
+
+	return ver, nil
+}
+
+// Removes a directory if it is empty.
+func (c *Cache) pruneEmpty(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) > 0 {
+		return
+	}
+	os.Remove(dir)
+}
+
+// Lists immediate subdirectory names.
+func listSubdirs(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
 }
