@@ -2,17 +2,20 @@ package blueprint
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/config"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/plan"
-	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/registry"
-	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/state"
+	spec "github.com/cruciblehq/spec/blueprint"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/plan"
+	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/spec/state"
 )
 
 const (
@@ -37,13 +40,18 @@ type ExecuteOptions struct {
 // Resolves all service references against the registry, allocates compute
 // resources, creates bindings, and configures gateway routing. If state is
 // provided, enables incremental planning based on current deployment state.
-func (bp *Blueprint) Execute(ctx context.Context, opts ExecuteOptions) (*plan.Plan, error) {
+func Execute(ctx context.Context, bp *spec.Blueprint, opts ExecuteOptions) (*plan.Plan, error) {
 	// Read existing state if provided
 	var st *state.State
 	if opts.State != "" {
-		var err error
-		st, err = state.Read(opts.State)
+		data, err := os.ReadFile(opts.State)
 		if err != nil {
+			return nil, crex.UserError("invalid state file", err.Error()).
+				Fallback("Ensure the state file exists and is valid.").
+				Err()
+		}
+		st = &state.State{}
+		if err := json.Unmarshal(data, st); err != nil {
 			return nil, crex.UserError("invalid state file", err.Error()).
 				Fallback("Ensure the state file exists and is valid.").
 				Err()
@@ -78,7 +86,7 @@ func (bp *Blueprint) Execute(ctx context.Context, opts ExecuteOptions) (*plan.Pl
 }
 
 // Resolves all service references in the blueprint and adds them to the plan.
-func resolveServiceReferences(ctx context.Context, bp *Blueprint, st *state.State, registryClient *registry.Client, registryHost string, defaultNamespace string, p *plan.Plan) error {
+func resolveServiceReferences(ctx context.Context, bp *spec.Blueprint, st *state.State, registryClient *registry.Client, registryHost string, defaultNamespace string, p *plan.Plan) error {
 	slog.Info("resolving service references", "registryHost", registryHost, "serviceCount", len(bp.Services))
 
 	if st != nil {
@@ -93,7 +101,7 @@ func resolveServiceReferences(ctx context.Context, bp *Blueprint, st *state.Stat
 			return err
 		}
 
-		ref, err := reference.Parse(service.Reference, resource.TypeService, opts)
+		ref, err := reference.Parse(service.Reference, string(manifest.TypeService), opts)
 		if err != nil {
 			return crex.UserError("invalid service reference in blueprint", fmt.Sprintf("cannot parse reference '%s'", service.Reference)).
 				Fallback("Ensure the service reference follows the expected format.").
@@ -171,7 +179,7 @@ func buildFrozenReference(ref *reference.Reference, namespace, resourceName stri
 }
 
 // Adds a service to the plan.
-func addServiceToPlan(svc *Service, frozenRef *reference.Reference, p *plan.Plan) error {
+func addServiceToPlan(svc *spec.Service, frozenRef *reference.Reference, p *plan.Plan) error {
 	if svc.ID == "" {
 		return crex.UserError("invalid service in blueprint", "service ID is required").
 			Fallback("Add an 'id' field to each service in the blueprint.").

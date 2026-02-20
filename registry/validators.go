@@ -3,7 +3,7 @@ package registry
 import (
 	"regexp"
 
-	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/spec/reference"
 )
 
 var (

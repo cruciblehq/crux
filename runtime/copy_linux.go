@@ -5,13 +5,12 @@ package runtime
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -78,7 +77,7 @@ func execWithStdin(ctx context.Context, task containerd.Task, pspec *specs.Proce
 	}
 
 	if code != 0 {
-		return fmt.Errorf("process exited with code %d: %s", code, stderr.String())
+		return crex.Wrapf(ErrContainerExec, "exit code %d: %s", code, stderr.String())
 	}
 
 	return nil
@@ -146,7 +145,7 @@ func execWithStdout(ctx context.Context, task containerd.Task, pspec *specs.Proc
 	}
 
 	if code != 0 {
-		return fmt.Errorf("process exited with code %d: %s", code, stderr.String())
+		return crex.Wrapf(ErrContainerExec, "exit code %d: %s", code, stderr.String())
 	}
 
 	return nil

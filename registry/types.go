@@ -50,11 +50,10 @@ const (
 // Error response from the registry API.
 //
 // Provides both machine-readable error classification through the Code field
-// and human-readable context through the Message field. The media type is
-// [MediaTypeError].
+// and context through the Message field. The media type is [MediaTypeError].
 type Error struct {
 	Code    ErrorCode `json:"code"`    // Error code (see [ErrorCode]).
-	Message string    `json:"message"` // Human-readable error description.
+	Message string    `json:"message"` // Error description.
 }
 
 // Implements the error interface.
@@ -72,7 +71,7 @@ func (e *Error) Error() string {
 // [MediaTypeNamespaceInfo].
 type NamespaceInfo struct {
 	Name        string `json:"name"`        // Namespace name.
-	Description string `json:"description"` // Human-readable description.
+	Description string `json:"description"` // Description.
 }
 
 // Lightweight namespace representation for listings.
@@ -82,7 +81,7 @@ type NamespaceInfo struct {
 // timestamps and statistics that are not present in [NamespaceInfo].
 type NamespaceSummary struct {
 	Name          string `json:"name"`          // Namespace name.
-	Description   string `json:"description"`   // Human-readable description.
+	Description   string `json:"description"`   // Description.
 	ResourceCount int    `json:"resourceCount"` // Number of resources in this namespace.
 	CreatedAt     int64  `json:"createdAt"`     // When the namespace was created.
 	UpdatedAt     int64  `json:"updatedAt"`     // When the namespace was last updated.
@@ -96,7 +95,7 @@ type NamespaceSummary struct {
 // media type is [MediaTypeNamespace].
 type Namespace struct {
 	Name        string            `json:"name"`        // Namespace name.
-	Description string            `json:"description"` // Human-readable description.
+	Description string            `json:"description"` // Description.
 	Resources   []ResourceSummary `json:"resources"`   // List of resources (summary form).
 	CreatedAt   int64             `json:"createdAt"`   // When the namespace was created.
 	UpdatedAt   int64             `json:"updatedAt"`   // When the namespace was last updated.
@@ -119,7 +118,7 @@ type NamespaceList struct {
 type ResourceInfo struct {
 	Name        string `json:"name"`        // Resource name.
 	Type        string `json:"type"`        // Resource type (e.g., "widget", "service").
-	Description string `json:"description"` // Human-readable description.
+	Description string `json:"description"` // Description.
 }
 
 // Lightweight resource representation for listings.
@@ -131,7 +130,7 @@ type ResourceInfo struct {
 type ResourceSummary struct {
 	Name          string  `json:"name"`          // Resource name.
 	Type          string  `json:"type"`          // Resource type (e.g., "widget", "service").
-	Description   string  `json:"description"`   // Human-readable description.
+	Description   string  `json:"description"`   // Description.
 	LatestVersion *string `json:"latestVersion"` // Most recent version string (null if no versions).
 	VersionCount  int     `json:"versionCount"`  // Number of versions for this resource.
 	ChannelCount  int     `json:"channelCount"`  // Number of channels for this resource.
@@ -150,7 +149,7 @@ type Resource struct {
 	Namespace   string           `json:"namespace"`   // Namespace this resource belongs to.
 	Name        string           `json:"name"`        // Resource name.
 	Type        string           `json:"type"`        // Resource type (e.g., "widget", "service").
-	Description string           `json:"description"` // Human-readable description.
+	Description string           `json:"description"` // Description.
 	Versions    []VersionSummary `json:"versions"`    // List of versions (summary form).
 	Channels    []ChannelSummary `json:"channels"`    // List of channels (summary form).
 	CreatedAt   int64            `json:"createdAt"`   // When the resource was created.
@@ -224,7 +223,7 @@ type VersionList struct {
 type ChannelInfo struct {
 	Name        string `json:"name"`        // Channel name.
 	Version     string `json:"version"`     // Version this channel points to.
-	Description string `json:"description"` // Human-readable description.
+	Description string `json:"description"` // Description.
 }
 
 // Lightweight channel representation for listings.
@@ -235,7 +234,7 @@ type ChannelInfo struct {
 type ChannelSummary struct {
 	Name        string `json:"name"`        // Channel name.
 	Version     string `json:"version"`     // Version this channel points to.
-	Description string `json:"description"` // Human-readable description.
+	Description string `json:"description"` // Description.
 	CreatedAt   int64  `json:"createdAt"`   // When the channel was created.
 	UpdatedAt   int64  `json:"updatedAt"`   // When the channel was last updated.
 }
@@ -255,7 +254,7 @@ type Channel struct {
 	Resource    string  `json:"resource"`    // Resource this channel belongs to.
 	Name        string  `json:"name"`        // Channel name.
 	Version     Version `json:"version"`     // Full version object this channel points to.
-	Description string  `json:"description"` // Human-readable description.
+	Description string  `json:"description"` // Description.
 	CreatedAt   int64   `json:"createdAt"`   // When the channel was created.
 	UpdatedAt   int64   `json:"updatedAt"`   // When the channel was last updated.
 }

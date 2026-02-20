@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 )
 
 // Copies a tar stream into a running container.

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS namespaces (
     name        TEXT NOT NULL,        -- Namespace identifier.
-    description TEXT NOT NULL,        -- Human-readable description.
+    description TEXT NOT NULL,        -- Description.
     created_at  INTEGER NOT NULL,     -- Unix timestamp when first cached.
     updated_at  INTEGER NOT NULL,     -- Unix timestamp when last updated.
     PRIMARY KEY (name)
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS resources (
     namespace   TEXT NOT NULL,        -- Parent namespace.
     name        TEXT NOT NULL,        -- Resource name.
     type        TEXT NOT NULL,        -- Resource type.
-    description TEXT NOT NULL,        -- Human-readable description.
+    description TEXT NOT NULL,        -- Description.
     created_at  INTEGER NOT NULL,     -- Unix timestamp when first cached.
     updated_at  INTEGER NOT NULL,     -- Unix timestamp when last updated.
     PRIMARY KEY (namespace, name),
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS channels (
     namespace   TEXT NOT NULL,        -- Parent namespace.
     resource    TEXT NOT NULL,        -- Parent resource name.
     name        TEXT NOT NULL,        -- Channel name.
-    description TEXT NOT NULL,        -- Human-readable description.
+    description TEXT NOT NULL,        -- Description.
     version     TEXT NOT NULL,        -- Version this channel points to.
     created_at  INTEGER NOT NULL,     -- Unix timestamp when first cached.
     updated_at  INTEGER NOT NULL,     -- Unix timestamp when last updated.

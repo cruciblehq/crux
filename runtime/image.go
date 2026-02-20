@@ -13,8 +13,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/spec/reference"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

@@ -6,11 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/kit/archive"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Options for packaging a Crucible resource.
@@ -30,7 +29,12 @@ type Result struct {
 // Creates a zstd-compressed tar archive containing the manifest and build
 // artifacts from the directory specified by opts.Dist.
 func Pack(ctx context.Context, opts Options) (*Result, error) {
-	man, err := manifest.Read(opts.Manifest)
+	data, err := os.ReadFile(opts.Manifest)
+	if err != nil {
+		return nil, crex.Wrap(ErrFileSystemOperation, err)
+	}
+
+	man, err := manifest.Decode(data)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +77,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		Fallback("Please report this issue to the Crucible team.")
 
 	switch man.Resource.Type {
-	case resource.TypeRuntime:
+	case manifest.TypeRuntime:
 		if _, ok := man.Config.(*manifest.Runtime); !ok {
 			return mismatch.Err()
 		}
@@ -84,7 +88,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 				Err()
 		}
 
-	case resource.TypeService:
+	case manifest.TypeService:
 		if _, ok := man.Config.(*manifest.Service); !ok {
 			return mismatch.Err()
 		}
@@ -95,7 +99,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 				Err()
 		}
 
-	case resource.TypeWidget:
+	case manifest.TypeWidget:
 		widget, ok := man.Config.(*manifest.Widget)
 		if !ok {
 			return mismatch.Err()

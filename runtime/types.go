@@ -9,7 +9,7 @@ const (
 	StateRunning                 // Runtime is running and reachable.
 )
 
-// Human-readable representation of the state.
+// Canonical string representation of the state.
 func (s State) String() string {
 	switch s {
 	case StateNotCreated:
@@ -22,5 +22,3 @@ func (s State) String() string {
 		return "unknown"
 	}
 }
-
-

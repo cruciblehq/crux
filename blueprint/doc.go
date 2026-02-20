@@ -1,18 +1,20 @@
-// Package blueprint provides structures for defining system compositions.
+// Package blueprint generates deployment plans from blueprints.
 //
-// A blueprint orchestrates how resources are deployed, declaring which
-// services and widgets should be included in a system deployment. It
-// serves as the input to the planning phase, where references are resolved
-// and a concrete deployment plan is generated.
+// Data structures and codec are defined in the spec module
+// (github.com/cruciblehq/spec/blueprint). This package provides [Execute]
+// to generate a deployment plan from a decoded blueprint.
 //
-// Load a blueprint and generate a plan:
-//
-//	bp, err := blueprint.Read("blueprint.yaml")
+//	data, err := os.ReadFile("blueprint.json")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	p, err := bp.Execute(ctx, blueprint.ExecuteOptions{
+//	bp, err := spec.Decode(data)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	p, err := blueprint.Execute(ctx, bp, blueprint.ExecuteOptions{
 //		Registry: "http://hub:8080",
 //		Provider: config.ProviderTypeLocal,
 //	})
@@ -20,5 +22,6 @@
 //		log.Fatal(err)
 //	}
 //
-//	err = p.Write("plan.json")
+//	out, _ := json.MarshalIndent(p, "", "  ")
+//	os.WriteFile("plan.json", out, 0644)
 package blueprint

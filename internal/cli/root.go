@@ -7,7 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 )
 
 // Represents the root command for the Crux CLI.
@@ -15,6 +15,7 @@ var RootCmd struct {
 
 	// Global flags
 	Context string `short:"C" help:"Run as if crux was started in the given directory." default:"."`
+	Quiet   bool   `short:"q" help:"Suppress informational output."`
 	Verbose bool   `short:"v" help:"Enable verbose output."`
 	Debug   bool   `short:"d" help:"Enable debug output."`
 
@@ -60,8 +61,6 @@ func Execute() error {
 
 // Configures the global logger based on CLI flags.
 func configureLogger() {
-
-	// Get the handler from the default logger
 	handler, ok := slog.Default().Handler().(crex.Handler)
 	if !ok {
 		return // Not a crex.Handler, nothing to configure
@@ -74,10 +73,10 @@ func configureLogger() {
 	// Configure handler
 	if RootCmd.Debug {
 		handler.SetLevel(slog.LevelDebug)
-	} else if RootCmd.Verbose {
-		handler.SetLevel(slog.LevelInfo)
-	} else {
+	} else if RootCmd.Quiet {
 		handler.SetLevel(slog.LevelWarn)
+	} else {
+		handler.SetLevel(slog.LevelInfo)
 	}
 
 	// Commit

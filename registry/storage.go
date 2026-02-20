@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/kit/archive"
+	"github.com/cruciblehq/crux/archive"
+	"github.com/cruciblehq/crux/paths"
 )
 
 const (
@@ -49,7 +50,7 @@ func (r *SQLRegistry) storeArchiveFile(namespace, resource, version string, arch
 
 	// Create archive directory structure
 	archiveDir := r.archiveDirectoryPath(namespace, resource, version)
-	if err := os.MkdirAll(archiveDir, archive.DirMode); err != nil {
+	if err := os.MkdirAll(archiveDir, paths.DefaultDirMode); err != nil {
 		return "", "", 0, err
 	}
 

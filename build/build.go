@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/daemon"
 	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Options for building a Crucible resource.
@@ -17,6 +17,7 @@ type Options struct {
 	Output           string // Directory where built artifacts are placed.
 	Registry         string // Hub registry URL (required for services to fetch runtimes).
 	DefaultNamespace string // Default namespace for resource identifiers.
+	SocketPath       string // Path to the cruxd Unix socket. Required for recipe-based builds.
 }
 
 // Result of building a Crucible resource.
@@ -32,13 +33,16 @@ type Result struct {
 // in the directory specified by opts.OutputPath.
 func Build(ctx context.Context, opts Options) (*Result, error) {
 
-	// Load manifest options
-	man, err := manifest.Read(opts.Manifest)
+	data, err := os.ReadFile(opts.Manifest)
 	if err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrBuild, err)
 	}
 
-	// Ensure output directory exists (same for all builders)
+	man, err := manifest.Decode(data)
+	if err != nil {
+		return nil, crex.Wrap(ErrBuild, err)
+	}
+
 	if err := os.MkdirAll(opts.Output, paths.DefaultDirMode); err != nil {
 		return nil, crex.Wrap(ErrFileSystemOperation, err)
 	}
@@ -48,11 +52,13 @@ func Build(ctx context.Context, opts Options) (*Result, error) {
 	var builder Builder
 
 	switch man.Resource.Type {
-	case resource.TypeRuntime:
-		builder = NewRuntimeBuilder(opts.Registry, opts.DefaultNamespace, context)
-	case resource.TypeService:
-		builder = NewServiceBuilder(opts.Registry, opts.DefaultNamespace, context)
-	case resource.TypeWidget:
+	case manifest.TypeRuntime:
+		client := daemon.NewClient(opts.SocketPath)
+		builder = NewRuntimeBuilder(client, opts.Registry, opts.DefaultNamespace, context)
+	case manifest.TypeService:
+		client := daemon.NewClient(opts.SocketPath)
+		builder = NewServiceBuilder(client, opts.Registry, opts.DefaultNamespace, context)
+	case manifest.TypeWidget:
 		builder = NewWidgetBuilder()
 	default:
 		return nil, ErrInvalidResourceType

@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 )
 
 // Represents the 'crux scaffold' command.

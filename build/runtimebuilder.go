@@ -3,8 +3,9 @@ package build
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Builder for Crucible runtimes.
@@ -12,14 +13,16 @@ import (
 // Extracts the runtime configuration from the manifest and delegates to the
 // shared recipe pipeline.
 type RuntimeBuilder struct {
-	registry         string // Hub registry URL for resolving references.
-	defaultNamespace string // Default namespace for resolving references.
-	context          string // Directory containing the manifest, root for resolving copy sources.
+	client           *daemon.Client // Daemon client for sending build requests.
+	registry         string         // Hub registry URL for resolving references.
+	defaultNamespace string         // Default namespace for resolving references.
+	context          string         // Directory containing the manifest, root for resolving copy sources.
 }
 
 // Creates a new instance of [RuntimeBuilder].
-func NewRuntimeBuilder(registry, defaultNamespace, context string) *RuntimeBuilder {
+func NewRuntimeBuilder(client *daemon.Client, registry, defaultNamespace, context string) *RuntimeBuilder {
 	return &RuntimeBuilder{
+		client:           client,
 		registry:         registry,
 		defaultNamespace: defaultNamespace,
 		context:          context,
@@ -39,5 +42,5 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context, nil)
+	return buildRecipe(ctx, rb.client, m, &cfg.Recipe, rb.registry, rb.defaultNamespace, output, rb.context, nil)
 }

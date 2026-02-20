@@ -6,8 +6,7 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/reference"
 	"github.com/cruciblehq/crux/runtime"
 )
 
@@ -29,7 +28,7 @@ func (c *ContainerExecCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	id, err := reference.ParseIdentifier(c.Ref, resource.TypeService, opts)
+	id, err := reference.ParseIdentifier(c.Ref, "service", opts)
 	if err != nil {
 		return err
 	}

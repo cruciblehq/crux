@@ -4,19 +4,19 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/cache"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/registry"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // Options for pulling a resource.
 type Options struct {
-	Registry         string        // Hub registry URL.
-	Reference        string        // Resource reference (e.g., namespace/resource 1.0.0).
-	Type             resource.Type // Resource type context for parsing.
-	DefaultNamespace string        // Default namespace for resource identifiers.
+	Registry         string                // Hub registry URL.
+	Reference        string                // Resource reference (e.g., namespace/resource 1.0.0).
+	Type             manifest.ResourceType // Resource type context for parsing.
+	DefaultNamespace string                // Default namespace for resource identifiers.
 }
 
 // Result contains information about the pull operation.
@@ -42,7 +42,7 @@ func Pull(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	ref, err := reference.Parse(opts.Reference, opts.Type, refOpts)
+	ref, err := reference.Parse(opts.Reference, string(opts.Type), refOpts)
 	if err != nil {
 		return nil, crex.UserError("invalid reference", err.Error()).
 			Fallback("Use the format 'namespace/resource version'.").

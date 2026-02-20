@@ -2,10 +2,10 @@ package registry
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // Resolves a reference to a specific version with full metadata.
@@ -54,12 +54,12 @@ func resolveVersionConstraint(ctx context.Context, client *Client, ref *referenc
 	}
 
 	if len(versions.Versions) == 0 {
-		return nil, fmt.Errorf("%w for %s/%s", ErrNoVersions, ref.Namespace(), ref.Name())
+		return nil, crex.Wrapf(ErrNoVersions, "%s/%s", ref.Namespace(), ref.Name())
 	}
 
 	latestVersion := FindLatestVersion(versions.Versions, ref.Version())
 	if latestVersion == nil {
-		return nil, fmt.Errorf("%w: %s", ErrNoMatchingVersion, ref.Version())
+		return nil, crex.Wrapf(ErrNoMatchingVersion, "%s", ref.Version())
 	}
 
 	return client.ReadVersion(ctx, ref.Namespace(), ref.Name(), latestVersion.String())

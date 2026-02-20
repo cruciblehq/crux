@@ -6,8 +6,8 @@ import (
 
 	"github.com/cruciblehq/crux/build"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/kit/watch"
 	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/watch"
 )
 
 // Represents the 'crux build' command.
@@ -34,6 +34,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 		Output:           paths.BuildDir(RootCmd.Context),
 		Registry:         registry,
 		DefaultNamespace: internal.DefaultNamespace,
+		SocketPath:       paths.DaemonSocket(),
 	})
 	if err != nil {
 		return err
@@ -56,7 +57,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 // changes. When a file change is detected, it triggers a rebuild. The function
 // continues to watch for changes until the provided context is canceled.
 func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
-	callback := func(we *watch.WatchEvent) error {
+	callback := func(we *watch.Event) error {
 
 		// Check for cancellation
 		if ctx.Err() != nil {
@@ -71,6 +72,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 			Output:           paths.BuildDir(RootCmd.Context),
 			Registry:         registry,
 			DefaultNamespace: internal.DefaultNamespace,
+			SocketPath:       paths.DaemonSocket(),
 		}); err != nil {
 			slog.Error(err.Error())
 			return nil
