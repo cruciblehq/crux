@@ -2,6 +2,10 @@ module github.com/cruciblehq/crux
 
 go 1.25.1
 
+replace github.com/cruciblehq/crex => ../crex
+
+replace github.com/cruciblehq/spec => ../spec
+
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/alecthomas/kong v1.13.0
@@ -10,9 +14,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6
 	github.com/containerd/containerd/v2 v2.2.1
 	github.com/containerd/errdefs v1.0.0
+	github.com/cruciblehq/crex v0.0.0
+	github.com/cruciblehq/spec v0.0.0
 	github.com/evanw/esbuild v0.27.2
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/go-containerregistry v0.20.7
 	github.com/klauspost/compress v1.18.2
 	github.com/mattn/go-sqlite3 v1.14.33

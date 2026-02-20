@@ -3,9 +3,9 @@ package build
 import (
 	"strings"
 
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // Source type for a stage's base image.
@@ -63,14 +63,14 @@ func parseFrom(from string, options reference.IdentifierOptions) (source, error)
 			return source{}, ErrInvalidFromFormat
 		}
 		value := strings.Join(fields[1:], " ")
-		if _, err := reference.Parse(value, resource.TypeRuntime, options); err != nil {
+		if _, err := reference.Parse(value, string(manifest.TypeRuntime), options); err != nil {
 			return source{}, crex.Wrap(ErrInvalidFromFormat, err)
 		}
 		return source{Type: sourceRef, Value: value}, nil
 
 	default:
 		value := strings.Join(fields, " ")
-		if _, err := reference.Parse(value, resource.TypeRuntime, options); err != nil {
+		if _, err := reference.Parse(value, string(manifest.TypeRuntime), options); err != nil {
 			return source{}, crex.Wrap(ErrInvalidFromFormat, err)
 		}
 		return source{Type: sourceRef, Value: value}, nil

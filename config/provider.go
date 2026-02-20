@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/paths"
 	"gopkg.in/yaml.v3"
 )

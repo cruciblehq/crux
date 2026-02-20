@@ -15,8 +15,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cruciblehq/crux/kit/archive"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/paths"
 )
 
@@ -126,7 +126,7 @@ func downloadLima(dest string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return crex.Wrap(ErrLimaDownload, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, url))
+		return crex.Wrapf(ErrLimaDownload, "unexpected status %d from %s", resp.StatusCode, url)
 	}
 
 	return extractLima(resp.Body, dest)
@@ -143,7 +143,7 @@ func extractLima(r io.Reader, dest string) error {
 	}
 
 	if _, err := os.Stat(filepath.Join(dest, "bin", limactlBin)); err != nil {
-		return crex.Wrap(ErrLimaDownload, fmt.Errorf("limactl not found in archive"))
+		return crex.Wrapf(ErrLimaDownload, "limactl not found in archive")
 	}
 	return nil
 }

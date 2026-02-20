@@ -1,544 +1,147 @@
 package build
 
 import (
-	"archive/tar"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/cache"
-	"github.com/cruciblehq/crux/kit/archive"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/daemon"
 	"github.com/cruciblehq/crux/pack"
 	"github.com/cruciblehq/crux/pull"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/runtime"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/protocol"
+	"github.com/cruciblehq/spec/reference"
 )
 
-// Holds shared state for building all stages of a recipe.
-type recipeBuild struct {
-	client     *containerd.Client            // Shared containerd gRPC connection.
-	id         *reference.Identifier         // Parsed resource identifier.
-	version    string                        // Resource version from the manifest, used as the base for stage image versions.
-	options    reference.IdentifierOptions   // Options for parsing references in the recipe.
-	output     string                        // Output directory for the final build artifact.
-	context    string                        // Directory containing the manifest, root for resolving copy sources.
-	entrypoint []string                      // OCI entrypoint to set on the output image (services only).
-	containers []*runtime.Container          // All stage containers, destroyed after the build completes.
-	stages     map[string]*runtime.Container // Named stage containers for cross-stage copy lookups.
-}
-
-// Builds a recipe end-to-end against the container runtime.
+// Builds a recipe by resolving sources and delegating execution to cruxd.
 //
-// This is the shared pipeline for all resource types that embed a recipe.
-// All stages are built in declaration order. The non-transient stage is
-// exported as the final image.
-func buildRecipe(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output, context string, entrypoint []string) (*Result, error) {
+// All stage sources are resolved to local file paths (pulling and extracting
+// remote references as needed). The resolved recipe is sent to the daemon
+// as a [protocol.BuildRequest]. The daemon handles container creation, step
+// execution, and image export.
+func buildRecipe(ctx context.Context, client *daemon.Client, m manifest.Manifest, recipe *manifest.Recipe, registry, defaultNamespace, output, root string, entrypoint []string) (*Result, error) {
 	options := reference.IdentifierOptions{
 		DefaultRegistry:  registry,
 		DefaultNamespace: defaultNamespace,
 	}
 
-	id, err := reference.ParseIdentifier(m.Resource.Name, m.Resource.Type, options)
+	resolved, cleanup, err := resolveAllSources(ctx, recipe, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	req := &protocol.BuildRequest{
+		Recipe:     resolved,
+		Resource:   m.Resource.Name,
+		Output:     output,
+		Root:       root,
+		Entrypoint: entrypoint,
+	}
+
+	slog.Info("sending build request to daemon")
+
+	result, err := client.Build(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ensureRuntime(); err != nil {
-		return nil, err
-	}
-
-	client, err := runtime.NewContainerdClient(id.Hostname())
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
-
-	ctx, done, err := client.WithLease(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer done(ctx)
-
-	rb := &recipeBuild{
-		client:     client,
-		id:         id,
-		version:    m.Resource.Version,
-		options:    options,
-		output:     output,
-		context:    context,
-		entrypoint: entrypoint,
-		stages:     make(map[string]*runtime.Container),
-	}
-	defer rb.destroyContainers(ctx)
-
-	for i, stage := range recipe.Stages {
-		if err := rb.buildStage(ctx, stage, i); err != nil {
-			return nil, fmt.Errorf("stage %s: %w", stageLabel(stage.Name, i), err)
-		}
-	}
-
-	return &Result{Output: output, Manifest: &m}, nil
+	return &Result{Output: result.Output, Manifest: &m}, nil
 }
 
-// Builds a single stage of a recipe.
+// Resolves all stage sources in a recipe to local file paths.
 //
-// Resolves the stage's base image, starts a build container, executes the
-// stage's steps, then commits the result. Non-transient stages are exported
-// to the output directory.
-func (rb *recipeBuild) buildStage(ctx context.Context, stage manifest.Stage, index int) error {
-	label := stageLabel(stage.Name, index)
-	slog.Info("building stage", "stage", label)
+// Returns a copy of the recipe with all sources rewritten to file paths,
+// a cleanup function to remove temporary extraction directories, and any
+// error encountered during resolution.
+func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, options reference.IdentifierOptions) (*manifest.Recipe, func(), error) {
+	resolved := *recipe
+	resolved.Stages = make([]manifest.Stage, len(recipe.Stages))
+	copy(resolved.Stages, recipe.Stages)
 
-	source, err := parseFrom(stage.From, rb.options)
-	if err != nil {
-		return err
+	var tempDirs []string
+	cleanup := func() {
+		for _, dir := range tempDirs {
+			os.RemoveAll(dir)
+		}
 	}
 
-	version := rb.version
-	if !stage.Transient {
-		version = stageVersion(version, label)
-	}
-	img := runtime.NewImage(rb.client, rb.id, version)
+	for i := range resolved.Stages {
+		stage := &resolved.Stages[i]
 
-	if err := rb.resolveSource(ctx, img, source); err != nil {
-		return err
-	}
-
-	ctr, err := img.Start(ctx, rb.containerID(stage.Name, index))
-	if err != nil {
-		return err
-	}
-
-	rb.addContainer(stage.Name, ctr)
-
-	if err := executeSteps(ctx, ctr, stage.Steps, newRecipeState(), rb.context, rb.stages); err != nil {
-		return err
-	}
-
-	if !stage.Transient {
-		if err := ctr.Stop(ctx); err != nil {
-			return err
+		src, err := parseFrom(stage.From, options)
+		if err != nil {
+			cleanup()
+			return nil, nil, crex.Wrapf(ErrBuild, "stage %s: %w", stageLabel(stage.Name, i), err)
 		}
 
-		if err := ctr.Commit(ctx); err != nil {
-			return err
+		if src.Type == sourceRef {
+			filePath, extractDir, err := resolveRefSource(ctx, src.Value, options)
+			if err != nil {
+				cleanup()
+				return nil, nil, crex.Wrapf(ErrBuild, "stage %s: %w", stageLabel(stage.Name, i), err)
+			}
+			if extractDir != "" {
+				tempDirs = append(tempDirs, extractDir)
+			}
+			stage.From = fmt.Sprintf("file %s", filePath)
 		}
-
-		if err := img.SetEntrypoint(ctx, rb.entrypoint); err != nil {
-			return err
-		}
-
-		return img.Export(ctx, filepath.Join(rb.output, pack.ImageFile))
 	}
 
-	return nil
+	return &resolved, cleanup, nil
 }
 
-// Registers a stage container for cleanup.
+// Resolves a runtime reference to a local OCI image file path.
 //
-// All containers are destroyed when the recipe build completes. Named
-// containers are also indexed for cross-stage copy lookups.
-func (rb *recipeBuild) addContainer(name string, ctr *runtime.Container) {
-	rb.containers = append(rb.containers, ctr)
-	if name != "" {
-		rb.stages[name] = ctr
-	}
-}
-
-// Destroys all stage containers.
-func (rb *recipeBuild) destroyContainers(ctx context.Context) {
-	for _, ctr := range rb.containers {
-		ctr.Destroy(ctx)
-	}
-}
-
-// Returns a unique container ID for a stage, scoped to this resource.
-func (rb *recipeBuild) containerID(name string, index int) string {
-	if name != "" {
-		return fmt.Sprintf("%s-stage-%s", rb.id.Name(), name)
-	}
-	return fmt.Sprintf("%s-stage-%d", rb.id.Name(), index+1)
-}
-
-// Resolves a recipe source into an imported container image.
-//
-// For file sources the local OCI tarball is imported directly. For ref
-// sources the runtime archive is pulled from the registry (with caching),
-// extracted to a temporary directory, and the contained image.tar is
-// imported.
-func (rb *recipeBuild) resolveSource(ctx context.Context, img *runtime.Image, src source) error {
-	switch src.Type {
-	case sourceFile:
-		return img.Import(ctx, src.Value)
-	case sourceRef:
-		return rb.resolveRefSource(ctx, img, src)
-	}
-	return nil
-}
-
-// Pulls a runtime archive from the registry, extracts image.tar, and imports
-// it into the container runtime.
-func (rb *recipeBuild) resolveRefSource(ctx context.Context, img *runtime.Image, src source) error {
+// Pulls the archive from the registry (with caching), extracts it to a
+// temporary directory, and returns the path to the image file within the
+// extracted archive. The caller must clean up the temporary directory.
+func resolveRefSource(ctx context.Context, ref string, options reference.IdentifierOptions) (imagePath, extractDir string, err error) {
 	result, err := pull.Pull(ctx, pull.Options{
-		Registry:         rb.options.DefaultRegistry,
-		Reference:        src.Value,
-		Type:             resource.TypeRuntime,
-		DefaultNamespace: rb.options.DefaultNamespace,
+		Registry:         options.DefaultRegistry,
+		Reference:        ref,
+		Type:             manifest.TypeRuntime,
+		DefaultNamespace: options.DefaultNamespace,
 	})
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	localCache, err := cache.Open(ctx, nil)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	defer localCache.Close()
 
 	archiveReader, err := localCache.OpenArchive(ctx, result.Namespace, result.Resource, result.Version)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	defer archiveReader.Close()
 
-	extractDir, err := os.MkdirTemp("", "crux-runtime-*")
+	extractDir, err = os.MkdirTemp("", "crux-runtime-*")
 	if err != nil {
-		return err
+		return "", "", err
 	}
-	defer os.RemoveAll(extractDir)
 
 	if err := archive.ExtractFromReader(archiveReader, extractDir, archive.Zstd); err != nil {
-		return err
+		os.RemoveAll(extractDir)
+		return "", "", err
 	}
 
-	imagePath := filepath.Join(extractDir, pack.ImageFile)
-	return img.Import(ctx, imagePath)
+	return filepath.Join(extractDir, pack.ImageFile), extractDir, nil
 }
 
-// Returns a version string for a transient stage image, distinguishing it
-// from the output image.
-func stageVersion(version, label string) string {
-	return fmt.Sprintf("%s-stage-%s", version, label)
-}
-
-// Returns a human-readable label for a stage, preferring the name when
-// available and falling back to the 1-based index.
+// Returns a label for a stage, preferring the name when available and falling
+// back to the 1-based index.
 func stageLabel(name string, index int) string {
 	if name != "" {
 		return fmt.Sprintf("%q", name)
 	}
 	return fmt.Sprintf("%d", index+1)
-}
-
-// Executes a list of steps in order against the build container.
-func executeSteps(ctx context.Context, ctr *runtime.Container, steps []manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
-	for i, step := range steps {
-		if err := executeStep(ctx, ctr, step, state, context, stages); err != nil {
-			return fmt.Errorf("step %d: %w", i+1, err)
-		}
-	}
-	return nil
-}
-
-// Executes a single step, dispatching to operation execution, group recursion,
-// or state mutation depending on the step's fields.
-func executeStep(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
-	hasOp := step.Run != "" || step.Copy != ""
-
-	// Platform group: apply group-level modifiers and recurse.
-	if len(step.Steps) > 0 {
-		state.apply(step)
-		return executeSteps(ctx, ctr, step.Steps, state, context, stages)
-	}
-
-	// Operation with optional scoped modifiers.
-	if hasOp {
-		return executeOperation(ctx, ctr, step, state, context, stages)
-	}
-
-	// Standalone modifier(s): persist in state.
-	state.apply(step)
-	return nil
-}
-
-// Executes a run or copy operation with scoped modifier overrides.
-//
-// Step-level modifiers override the persistent state for this operation only.
-// The persistent state is not modified.
-func executeOperation(ctx context.Context, ctr *runtime.Container, step manifest.Step, state *recipeState, context string, stages map[string]*runtime.Container) error {
-	shell, opts := state.resolve(step)
-
-	if err := ensureDir(ctx, ctr, opts.Workdir); err != nil {
-		return err
-	}
-
-	switch {
-	case step.Run != "":
-		slog.Debug("run", "command", step.Run, "shell", shell)
-		result, err := ctr.ExecWith(ctx, opts, shell, "-c", step.Run)
-		if err != nil {
-			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("command failed (exit %d): %s", result.ExitCode, result.Stderr)
-		}
-
-	case step.Copy != "":
-		if err := executeCopy(ctx, ctr, step.Copy, opts.Workdir, context, stages); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Executes a copy operation, transferring files into the container.
-//
-// The copy string has the format "src dest" for host copies, or "stage:src
-// dest" for cross-stage copies. Host sources are resolved relative to context.
-// Cross-stage sources are read from a named stage container's filesystem.
-// The source is streamed as a tar archive via [runtime.Container.CopyTo].
-func executeCopy(ctx context.Context, ctr *runtime.Container, copyStr, workdir, context string, stages map[string]*runtime.Container) error {
-	src, dest, err := parseCopy(copyStr, workdir)
-	if err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	// Ensure the destination parent directory exists.
-	if err := ensureDir(ctx, ctr, filepath.Dir(dest)); err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	// Cross-stage copy: "stage:path".
-	if stage, path, ok := parseStageCopy(src); ok {
-		return executeStageCopy(ctx, ctr, stages, stage, path, dest)
-	}
-
-	return executeHostCopy(ctx, ctr, src, dest, context)
-}
-
-// Copies a file or directory from the host into the container.
-func executeHostCopy(ctx context.Context, ctr *runtime.Container, src, dest, context string) error {
-	// Resolve source relative to the manifest directory.
-	if !filepath.IsAbs(src) {
-		src = filepath.Join(context, src)
-	}
-
-	info, err := os.Stat(src)
-	if err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	slog.Debug("copy", "src", src, "dest", dest, "dir", info.IsDir())
-
-	pr, pw := io.Pipe()
-
-	go func() {
-		tw := tar.NewWriter(pw)
-		var writeErr error
-
-		if info.IsDir() {
-			writeErr = writeDirToTar(tw, src, filepath.Base(dest))
-		} else {
-			writeErr = writeFileToTar(tw, src, filepath.Base(dest))
-		}
-
-		tw.Close()
-		pw.CloseWithError(writeErr)
-	}()
-
-	if err := ctr.CopyTo(ctx, pr, filepath.Dir(dest)); err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	return nil
-}
-
-// Copies a path from a named stage container into the target container.
-//
-// The tar stream is piped directly from the source container's CopyFrom
-// to the target container's CopyTo.
-func executeStageCopy(ctx context.Context, ctr *runtime.Container, stages map[string]*runtime.Container, stage, path, dest string) error {
-	srcCtr, ok := stages[stage]
-	if !ok {
-		return crex.Wrap(ErrCopy, fmt.Errorf("unknown stage %q", stage))
-	}
-
-	slog.Debug("cross-stage copy", "stage", stage, "src", path, "dest", dest)
-
-	pr, pw := io.Pipe()
-
-	errc := make(chan error, 1)
-	go func() {
-		errc <- srcCtr.CopyFrom(ctx, pw, path)
-		pw.Close()
-	}()
-
-	if err := ctr.CopyTo(ctx, pr, filepath.Dir(dest)); err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	if err := <-errc; err != nil {
-		return crex.Wrap(ErrCopy, err)
-	}
-
-	return nil
-}
-
-// Parses a cross-stage copy source of the form "stage:path".
-//
-// Returns the stage name, the path within the stage, and true if the source
-// matches the cross-stage format. Returns false if it is a regular host path.
-func parseStageCopy(src string) (stage, path string, ok bool) {
-	i := strings.IndexByte(src, ':')
-	if i < 1 {
-		return "", "", false
-	}
-
-	// A colon after a path separator is not a stage prefix (e.g. "/foo:bar").
-	if strings.ContainsRune(src[:i], '/') {
-		return "", "", false
-	}
-
-	return src[:i], src[i+1:], true
-}
-
-// Parses a copy string into source and destination paths.
-//
-// The string must contain exactly two whitespace-separated tokens. If dest
-// is not absolute, it is joined with workdir.
-func parseCopy(s, workdir string) (src, dest string, err error) {
-	parts := strings.Fields(s)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("expected source and destination, got %q", s)
-	}
-
-	src = parts[0]
-	dest = parts[1]
-
-	if !filepath.IsAbs(dest) {
-		if workdir == "" {
-			return "", "", fmt.Errorf("relative dest %q requires workdir", dest)
-		}
-		dest = filepath.Join(workdir, dest)
-	}
-
-	return src, dest, nil
-}
-
-// Writes a single file to a tar writer with the given archive name.
-func writeFileToTar(tw *tar.Writer, hostPath, name string) error {
-	info, err := os.Stat(hostPath)
-	if err != nil {
-		return err
-	}
-
-	header, err := tar.FileInfoHeader(info, "")
-	if err != nil {
-		return err
-	}
-	header.Name = name
-	header.Mode = int64(archive.FileMode)
-
-	if err := tw.WriteHeader(header); err != nil {
-		return err
-	}
-
-	f, err := os.Open(hostPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(tw, f)
-	return err
-}
-
-// Writes a directory tree to a tar writer rooted at the given archive prefix.
-func writeDirToTar(tw *tar.Writer, hostDir, prefix string) error {
-	return filepath.WalkDir(hostDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(hostDir, path)
-		if err != nil {
-			return err
-		}
-
-		archivePath := filepath.ToSlash(filepath.Join(prefix, relPath))
-		return writeTarEntry(tw, path, archivePath, d)
-	})
-}
-
-// Writes a single file or directory entry to a tar writer.
-func writeTarEntry(tw *tar.Writer, hostPath, archivePath string, d os.DirEntry) error {
-	info, err := d.Info()
-	if err != nil {
-		return err
-	}
-
-	header, err := tar.FileInfoHeader(info, "")
-	if err != nil {
-		return err
-	}
-	header.Name = archivePath
-
-	if info.IsDir() {
-		header.Mode = int64(archive.DirMode)
-	} else {
-		header.Mode = int64(archive.FileMode)
-	}
-
-	if err := tw.WriteHeader(header); err != nil {
-		return err
-	}
-
-	if info.Mode().IsRegular() {
-		f, err := os.Open(hostPath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = io.Copy(tw, f)
-		return err
-	}
-
-	return nil
-}
-
-// Creates a directory inside the container. No-op if dir is empty.
-func ensureDir(ctx context.Context, ctr *runtime.Container, dir string) error {
-	if dir == "" {
-		return nil
-	}
-	result, err := ctr.Exec(ctx, "mkdir", "-p", dir)
-	if err != nil {
-		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("failed to create workdir %q (exit %d): %s", dir, result.ExitCode, result.Stderr)
-	}
-	return nil
-}
-
-// Starts the container runtime if it is not already running.
-func ensureRuntime() error {
-	status, err := runtime.Status()
-	if err != nil {
-		return err
-	}
-	if status == runtime.StateRunning {
-		return nil
-	}
-	slog.Info("starting runtime")
-	return runtime.Start()
 }

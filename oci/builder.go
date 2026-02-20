@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"

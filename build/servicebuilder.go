@@ -3,20 +3,23 @@ package build
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/daemon"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Builder for Crucible services.
 type ServiceBuilder struct {
-	registry         string // Hub registry URL for resolving references.
-	defaultNamespace string // Default namespace for resolving references.
-	context          string // Project directory, containing the manifest.
+	client           *daemon.Client // Daemon client for sending build requests.
+	registry         string         // Hub registry URL for resolving references.
+	defaultNamespace string         // Default namespace for resolving references.
+	context          string         // Project directory, containing the manifest.
 }
 
 // Creates a new instance of [ServiceBuilder].
-func NewServiceBuilder(registry, defaultNamespace, context string) *ServiceBuilder {
+func NewServiceBuilder(client *daemon.Client, registry, defaultNamespace, context string) *ServiceBuilder {
 	return &ServiceBuilder{
+		client:           client,
 		registry:         registry,
 		defaultNamespace: defaultNamespace,
 		context:          context,
@@ -36,5 +39,5 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	return buildRecipe(ctx, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output, sb.context, cfg.Entrypoint)
+	return buildRecipe(ctx, sb.client, m, &cfg.Recipe, sb.registry, sb.defaultNamespace, output, sb.context, cfg.Entrypoint)
 }

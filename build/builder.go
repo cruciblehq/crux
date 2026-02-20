@@ -3,7 +3,7 @@ package build
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Builder interface for different resource types.

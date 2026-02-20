@@ -2,16 +2,19 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/blueprint"
 	"github.com/cruciblehq/crux/config"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/paths"
+	spec "github.com/cruciblehq/spec/blueprint"
 )
 
 const (
@@ -46,12 +49,17 @@ func (c *PlanCmd) Run(ctx context.Context) error {
 
 	slog.Info("generating deployment plan...", "blueprint", c.Blueprint, "state", c.State)
 
-	bp, err := blueprint.Read(c.Blueprint)
+	bpData, err := os.ReadFile(c.Blueprint)
 	if err != nil {
 		return err
 	}
 
-	p, err := bp.Execute(ctx, blueprint.ExecuteOptions{
+	bp, err := spec.Decode(bpData)
+	if err != nil {
+		return err
+	}
+
+	p, err := blueprint.Execute(ctx, bp, blueprint.ExecuteOptions{
 		State:            c.State,
 		Registry:         registryURL,
 		Provider:         provider.Type,
@@ -67,7 +75,11 @@ func (c *PlanCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.Write(output); err != nil {
+	data, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(output, data, paths.DefaultFileMode); err != nil {
 		return err
 	}
 
@@ -82,7 +94,7 @@ func determinePlanOutputPath(blueprintPath string) (string, error) {
 	dir := filepath.Dir(blueprintPath)
 	plansDir := filepath.Join(paths.DistDir(dir), planOutputSubdir)
 	if err := os.MkdirAll(plansDir, paths.DefaultDirMode); err != nil {
-		return "", fmt.Errorf("cannot create plans directory: %w", err)
+		return "", crex.Wrap(ErrFileSystem, err)
 	}
 	return filepath.Join(plansDir, fmt.Sprintf("plan-%s.json", timestamp)), nil
 }

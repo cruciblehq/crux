@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/kit/crex"
 	"github.com/cruciblehq/crux/pull"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Represents the 'crux pull' command.
@@ -25,7 +25,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 		registry = internal.DefaultRegistryURL
 	}
 
-	resType, err := resource.ParseType(c.Type)
+	resType, err := manifest.ParseResourceType(c.Type)
 	if err != nil {
 		return crex.UserError("invalid resource type", c.Type).
 			Fallback("Use a valid resource type such as 'widget' or 'service'.").

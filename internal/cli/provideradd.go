@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/config"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 )
 
 const (

@@ -129,6 +129,24 @@ func Runtime() string {
 	return filepath.Join(Cache(), "run")
 }
 
+// Path to the cruxd daemon Unix socket.
+//
+// This matches the socket path used by the cruxd daemon, allowing the
+// CLI to connect to it.
+//
+//	Linux:   $XDG_RUNTIME_DIR/cruxd/cruxd.sock
+//	macOS:   ~/Library/Caches/cruxd/run/cruxd.sock
+func DaemonSocket() string {
+	const daemonName = "cruxd"
+	var dir string
+	if xdg.RuntimeDir != "" {
+		dir = filepath.Join(xdg.RuntimeDir, daemonName)
+	} else {
+		dir = filepath.Join(xdg.CacheHome, daemonName, "run")
+	}
+	return filepath.Join(dir, daemonName+".sock")
+}
+
 // Path to the directory for log files.
 //
 //	Linux:   $XDG_STATE_HOME/crux/logs or ~/.local/state/crux/logs

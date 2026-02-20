@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/cache"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/reference"
 	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // Options for pushing a package to the Hub registry.
@@ -38,7 +38,7 @@ func Push(ctx context.Context, opts PushOptions) error {
 		return err
 	}
 
-	id, err := reference.ParseIdentifier(man.Resource.Name, man.Resource.Type, refOpts)
+	id, err := reference.ParseIdentifier(man.Resource.Name, string(man.Resource.Type), refOpts)
 	if err != nil {
 		return err
 	}
@@ -84,12 +84,20 @@ func validatePackage(packageOutput string) error {
 // Ensures that crucible.yaml exists and is valid. If not, an error is returned.
 // Returns the loaded manifest on success.
 func loadManifest(manifestfile string) (*manifest.Manifest, error) {
-	man, err := manifest.Read(manifestfile)
+	data, err := os.ReadFile(manifestfile)
 	if err != nil {
 		return nil, crex.UserError("failed to read manifest", err.Error()).
 			Fallback("Ensure crucible.yaml exists and is valid.").
 			Err()
 	}
+
+	man, err := manifest.Decode(data)
+	if err != nil {
+		return nil, crex.UserError("failed to read manifest", err.Error()).
+			Fallback("Ensure crucible.yaml exists and is valid.").
+			Err()
+	}
+
 	return man, nil
 }
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/spec/manifest"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 

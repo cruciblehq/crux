@@ -23,8 +23,8 @@ var (
 	stage     = "" // Development stage or git branch (e.g., "staging", "main")
 	gitCommit = "" // Git commit hash (e.g., "a1b2c3d4")
 
+	rawQuiet   = "false" // Whether to enable quiet mode
 	rawDebug   = "false" // Whether to enable debug mode
-	rawTrace   = "false" // Whether to enable trace mode
 	rawVerbose = "false" // Whether to enable verbose logging
 )
 

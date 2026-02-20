@@ -7,9 +7,8 @@ import (
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/kit/crex"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // Represents the 'crux cache remove' command.
@@ -44,7 +43,7 @@ func removeReference(ctx context.Context, c *cache.Cache, refStr string) error {
 	if err != nil {
 		return err
 	}
-	ref, err := reference.Parse(refStr, resource.TypeWidget, opts)
+	ref, err := reference.Parse(refStr, "widget", opts)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).
 			Fallback("Use the format 'namespace/resource version'.").

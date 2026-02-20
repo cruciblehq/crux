@@ -6,7 +6,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
 )
 
 // Specifies the authentication method for AWS providers.

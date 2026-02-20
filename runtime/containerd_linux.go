@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/cruciblehq/crux/kit/archive"
-	"github.com/cruciblehq/crux/kit/crex"
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/paths"
 )
 
