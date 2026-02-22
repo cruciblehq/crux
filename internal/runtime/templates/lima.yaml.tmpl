@@ -54,6 +54,35 @@ provision:
       chgrp containerd /run/containerd
       chmod 775 /run/containerd
       rc-service containerd start --ifnotstarted
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -eu
+      CRUXD_BIN="/usr/local/bin/cruxd"
+      if [ ! -f "$CRUXD_BIN" ]; then
+        ARCHIVE="/tmp/cruxd.tar.gz"
+        wget -q -O "$ARCHIVE" "{{ .CruxdDownloadURL }}"
+        tar -xzf "$ARCHIVE" -C /usr/local/bin cruxd
+        chmod +x "$CRUXD_BIN"
+        rm -f "$ARCHIVE"
+      fi
+      # Create OpenRC service for cruxd
+      if [ ! -f /etc/init.d/cruxd ]; then
+        cat > /etc/init.d/cruxd <<'EOF'
+      #!/sbin/openrc-run
+      name="cruxd"
+      description="Crucible daemon"
+      command="/usr/local/bin/cruxd"
+      command_background="yes"
+      pidfile="/run/cruxd/cruxd.pid"
+      start_pre() {
+        mkdir -p /run/cruxd
+      }
+      EOF
+        chmod +x /etc/init.d/cruxd
+        rc-update add cruxd default
+      fi
+      rc-service cruxd start --ifnotstarted
 portForwards:
   - guestSocket: "{{ .GuestSocket }}"
     hostSocket: "{{ .HostSocket }}"
@@ -64,3 +93,9 @@ probes:
       #!/bin/sh
       test -S /run/containerd/containerd.sock
     hint: containerd is not running
+  - mode: readiness
+    description: cruxd to be running
+    script: |
+      #!/bin/sh
+      test -S /run/cruxd/cruxd.sock
+    hint: cruxd is not running

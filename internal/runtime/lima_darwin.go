@@ -160,14 +160,15 @@ var configTemplate = template.Must(template.New("lima").Parse(configTemplateSour
 
 // Values injected into the Lima YAML template.
 type configData struct {
-	Arch          string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs          int    // Number of virtual CPUs.
-	Memory        string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk          string // Disk size with unit suffix (e.g. "10GiB").
-	GuestSocket   string // Guest socket path where cruxd listens.
-	HostSocket    string // Host socket path for forwarding the guest cruxd socket.
-	User          string // Host username (Lima creates a matching guest user).
-	ContainerdGID int    // GID for the containerd group (controls socket access).
+	Arch             string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs             int    // Number of virtual CPUs.
+	Memory           string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk             string // Disk size with unit suffix (e.g. "10GiB").
+	GuestSocket      string // Guest socket path where cruxd listens.
+	HostSocket       string // Host socket path for forwarding the guest cruxd socket.
+	User             string // Host username (Lima creates a matching guest user).
+	ContainerdGID    int    // GID for the containerd group (controls socket access).
+	CruxdDownloadURL string // URL to download the cruxd binary from.
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -176,14 +177,15 @@ type configData struct {
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
 	data := configData{
-		Arch:          limaArch(),
-		CPUs:          defaultCPUs,
-		Memory:        fmt.Sprintf("%dGiB", defaultMemoryGiB),
-		Disk:          fmt.Sprintf("%dGiB", defaultDiskGiB),
-		GuestSocket:   spec.Socket(),
-		HostSocket:    paths.DaemonSocket(),
-		User:          os.Getenv("USER"),
-		ContainerdGID: defaultContainerdGID,
+		Arch:             limaArch(),
+		CPUs:             defaultCPUs,
+		Memory:           fmt.Sprintf("%dGiB", defaultMemoryGiB),
+		Disk:             fmt.Sprintf("%dGiB", defaultDiskGiB),
+		GuestSocket:      spec.Socket(),
+		HostSocket:       paths.DaemonSocket(),
+		User:             os.Getenv("USER"),
+		ContainerdGID:    defaultContainerdGID,
+		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, limaArch()),
 	}
 
 	configDir := paths.VM()
