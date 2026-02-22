@@ -18,8 +18,9 @@ var (
 	ErrRuntimeExec           = errors.New("failed to execute command in runtime")
 	ErrRuntimeConfig         = errors.New("failed to generate runtime configuration")
 
-	// Lima errors (macOS only).
-	ErrLimaDownload = errors.New("failed to download lima")
+	// Lima and cruxd installation errors.
+	ErrLimaDownload  = errors.New("failed to download lima")
+	ErrDaemonInstall = errors.New("failed to install cruxd")
 )
 
 // A failed runtime command.

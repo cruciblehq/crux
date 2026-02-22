@@ -25,6 +25,9 @@ const (
 	// This mode is required when handling resource extraction and storage and
 	// optional for other purposes.
 	DefaultFileMode os.FileMode = 0644
+
+	// Default permission mode for executable files.
+	DefaultExecMode os.FileMode = 0755
 )
 
 // Path to the build output directory for a resource project.
