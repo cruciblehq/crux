@@ -84,6 +84,7 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		GuestSocket:   "/run/cruxd/cruxd.sock",
 		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
+		Home:          "/home/testuser",
 		ContainerdGID: 999,
 		CruxdGID:      989,
 	}
@@ -100,6 +101,9 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"cpus: 2",
 		"memory: 2GiB",
 		"disk: 10GiB",
+		"mountType: virtiofs",
+		`location: "/home/testuser"`,
+		"writable: true",
 		"containerd:",
 		"system: false",
 		"user: false",
@@ -127,6 +131,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 		GuestSocket:   "/run/cruxd/cruxd.sock",
 		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
+		Home:          "/home/testuser",
 		ContainerdGID: 999,
 		CruxdGID:      989,
 	}

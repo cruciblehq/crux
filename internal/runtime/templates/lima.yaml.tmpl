@@ -19,6 +19,10 @@ images:
 containerd:
   system: false
   user: false
+mountType: virtiofs
+mounts:
+  - location: "{{ .Home }}"
+    writable: true
 provision:
   # Write the containerd config before the system script runs. The gRPC socket
   # GID grants the Lima user access via the containerd group created in the
