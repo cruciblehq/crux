@@ -66,7 +66,16 @@ provision:
         chmod +x "$CRUXD_BIN"
         rm -f "$ARCHIVE"
       fi
-      # Create OpenRC service for cruxd
+      # Create cruxd group so that any member can connect to the daemon
+      # socket. The Lima user is added to the group during provisioning.
+      if ! getent group cruxd >/dev/null 2>&1; then
+        addgroup -g {{ .CruxdGID }} -S cruxd
+      fi
+      addgroup {{ .User }} cruxd 2>/dev/null || true
+      # Create OpenRC service for cruxd. The daemon runs as the Lima user
+      # (not root). The Lima user is in the containerd group, so it can
+      # talk to containerd, and in the cruxd group, so the socket is
+      # accessible to other group members.
       if [ ! -f /etc/init.d/cruxd ]; then
         printf '%s\n' '#!/sbin/openrc-run' \
           'name="cruxd"' \
@@ -74,9 +83,11 @@ provision:
           'command="/usr/local/bin/cruxd"' \
           'command_args="start"' \
           'command_background="yes"' \
+          'command_user="{{ .User }}"' \
           'pidfile="/run/cruxd/cruxd.pid"' \
           'start_pre() {' \
           '  mkdir -p /run/cruxd' \
+          '  chown {{ .User }}:cruxd /run/cruxd' \
           '}' > /etc/init.d/cruxd
         chmod +x /etc/init.d/cruxd
         rc-update add cruxd default

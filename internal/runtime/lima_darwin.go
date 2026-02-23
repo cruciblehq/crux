@@ -42,6 +42,10 @@ const (
 	// Alpine reserves GID 999 for the ping group, so we use 990.
 	defaultContainerdGID = 990
 
+	// Default GID for the cruxd group inside the VM. Members of this
+	// group can connect to the cruxd daemon socket.
+	defaultCruxdGID = 989
+
 	// Download URL template for Lima releases. Uses placeholders for version,
 	// OS, and architecture.
 	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
@@ -168,6 +172,7 @@ type configData struct {
 	HostSocket       string // Host socket path for forwarding the guest cruxd socket.
 	User             string // Host username (Lima creates a matching guest user).
 	ContainerdGID    int    // GID for the containerd group (controls socket access).
+	CruxdGID         int    // GID for the cruxd group (controls daemon socket access).
 	CruxdDownloadURL string // URL to download the cruxd binary from.
 }
 
@@ -185,6 +190,7 @@ func generateConfig() (string, error) {
 		HostSocket:       paths.DaemonSocket(),
 		User:             os.Getenv("USER"),
 		ContainerdGID:    defaultContainerdGID,
+		CruxdGID:         defaultCruxdGID,
 		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, goruntime.GOARCH),
 	}
 

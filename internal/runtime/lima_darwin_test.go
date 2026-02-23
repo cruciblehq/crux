@@ -85,6 +85,7 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
 		ContainerdGID: 999,
+		CruxdGID:      989,
 	}
 
 	var buf bytes.Buffer
@@ -103,6 +104,10 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"system: false",
 		"user: false",
 		"apk add --no-cache containerd",
+		"addgroup -g 989 -S cruxd",
+		"addgroup testuser cruxd",
+		`command_user="testuser"`,
+		"chown testuser:cruxd /run/cruxd",
 		"/run/cruxd/cruxd.sock",
 		"/tmp/test/cruxd.sock",
 	}
@@ -123,6 +128,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 		HostSocket:    "/tmp/test/cruxd.sock",
 		User:          "testuser",
 		ContainerdGID: 999,
+		CruxdGID:      989,
 	}
 
 	var buf bytes.Buffer
