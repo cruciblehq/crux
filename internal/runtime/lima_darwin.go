@@ -171,6 +171,7 @@ type configData struct {
 	GuestSocket      string // Guest socket path where cruxd listens.
 	HostSocket       string // Host socket path for forwarding the guest cruxd socket.
 	User             string // Host username (Lima creates a matching guest user).
+	Home             string // Host home directory, mounted read-write via virtiofs.
 	ContainerdGID    int    // GID for the containerd group (controls socket access).
 	CruxdGID         int    // GID for the cruxd group (controls daemon socket access).
 	CruxdDownloadURL string // URL to download the cruxd binary from.
@@ -181,6 +182,11 @@ type configData struct {
 // The configuration targets the host's native architecture and uses sensible
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", crex.Wrap(ErrRuntimeConfig, err)
+	}
+
 	data := configData{
 		Arch:             limaArch(),
 		CPUs:             defaultCPUs,
@@ -189,6 +195,7 @@ func generateConfig() (string, error) {
 		GuestSocket:      spec.Socket(),
 		HostSocket:       paths.DaemonSocket(),
 		User:             os.Getenv("USER"),
+		Home:             home,
 		ContainerdGID:    defaultContainerdGID,
 		CruxdGID:         defaultCruxdGID,
 		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, goruntime.GOARCH),
