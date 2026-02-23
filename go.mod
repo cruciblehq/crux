@@ -2,10 +2,6 @@ module github.com/cruciblehq/crux
 
 go 1.25.1
 
-replace github.com/cruciblehq/crex => ../crex
-
-replace github.com/cruciblehq/spec => ../spec
-
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/alecthomas/kong v1.13.0
