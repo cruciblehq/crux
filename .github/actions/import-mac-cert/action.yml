@@ -49,15 +49,13 @@ runs:
           exit 1
         }
 
-        # Re-encode as legacy PKCS#12 (3DES/SHA1) for macOS security import compatibility
-        LEGACY_FILE=$(mktemp)
-        "$BREW_OPENSSL" pkcs12 -in "$CERT_FILE" -out /tmp/cert-temp.pem -nodes -legacy -passin pass:"$MAC_CERT_PWD"
-        "$BREW_OPENSSL" pkcs12 -export -in /tmp/cert-temp.pem -out "$LEGACY_FILE" \
-          -passout pass:"$MAC_CERT_PWD" \
-          -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1
-        rm -f /tmp/cert-temp.pem "$CERT_FILE"
-        CERT_FILE="$LEGACY_FILE"
-        echo "Certificate re-encoded to legacy format"
+        # Extract cert and key as PEM (avoids PKCS#12 format issues with security import)
+        CERT_PEM=$(mktemp)
+        KEY_PEM=$(mktemp)
+        "$BREW_OPENSSL" pkcs12 -in "$CERT_FILE" -clcerts -nokeys -legacy -passin pass:"$MAC_CERT_PWD" -out "$CERT_PEM"
+        "$BREW_OPENSSL" pkcs12 -in "$CERT_FILE" -nocerts -nodes -legacy -passin pass:"$MAC_CERT_PWD" -out "$KEY_PEM"
+        rm -f "$CERT_FILE"
+        echo "Extracted certificate and key as PEM"
 
         # Create and configure keychain
         security create-keychain -p "$MAC_CERT_PWD" "$KEYCHAIN_PATH"
@@ -66,12 +64,13 @@ runs:
         security default-keychain -s "$KEYCHAIN_PATH"
         security unlock-keychain -p "$MAC_CERT_PWD" "$KEYCHAIN_PATH"
 
-        # Import certificate
-        security import "$CERT_FILE" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PWD" -T /usr/bin/codesign
+        # Import certificate and key separately as PEM
+        security import "$CERT_PEM" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+        security import "$KEY_PEM" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MAC_CERT_PWD" "$KEYCHAIN_PATH"
 
-        # Clean up certificate file
-        rm -f "$CERT_FILE"
+        # Clean up
+        rm -f "$CERT_PEM" "$KEY_PEM"
 
         # Output keychain path for cleanup
         echo "keychain=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"
