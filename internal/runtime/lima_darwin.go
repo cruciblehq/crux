@@ -245,6 +245,10 @@ func (l *lima) start() error {
 		return err
 	}
 
+	// Remove any stale host socket left behind by a previous run (crash,
+	// forced stop, etc.) so Lima's SSH forwarding can bind fresh.
+	os.Remove(paths.DaemonSocket())
+
 	switch status {
 	case StateRunning:
 		return ErrRuntimeAlreadyRunning
