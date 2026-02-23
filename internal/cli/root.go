@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/alecthomas/kong"
 	"github.com/cruciblehq/crux/internal"
@@ -51,6 +52,12 @@ func Execute() error {
 	)
 
 	configureLogger()
+
+	// Resolve -C to an absolute path so all downstream consumers
+	// (including cruxd inside the VM) get a fully qualified path.
+	if abs, err := filepath.Abs(RootCmd.Context); err == nil {
+		RootCmd.Context = abs
+	}
 
 	if err := kongCtx.Run(); err != nil {
 		return err
