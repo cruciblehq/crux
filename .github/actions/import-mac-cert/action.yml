@@ -33,12 +33,31 @@ runs:
         # Decode certificate
         echo "$MAC_CERT_P12" | base64 --decode > "$CERT_FILE"
 
+        # Find Homebrew OpenSSL 3 (pre-installed on macos runners)
+        BREW_OPENSSL="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"
+        if [ ! -x "$BREW_OPENSSL" ]; then
+          echo "::error::Homebrew OpenSSL 3 not found"
+          rm -f "$CERT_FILE"
+          exit 1
+        fi
+        echo "Using OpenSSL: $($BREW_OPENSSL version)"
+
         # Validate certificate
-        openssl pkcs12 -info -in "$CERT_FILE" -passin pass:"$MAC_CERT_PWD" -nokeys >/dev/null 2>&1 || {
+        "$BREW_OPENSSL" pkcs12 -info -in "$CERT_FILE" -passin pass:"$MAC_CERT_PWD" -nokeys -legacy >/dev/null 2>&1 || {
           echo "::error::Certificate is invalid or password is wrong"
           rm -f "$CERT_FILE"
           exit 1
         }
+
+        # Re-encode as legacy PKCS#12 (3DES/SHA1) for macOS security import compatibility
+        LEGACY_FILE=$(mktemp)
+        "$BREW_OPENSSL" pkcs12 -in "$CERT_FILE" -out /tmp/cert-temp.pem -nodes -legacy -passin pass:"$MAC_CERT_PWD"
+        "$BREW_OPENSSL" pkcs12 -export -in /tmp/cert-temp.pem -out "$LEGACY_FILE" \
+          -passout pass:"$MAC_CERT_PWD" \
+          -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1
+        rm -f /tmp/cert-temp.pem "$CERT_FILE"
+        CERT_FILE="$LEGACY_FILE"
+        echo "Certificate re-encoded to legacy format"
 
         # Create and configure keychain
         security create-keychain -p "$MAC_CERT_PWD" "$KEYCHAIN_PATH"
