@@ -11,6 +11,7 @@ import (
 	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/daemon"
+	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/protocol"
@@ -131,7 +132,17 @@ func resolveRefSource(ctx context.Context, ref string, options reference.Identif
 	}
 	defer archiveReader.Close()
 
-	extractDir, err = os.MkdirTemp("", "crux-runtime-*")
+	// Use the cache directory as the temp base so extracted archives stay
+	// under the user's home directory. On macOS this is critical because the
+	// home directory is the virtiofs mount shared with the build VM; the
+	// system temp directory (/var/folders) is not mounted and would be
+	// invisible to cruxd.
+	tempBase := paths.Cache()
+	if err := os.MkdirAll(tempBase, paths.DefaultDirMode); err != nil {
+		return "", "", err
+	}
+
+	extractDir, err = os.MkdirTemp(tempBase, "crux-runtime-*")
 	if err != nil {
 		return "", "", err
 	}
