@@ -1,4 +1,4 @@
-# Crux
+# crux
 
 [![Build](https://github.com/cruciblehq/crux/actions/workflows/build.yml/badge.svg)](https://github.com/cruciblehq/crux/actions/workflows/build.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://cruciblehq.github.io/crux/badges/coverage.json)](https://cruciblehq.github.io/crux/coverage/coverage.html)
