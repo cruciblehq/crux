@@ -185,7 +185,7 @@ func generateConfig() (string, error) {
 		HostSocket:       paths.DaemonSocket(),
 		User:             os.Getenv("USER"),
 		ContainerdGID:    defaultContainerdGID,
-		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, limaArch()),
+		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, goruntime.GOARCH),
 	}
 
 	configDir := paths.VM()
