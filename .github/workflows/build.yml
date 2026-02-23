@@ -34,6 +34,8 @@ jobs:
 
       - name: Run Go tests and coverage
         uses: cruciblehq/.github/actions/go-test-coverage@main
+        with:
+          coverage-threshold: "20"
 
       - name: Generate Go reference docs
         run: |
