@@ -68,17 +68,16 @@ provision:
       fi
       # Create OpenRC service for cruxd
       if [ ! -f /etc/init.d/cruxd ]; then
-        cat > /etc/init.d/cruxd <<'EOF'
-      #!/sbin/openrc-run
-      name="cruxd"
-      description="Crucible daemon"
-      command="/usr/local/bin/cruxd"
-      command_background="yes"
-      pidfile="/run/cruxd/cruxd.pid"
-      start_pre() {
-        mkdir -p /run/cruxd
-      }
-      EOF
+        printf '%s\n' '#!/sbin/openrc-run' \
+          'name="cruxd"' \
+          'description="Crucible daemon"' \
+          'command="/usr/local/bin/cruxd"' \
+          'command_args="start"' \
+          'command_background="yes"' \
+          'pidfile="/run/cruxd/cruxd.pid"' \
+          'start_pre() {' \
+          '  mkdir -p /run/cruxd' \
+          '}' > /etc/init.d/cruxd
         chmod +x /etc/init.d/cruxd
         rc-update add cruxd default
       fi
