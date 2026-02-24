@@ -50,14 +50,6 @@ const (
 	// OS, and architecture.
 	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
 
-	// Version and download URL for the containerd-fuse-overlayfs proxy
-	// snapshotter. Provides overlay semantics without root privileges.
-	fuseSnapshotterVersion = "2.1.7"
-
-	// Download URL template for the containerd-fuse-overlayfs proxy
-	// snapshotter binary. Uses a placeholder for the architecture.
-	fuseSnapshotterURL = "https://github.com/containerd/fuse-overlayfs-snapshotter/releases/download/v" + fuseSnapshotterVersion + "/containerd-fuse-overlayfs-" + fuseSnapshotterVersion + "-linux-%s.tar.gz"
-
 	// Binary name for the Lima CLI.
 	limactlBin = "limactl"
 
@@ -172,18 +164,17 @@ var configTemplate = template.Must(template.New("lima").Parse(configTemplateSour
 
 // Values injected into the Lima YAML template.
 type configData struct {
-	Arch               string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs               int    // Number of virtual CPUs.
-	Memory             string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk               string // Disk size with unit suffix (e.g. "10GiB").
-	GuestSocket        string // Guest socket path where cruxd listens.
-	HostSocket         string // Host socket path for forwarding the guest cruxd socket.
-	User               string // Host username (Lima creates a matching guest user).
-	Home               string // Host home directory, mounted read-write via virtiofs.
-	ContainerdGID      int    // GID for the containerd group (controls socket access).
-	CruxdGID           int    // GID for the cruxd group (controls daemon socket access).
-	CruxdDownloadURL   string // URL to download the cruxd binary from.
-	FuseSnapshotterURL string // URL to download the containerd-fuse-overlayfs proxy binary.
+	Arch             string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs             int    // Number of virtual CPUs.
+	Memory           string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk             string // Disk size with unit suffix (e.g. "10GiB").
+	GuestSocket      string // Guest socket path where cruxd listens.
+	HostSocket       string // Host socket path for forwarding the guest cruxd socket.
+	User             string // Host username (Lima creates a matching guest user).
+	Home             string // Host home directory, mounted read-write via virtiofs.
+	ContainerdGID    int    // GID for the containerd group (controls socket access).
+	CruxdGID         int    // GID for the cruxd group (controls daemon socket access).
+	CruxdDownloadURL string // URL to download the cruxd binary from.
 }
 
 // Generates the Lima YAML configuration for the crux VM.
@@ -197,18 +188,17 @@ func generateConfig() (string, error) {
 	}
 
 	data := configData{
-		Arch:               limaArch(),
-		CPUs:               defaultCPUs,
-		Memory:             fmt.Sprintf("%dGiB", defaultMemoryGiB),
-		Disk:               fmt.Sprintf("%dGiB", defaultDiskGiB),
-		GuestSocket:        spec.Socket(),
-		HostSocket:         paths.DaemonSocket(),
-		User:               os.Getenv("USER"),
-		Home:               home,
-		ContainerdGID:      defaultContainerdGID,
-		CruxdGID:           defaultCruxdGID,
-		CruxdDownloadURL:   fmt.Sprintf(cruxdDownloadURL, goruntime.GOARCH),
-		FuseSnapshotterURL: fmt.Sprintf(fuseSnapshotterURL, goruntime.GOARCH),
+		Arch:             limaArch(),
+		CPUs:             defaultCPUs,
+		Memory:           fmt.Sprintf("%dGiB", defaultMemoryGiB),
+		Disk:             fmt.Sprintf("%dGiB", defaultDiskGiB),
+		GuestSocket:      spec.Socket(),
+		HostSocket:       paths.DaemonSocket(),
+		User:             os.Getenv("USER"),
+		Home:             home,
+		ContainerdGID:    defaultContainerdGID,
+		CruxdGID:         defaultCruxdGID,
+		CruxdDownloadURL: fmt.Sprintf(cruxdDownloadURL, goruntime.GOARCH),
 	}
 
 	configDir := paths.VM()
@@ -306,6 +296,7 @@ func (l *lima) stop() error {
 	if err := l.run("stop", limaInstanceName); err != nil {
 		return crex.Wrap(ErrRuntimeStop, err)
 	}
+	os.Remove(paths.DaemonSocket())
 	return nil
 }
 
@@ -325,6 +316,7 @@ func (l *lima) destroy() error {
 	if err := l.run("delete", "--force", limaInstanceName); err != nil {
 		return crex.Wrap(ErrRuntimeDestroy, err)
 	}
+	os.Remove(paths.DaemonSocket())
 	return nil
 }
 
