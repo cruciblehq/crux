@@ -21,7 +21,7 @@ containerd:
   user: false
 mountType: virtiofs
 mounts:
-  - location: "{{ .Home }}"
+  - location: /
     writable: true
 provision:
   # Write the containerd config before the system script runs. The gRPC socket

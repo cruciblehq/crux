@@ -7,7 +7,7 @@ const (
 	// Pinned cruxd version. This must match a published release at
 	// github.com/cruciblehq/cruxd so that crux always downloads a
 	// known-compatible daemon binary.
-	cruxdVersion = "0.1.5"
+	cruxdVersion = "0.1.7"
 
 	// Download URL template for the cruxd release archive. The single
 	// placeholder is the Linux architecture (e.g. "amd64", "aarch64").
