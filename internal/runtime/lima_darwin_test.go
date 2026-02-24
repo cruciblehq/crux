@@ -77,17 +77,16 @@ func TestExtractLima(t *testing.T) {
 
 func TestConfigTemplate_IsValid(t *testing.T) {
 	data := configData{
-		Arch:               "aarch64",
-		CPUs:               2,
-		Memory:             "2GiB",
-		Disk:               "10GiB",
-		GuestSocket:        "/run/cruxd/cruxd.sock",
-		HostSocket:         "/tmp/test/cruxd.sock",
-		User:               "testuser",
-		Home:               "/home/testuser",
-		ContainerdGID:      999,
-		CruxdGID:           989,
-		FuseSnapshotterURL: "https://example.com/containerd-fuse-overlayfs.tar.gz",
+		Arch:          "aarch64",
+		CPUs:          2,
+		Memory:        "2GiB",
+		Disk:          "10GiB",
+		GuestSocket:   "/run/cruxd/cruxd.sock",
+		HostSocket:    "/tmp/test/cruxd.sock",
+		User:          "testuser",
+		Home:          "/home/testuser",
+		ContainerdGID: 999,
+		CruxdGID:      989,
 	}
 
 	var buf bytes.Buffer
@@ -108,15 +107,6 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"containerd:",
 		"system: false",
 		"user: false",
-		"apk add --no-cache containerd",
-		"fuse-overlayfs",
-		"containerd-fuse-overlayfs",
-		"proxy_plugins.fuse-overlayfs",
-		"/run/containerd-fuse-overlayfs.sock /var/lib/containerd-fuse-overlayfs",
-		"addgroup -g 989 -S cruxd",
-		"addgroup testuser cruxd",
-		`command_user="testuser"`,
-		"chown testuser:cruxd /run/cruxd",
 		"/run/cruxd/cruxd.sock",
 		"/tmp/test/cruxd.sock",
 	}
@@ -129,17 +119,16 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 
 func TestConfigTemplate_x86(t *testing.T) {
 	data := configData{
-		Arch:               "x86_64",
-		CPUs:               4,
-		Memory:             "4GiB",
-		Disk:               "20GiB",
-		GuestSocket:        "/run/cruxd/cruxd.sock",
-		HostSocket:         "/tmp/test/cruxd.sock",
-		User:               "testuser",
-		Home:               "/home/testuser",
-		ContainerdGID:      999,
-		CruxdGID:           989,
-		FuseSnapshotterURL: "https://example.com/containerd-fuse-overlayfs.tar.gz",
+		Arch:          "x86_64",
+		CPUs:          4,
+		Memory:        "4GiB",
+		Disk:          "20GiB",
+		GuestSocket:   "/run/cruxd/cruxd.sock",
+		HostSocket:    "/tmp/test/cruxd.sock",
+		User:          "testuser",
+		Home:          "/home/testuser",
+		ContainerdGID: 999,
+		CruxdGID:      989,
 	}
 
 	var buf bytes.Buffer
