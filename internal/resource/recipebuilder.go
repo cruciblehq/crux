@@ -54,7 +54,7 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 		Entrypoint: entrypoint,
 	}
 
-	slog.Info("sending build request to daemon")
+	slog.Debug("sending build request to daemon")
 
 	result, err := b.client.Build(ctx, req)
 	if err != nil {
@@ -64,11 +64,14 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 	return &BuildResult{Output: result.Output, Manifest: &m}, nil
 }
 
-// Resolves all stage sources in a recipe to local file paths.
+// Resolves all stage sources in a recipe to forms the daemon can handle.
 //
-// Returns a copy of the recipe with all sources rewritten to file paths,
-// a cleanup function to remove temporary extraction directories, and any
-// error encountered during resolution.
+// Crucible runtime references (space-separated name and version constraint)
+// are pulled, extracted, and rewritten to file paths. File and OCI sources
+// are passed through unchanged — OCI references (single-token image names)
+// are resolved by the daemon at build time. Returns a copy of the recipe
+// with resolved sources, a cleanup function to remove temporary extraction
+// directories, and any error encountered during resolution.
 func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, options reference.IdentifierOptions) (*manifest.Recipe, func(), error) {
 	resolved := *recipe
 	resolved.Stages = make([]manifest.Stage, len(recipe.Stages))
