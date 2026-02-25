@@ -7,59 +7,43 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/spec/archive"
 	"github.com/cruciblehq/spec/manifest"
 )
 
-// Options for packaging a Crucible resource.
-type PackOptions struct {
-	Manifest string // Path to the manifest file.
-	Dist     string // Directory where built artifacts are located.
-	Output   string // Output archive path.
-}
-
-// Result of packaging a Crucible resource.
+// Holds the output of a successful [Runner.Pack] call.
 type PackResult struct {
-	Output string // Path where the package was written.
+	Output string // Path where the package archive was written.
 }
 
 // Packages a built resource into a distributable archive.
 //
-// Creates a zstd-compressed tar archive containing the manifest and build
-// artifacts from the directory specified by opts.Dist.
-func Pack(ctx context.Context, opts PackOptions) (*PackResult, error) {
-	data, err := os.ReadFile(opts.Manifest)
-	if err != nil {
-		return nil, crex.Wrap(ErrFileSystemOperation, err)
-	}
-
-	man, err := manifest.Decode(data)
-	if err != nil {
+// Validates the dist directory and resource structure, then creates a
+// zstd-compressed tar archive containing the manifest file and build
+// artifacts.
+func pack(_ context.Context, m manifest.Manifest, manifestPath, dist, output string) (*PackResult, error) {
+	if err := verifyDist(dist); err != nil {
 		return nil, err
 	}
 
-	if err := validateDistExists(opts.Dist); err != nil {
+	if err := verifyResourceStructure(&m, dist); err != nil {
 		return nil, err
 	}
 
-	if err := validateResourceStructure(man, opts.Dist); err != nil {
+	if err := ensureOutputDir(output); err != nil {
 		return nil, err
 	}
 
-	if err := ensureOutputDir(opts.Output); err != nil {
+	if err := createArchive(output, manifestPath, dist); err != nil {
 		return nil, err
 	}
 
-	if err := createArchive(opts.Output, opts.Manifest, opts.Dist); err != nil {
-		return nil, err
-	}
-
-	return &PackResult{Output: opts.Output}, nil
+	return &PackResult{Output: output}, nil
 }
 
-// Validates that the build/ directory exists.
-func validateDistExists(dist string) error {
+// Verifies whether the build/ directory exists.
+func verifyDist(dist string) error {
 	if _, err := os.ReadDir(dist); err != nil {
 		if os.IsNotExist(err) {
 			return crex.UserError("build artifacts not found", "build/ directory does not exist").
@@ -71,8 +55,8 @@ func validateDistExists(dist string) error {
 	return nil
 }
 
-// Validates the resource structure based on type.
-func validateResourceStructure(man *manifest.Manifest, dist string) error {
+// Verifies the resource structure based on type.
+func verifyResourceStructure(man *manifest.Manifest, dist string) error {
 	mismatch := crex.ProgrammingError("pack failed", "manifest config type mismatch").
 		Fallback("Please report this issue to the Crucible team.")
 
@@ -112,7 +96,7 @@ func validateResourceStructure(man *manifest.Manifest, dist string) error {
 		}
 
 	default:
-		return ErrInvalidResourceType
+		return crex.Wrapf(ErrInvalidResourceType, "resource type %q is not supported", man.Resource.Type)
 	}
 
 	return nil
@@ -153,8 +137,9 @@ func createArchive(outputPath, manifestfile, dist string) error {
 
 	// Create archive
 	if err := archive.Create(tmpDir, outputPath); err != nil {
-		return crex.UserError("failed to create package archive", err.Error()).
+		return crex.UserError("failed to create package archive", "could not write the archive to disk").
 			Fallback("Check that you have write permissions for the output path.").
+			Cause(err).
 			Err()
 	}
 
@@ -173,10 +158,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer destination.Close()
 
-	_, err = io.Copy(destination, source)
-	return err
+	if _, err := io.Copy(destination, source); err != nil {
+		destination.Close()
+		return err
+	}
+
+	return destination.Close()
 }
 
 // Copies a directory recursively.

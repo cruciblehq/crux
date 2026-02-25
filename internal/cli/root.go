@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
-	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal"
 )
 
 // Represents the root command for the Crux CLI.
@@ -22,17 +22,18 @@ var RootCmd struct {
 
 	// Subcommands
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
-	Build     BuildCmd     `cmd:"" help:"Build and bundle Crucible resources."`
-	Pack      PackCmd      `cmd:"" help:"Package a built resource for distribution."`
-	Push      PushCmd      `cmd:"" help:"Push a resource package to the Hub registry."`
-	Pull      PullCmd      `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
-	Plan      PlanCmd      `cmd:"" help:"Generate a deployment plan from a blueprint."`
-	Provider  ProviderCmd  `cmd:"" help:"Manage cloud provider configurations."`
-	Cache     CacheCmd     `cmd:"" help:"Manage the local resource cache."`
-	Runtime   RuntimeCmd   `cmd:"" help:"Manage the container runtime environment."`
-	Image     ImageCmd     `cmd:"" help:"Manage OCI images in the runtime."`
-	Container ContainerCmd `cmd:"" help:"Manage containers in the runtime."`
-	Version   VersionCmd   `cmd:"" help:"Show version information."`
+	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
+	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
+	Start   StartCmd   `cmd:"" help:"Start a resource."`
+	Stop    StopCmd    `cmd:"" help:"Stop a running resource."`
+	Destroy DestroyCmd `cmd:"" help:"Remove a resource and its runtime state."`
+	Exec    ExecCmd    `cmd:"" help:"Execute a command inside a running resource."`
+	Status  StatusCmd  `cmd:"" help:"Show the state of a resource."`
+	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
+	Pull    PullCmd    `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
+	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
+	Runtime RuntimeCmd `cmd:"" help:"Manage the container runtime environment."`
+	Version VersionCmd `cmd:"" help:"Show version information."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
 

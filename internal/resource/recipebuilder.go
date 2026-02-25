@@ -1,4 +1,4 @@
-package build
+package resource
 
 import (
 	"context"
@@ -8,22 +8,24 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/daemon"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/spec/archive"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/protocol"
 	"github.com/cruciblehq/spec/reference"
 )
 
-// Shared state for recipe-based builders.
+// Common state and build logic embedded by [RuntimeRunner] and [ServiceRunner].
+//
+// Holds the daemon client, registry defaults, and the manifest directory
+// needed to resolve copy sources and execute the multi-stage recipe pipeline.
 type recipeBuilder struct {
 	client           *daemon.Client // Daemon client for sending build requests.
 	registry         string         // Hub registry URL for resolving references.
 	defaultNamespace string         // Default namespace for resolving references.
-	context          string         // Directory containing the manifest, root for resolving copy sources.
+	workdir          string         // Directory containing the manifest, root for resolving copy sources.
 }
 
 // Builds a recipe by resolving sources and delegating execution to cruxd.
@@ -32,7 +34,7 @@ type recipeBuilder struct {
 // remote references as needed). The resolved recipe is sent to the daemon
 // as a [protocol.BuildRequest]. The daemon handles container creation, step
 // execution, and image export.
-func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (*Result, error) {
+func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (*BuildResult, error) {
 	options := reference.IdentifierOptions{
 		DefaultRegistry:  b.registry,
 		DefaultNamespace: b.defaultNamespace,
@@ -48,7 +50,7 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 		Recipe:     resolved,
 		Resource:   m.Resource.Name,
 		Output:     output,
-		Root:       b.context,
+		Root:       b.workdir,
 		Entrypoint: entrypoint,
 	}
 
@@ -56,10 +58,10 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 
 	result, err := b.client.Build(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrRunner, err)
 	}
 
-	return &Result{Output: result.Output, Manifest: &m}, nil
+	return &BuildResult{Output: result.Output, Manifest: &m}, nil
 }
 
 // Resolves all stage sources in a recipe to local file paths.
@@ -82,13 +84,13 @@ func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, options ref
 	for i := range resolved.Stages {
 		stage := &resolved.Stages[i]
 
-		src, err := parseFrom(stage.From, options)
+		src, err := stage.ParseFrom()
 		if err != nil {
 			cleanup()
 			return nil, nil, crex.Wrapf(ErrBuild, "stage %s: %w", stageLabel(stage.Name, i), err)
 		}
 
-		if src.Type == sourceRef {
+		if src.Type == manifest.SourceRef {
 			filePath, extractDir, err := resolveRefSource(ctx, src.Value, options)
 			if err != nil {
 				cleanup()
@@ -110,8 +112,8 @@ func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, options ref
 // temporary directory, and returns the path to the image file within the
 // extracted archive. The caller must clean up the temporary directory.
 func resolveRefSource(ctx context.Context, ref string, options reference.IdentifierOptions) (imagePath, extractDir string, err error) {
-	result, err := resource.Pull(ctx, resource.PullOptions{
-		Registry:         options.DefaultRegistry,
+	result, err := Pull(ctx, PullOptions{
+		DefaultRegistry:  options.DefaultRegistry,
 		Reference:        ref,
 		Type:             manifest.TypeRuntime,
 		DefaultNamespace: options.DefaultNamespace,
@@ -152,7 +154,7 @@ func resolveRefSource(ctx context.Context, ref string, options reference.Identif
 		return "", "", err
 	}
 
-	return filepath.Join(extractDir, resource.ImageFile), extractDir, nil
+	return filepath.Join(extractDir, ImageFile), extractDir, nil
 }
 
 // Returns a label for a stage, preferring the name when available and falling

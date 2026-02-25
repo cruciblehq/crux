@@ -3,10 +3,12 @@ package cli
 import (
 	"context"
 	"log/slog"
+	"os"
 
-	"github.com/cruciblehq/crux/internal/build"
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/crux/internal/watch"
 )
 
@@ -29,12 +31,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	}
 
 	// Build first (don't wait for changes)
-	result, err := build.Build(ctx, build.Options{
-		Manifest:         paths.Manifest(RootCmd.Context),
-		Output:           paths.BuildDir(RootCmd.Context),
-		Registry:         registry,
-		DefaultNamespace: internal.DefaultNamespace,
-	})
+	result, err := c.build(ctx, registry)
 	if err != nil {
 		return err
 	}
@@ -65,13 +62,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
-		// Rebuild
-		if _, err := build.Build(ctx, build.Options{
-			Manifest:         paths.Manifest(RootCmd.Context),
-			Output:           paths.BuildDir(RootCmd.Context),
-			Registry:         registry,
-			DefaultNamespace: internal.DefaultNamespace,
-		}); err != nil {
+		if _, err := c.build(ctx, registry); err != nil {
 			slog.Error(err.Error())
 			return nil
 		}
@@ -91,4 +82,20 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 	return ctx.Err()
 }
 
+// Resolves the runner, creates the output directory, and builds the resource.
+func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildResult, error) {
+	man, r, err := resource.Resolve(paths.Manifest(RootCmd.Context), resource.Options{
+		DefaultRegistry:  registry,
+		DefaultNamespace: internal.DefaultNamespace,
+	})
+	if err != nil {
+		return nil, err
+	}
 
+	output := paths.BuildDir(RootCmd.Context)
+	if err := os.MkdirAll(output, paths.DefaultDirMode); err != nil {
+		return nil, crex.Wrap(resource.ErrFileSystemOperation, err)
+	}
+
+	return r.Build(ctx, *man, output)
+}
