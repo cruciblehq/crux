@@ -51,6 +51,11 @@ func Package(base string) string {
 	return filepath.Join(DistDir(base), "package.tar.zst")
 }
 
+// Path to the OCI image tarball in a resource project's build output.
+func ImageTar(base string) string {
+	return filepath.Join(BuildDir(base), "image.tar")
+}
+
 // Path to the manifest file for a resource project.
 func Manifest(base string) string {
 	return filepath.Join(base, "crucible.yaml")

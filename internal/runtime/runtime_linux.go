@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/spec/archive"
 	"github.com/cruciblehq/crux/internal/paths"
 	spec "github.com/cruciblehq/spec/paths"
 )

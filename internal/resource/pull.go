@@ -12,15 +12,22 @@ import (
 	specregistry "github.com/cruciblehq/spec/registry"
 )
 
-// Options for pulling a resource.
+// Configures a [Pull] call.
+//
+// Type and Reference are required. DefaultRegistry and DefaultNamespace are
+// used as fallbacks when the reference string does not include them explicitly.
 type PullOptions struct {
-	Registry         string                // Hub registry URL.
-	Reference        string                // Resource reference (e.g., namespace/resource 1.0.0).
 	Type             manifest.ResourceType // Resource type context for parsing.
+	Reference        string                // Resource reference (e.g., namespace/resource 1.0.0).
+	DefaultRegistry  string                // Hub registry URL when not specified in the reference.
 	DefaultNamespace string                // Default namespace for resource identifiers.
 }
 
-// Result of pulling a resource.
+// Holds the output of a successful [Pull] call.
+//
+// When Cached is true the archive already existed locally with the correct
+// digest, so no download was performed. Digest and Size always reflect the
+// archive content regardless of whether it was downloaded or cached.
 type PullResult struct {
 	Namespace string // Namespace name.
 	Resource  string // Resource name.
@@ -39,14 +46,15 @@ type PullResult struct {
 // (namespace/resource :stable). Channels are resolved to their current version
 // before downloading.
 func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
-	refOpts, err := reference.NewIdentifierOptions(opts.Registry, opts.DefaultNamespace)
+	refOpts, err := reference.NewIdentifierOptions(opts.DefaultRegistry, opts.DefaultNamespace)
 	if err != nil {
-		return nil, err
+		return nil, crex.Wrap(ErrRunner, err)
 	}
 	ref, err := reference.Parse(opts.Reference, string(opts.Type), refOpts)
 	if err != nil {
-		return nil, crex.UserError("invalid reference", err.Error()).
+		return nil, crex.UserError("invalid reference", "could not parse the resource reference").
 			Fallback("Use the format 'namespace/resource version'.").
+			Cause(err).
 			Err()
 	}
 
@@ -56,7 +64,8 @@ func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 	}
 	defer localCache.Close()
 
-	client := registry.NewClient(opts.Registry, nil)
+	registryURL := ref.Registry()
+	client := registry.NewClient(registryURL.String(), nil)
 
 	ver, err := registry.ResolveVersion(ctx, client, ref)
 	if err != nil {
@@ -65,7 +74,7 @@ func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 
 	if ver.Digest == nil || *ver.Digest == "" {
 		return nil, crex.UserError("no archive", "version exists but has no uploaded archive").
-			Fallback("The package may not have been fully published.").
+			Fallback("The package may not have been fully pushed.").
 			Err()
 	}
 
@@ -79,7 +88,7 @@ func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 // Converts resolution errors to user-friendly errors.
 func handleResolveError(err error) error {
 	if errors.Is(err, registry.ErrNoVersions) {
-		return crex.UserError("no versions found", "resource has no published versions").
+		return crex.UserError("no versions found", "resource has no pushed versions").
 			Fallback("Ensure the resource exists and has at least one version.").
 			Err()
 	}
@@ -89,8 +98,9 @@ func handleResolveError(err error) error {
 			Err()
 	}
 	if errors.Is(err, registry.ErrTypeMismatch) {
-		return crex.UserError("type mismatch", err.Error()).
+		return crex.UserError("type mismatch", "the resource type does not match what was requested").
 			Fallback("Ensure the resource type matches what you requested.").
+			Cause(err).
 			Err()
 	}
 
@@ -101,8 +111,9 @@ func handleResolveError(err error) error {
 			Err()
 	}
 
-	return crex.UserError("failed to resolve version", err.Error()).
+	return crex.UserError("failed to resolve version", "could not determine the target version").
 		Fallback("Check your network connection and registry URL.").
+		Cause(err).
 		Err()
 }
 
@@ -132,8 +143,9 @@ func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, v
 func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*PullResult, error) {
 	archiveReader, err := client.DownloadArchive(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
-		return nil, crex.UserError("failed to download archive", err.Error()).
+		return nil, crex.UserError("failed to download archive", "could not retrieve the archive from the registry").
 			Fallback("Check your network connection and try again.").
+			Cause(err).
 			Err()
 	}
 	defer archiveReader.Close()

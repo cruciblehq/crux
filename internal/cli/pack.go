@@ -21,12 +21,14 @@ func (c *PackCmd) Run(ctx context.Context) error {
 
 	slog.Info("packaging resource...", "output", paths.Package(RootCmd.Context))
 
-	// Package the built resource
-	result, err := resource.Pack(ctx, resource.PackOptions{
-		Manifest: paths.Manifest(RootCmd.Context),
-		Dist:     paths.BuildDir(RootCmd.Context),
-		Output:   paths.Package(RootCmd.Context),
-	})
+	manifestPath := paths.Manifest(RootCmd.Context)
+
+	man, r, err := resource.Resolve(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	result, err := r.Pack(ctx, *man, manifestPath, paths.BuildDir(RootCmd.Context), paths.Package(RootCmd.Context))
 	if err != nil {
 		return err
 	}

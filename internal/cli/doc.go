@@ -5,14 +5,15 @@
 //
 //	build       Build and bundle Crucible resources.
 //	pack        Package a built resource for distribution.
+//	start       Start a resource.
+//	stop        Stop a running resource.
+//	destroy     Remove a resource and its runtime state.
+//	exec        Execute a command inside a running resource.
+//	status      Show the state of a resource.
 //	push        Push a resource package to the Hub registry.
 //	pull        Pull a resource from the Hub registry to local cache.
-//	plan        Generate a deployment plan from a blueprint.
-//	provider    Manage cloud provider configurations.
 //	cache       Manage the local resource cache.
 //	runtime     Manage the container runtime environment.
-//	image       Manage OCI images in the runtime.
-//	container   Manage containers in the runtime.
 //	version     Show version information.
 //
 // Global flags (-C, -q, -v, -d) live on the root command and reconfigure the

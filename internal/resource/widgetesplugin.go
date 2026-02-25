@@ -1,4 +1,4 @@
-package build
+package resource
 
 import (
 	"fmt"
@@ -13,10 +13,11 @@ import (
 
 const (
 
-	// Name of the internal esbuild plugin
+	// Identifier registered with esbuild for the internal module resolution plugin.
 	ESPluginName = "crux-internal-es-plugin"
 
-	// Name of the dependencies directory
+	// Directory where third-party widget dependencies are resolved from
+	// during esbuild module resolution.
 	ESDependenciesDirName = "node_modules"
 )
 

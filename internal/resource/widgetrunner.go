@@ -1,4 +1,4 @@
-package build
+package resource
 
 import (
 	"context"
@@ -9,12 +9,23 @@ import (
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
-// Builder for Crucible widgets.
-type WidgetBuilder struct{}
+// [Runner] for Crucible widgets.
+//
+// Widgets are client-side JavaScript bundles built with esbuild. Only Build,
+// Pack, and Push are supported; lifecycle operations (Start, Stop, Destroy,
+// Exec, Status) return [ErrUnsupported].
+type WidgetRunner struct {
+	registry         string
+	defaultNamespace string
+}
 
-// Creates a new instance of [WidgetBuilder].
-func NewWidgetBuilder() *WidgetBuilder {
-	return &WidgetBuilder{}
+// Returns a [WidgetRunner] configured with the given registry and namespace
+// fallbacks for push operations.
+func NewWidgetRunner(registry, defaultNamespace string) *WidgetRunner {
+	return &WidgetRunner{
+		registry:         registry,
+		defaultNamespace: defaultNamespace,
+	}
 }
 
 // Builds a Crucible widget based on the provided manifest.
@@ -22,7 +33,7 @@ func NewWidgetBuilder() *WidgetBuilder {
 // It converts the manifest options into esbuild build options, invokes
 // esbuild to perform the build, and processes the build result to log
 // messages and handle errors.
-func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output string) (*Result, error) {
+func (wr *WidgetRunner) Build(ctx context.Context, m manifest.Manifest, output string) (*BuildResult, error) {
 
 	// Correct manifest type?
 	widget, ok := m.Config.(*manifest.Widget)
@@ -52,8 +63,9 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output 
 		return nil, err
 	}
 
-	return &Result{
-		Output: output,
+	return &BuildResult{
+		Output:   output,
+		Manifest: &m,
 	}, nil
 }
 
@@ -145,4 +157,38 @@ func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.Build
 	}
 
 	return esOptions, nil
+}
+
+func (wr *WidgetRunner) Start(_ context.Context, _ manifest.Manifest, _ string) error {
+	return ErrUnsupported
+}
+
+func (wr *WidgetRunner) Stop(_ context.Context, _ manifest.Manifest) error {
+	return ErrUnsupported
+}
+
+func (wr *WidgetRunner) Destroy(_ context.Context, _ manifest.Manifest) error {
+	return ErrUnsupported
+}
+
+func (wr *WidgetRunner) Exec(_ context.Context, _ manifest.Manifest, _ []string) (*ExecResult, error) {
+	return nil, ErrUnsupported
+}
+
+func (wr *WidgetRunner) Status(_ context.Context, _ manifest.Manifest) (*StatusResult, error) {
+	return nil, ErrUnsupported
+}
+
+// Packages the widget's build output into a distributable archive.
+//
+// The dist directory must contain index.js.
+func (wr *WidgetRunner) Pack(ctx context.Context, m manifest.Manifest, manifestPath, dist, output string) (*PackResult, error) {
+	return pack(ctx, m, manifestPath, dist, output)
+}
+
+// Uploads a widget package archive to the Hub registry.
+//
+// packagePath must point to an archive created by [WidgetRunner.Pack].
+func (wr *WidgetRunner) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
+	return push(ctx, m, packagePath, wr.registry, wr.defaultNamespace)
 }

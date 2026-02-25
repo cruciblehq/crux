@@ -35,9 +35,9 @@ func (c *PullCmd) Run(ctx context.Context) error {
 	reference := strings.Join(c.Reference, " ")
 
 	opts := resource.PullOptions{
-		Registry:         registry,
-		Reference:        reference,
 		Type:             resType,
+		Reference:        reference,
+		DefaultRegistry:  registry,
 		DefaultNamespace: internal.DefaultNamespace,
 	}
 

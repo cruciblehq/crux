@@ -1,4 +1,4 @@
-package build
+package resource
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ type esbuildResultSortHelper struct {
 // Processes the esbuild build result and logs errors and warnings.
 //
 // It normalizes the messages, sorts them, and logs them. If there are errors,
-// it returns an indicating a general failure of the build.
+// it returns an error indicating a general failure of the build.
 func processEsBuildResult(result es.BuildResult) error {
 
 	// Clean build
@@ -90,7 +90,7 @@ func normalizeAndSortEsBuildResult(result es.BuildResult) []esbuildResultSortHel
 	return helpers
 }
 
-// Converts esbuild errors into [esbuildResultSortHelper] structs.
+// Converts an esbuild message into an [esbuildResultSortHelper].
 //
 // It uses the provided severity level to create either error or warning
 // messages. If location information is available, it includes it in the helper

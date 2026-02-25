@@ -15,91 +15,44 @@ import (
 	specregistry "github.com/cruciblehq/spec/registry"
 )
 
-// Options for pushing a package to the Hub registry.
-type PushOptions struct {
-	Registry         string // Hub registry URL.
-	Manifestfile     string // Path to the manifest file.
-	Package          string // Path to the package archive.
-	DefaultNamespace string // Default namespace for resource identifiers.
-}
-
-// Pushes a resource package to the Hub registry.
-func Push(ctx context.Context, opts PushOptions) error {
-	if err := validatePackage(opts.Package); err != nil {
-		return err
+// Pushes a resource package using a pre-loaded manifest.
+func push(ctx context.Context, m manifest.Manifest, packagePath, defaultRegistry, defaultNamespace string) error {
+	if err := validatePackage(packagePath); err != nil {
+		return crex.UserError("package not found", "package does not exist").
+			Fallback("Run 'crux pack' first to create the package.").
+			Cause(err).
+			Err()
 	}
 
-	man, err := loadManifest(opts.Manifestfile)
+	refOpts, err := reference.NewIdentifierOptions(defaultRegistry, defaultNamespace)
 	if err != nil {
-		return err
+		return crex.Wrap(ErrRunner, err)
 	}
 
-	refOpts, err := reference.NewIdentifierOptions(opts.Registry, opts.DefaultNamespace)
+	id, err := reference.ParseIdentifier(m.Resource.Name, string(m.Resource.Type), refOpts)
 	if err != nil {
-		return err
+		return crex.UserError("invalid resource name", "could not parse the resource identifier").
+			Fallback("Check the resource name in crucible.yaml.").
+			Cause(err).
+			Err()
 	}
 
-	id, err := reference.ParseIdentifier(man.Resource.Name, string(man.Resource.Type), refOpts)
-	if err != nil {
-		return err
-	}
-
-	client := registry.NewClient(opts.Registry, nil)
+	registryURL := id.Registry()
+	client := registry.NewClient(registryURL.String(), nil)
 
 	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err
 	}
 
-	if err := ensureResource(ctx, client, id.Namespace(), id.Name(), man); err != nil {
+	if err := ensureResource(ctx, client, id.Namespace(), id.Name(), &m); err != nil {
 		return err
 	}
 
-	if err := createVersion(ctx, client, id.Namespace(), id.Name(), man.Resource.Version); err != nil {
+	if err := createVersion(ctx, client, id.Namespace(), id.Name(), m.Resource.Version); err != nil {
 		return err
 	}
 
-	return uploadPackage(ctx, client, id.Namespace(), id.Name(), man.Resource.Version, opts.Package)
-}
-
-// Validates that the package file exists.
-//
-// The package file is expected to be at the default location. If not found, an
-// error is returned prompting the user to package the resource first. The
-// package's format and integrity are not validated.
-func validatePackage(packageOutput string) error {
-	f, err := os.Open(packageOutput)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return crex.UserError("package not found", fmt.Sprintf("%s does not exist", packageOutput)).
-				Fallback("Run 'crux pack' first to create the package.").
-				Err()
-		}
-		return err
-	}
-	f.Close()
-	return nil
-}
-
-// Loads and validates the manifest.
-//
-// Ensures that crucible.yaml exists and is valid. If not, an error is returned.
-// Returns the loaded manifest on success.
-func loadManifest(manifestfile string) (*manifest.Manifest, error) {
-	data, err := os.ReadFile(manifestfile)
-	if err != nil {
-		return nil, crex.UserError("failed to read manifest", err.Error()).
-			Fallback("Ensure crucible.yaml exists and is valid.").
-			Err()
-	}
-
-	man, err := manifest.Decode(data)
-	if err != nil {
-		return nil, crex.UserError("failed to read manifest", err.Error()).
-			Fallback("Ensure crucible.yaml exists and is valid.").
-			Err()
-	}
-
-	return man, nil
+	return uploadPackage(ctx, client, id.Namespace(), id.Name(), m.Resource.Version, packagePath)
 }
 
 // Verifies that the namespace exists.
@@ -120,8 +73,9 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 			Err()
 	}
 
-	return crex.UserError("failed to check namespace", err.Error()).
+	return crex.UserError("failed to check namespace", "could not verify the namespace exists").
 		Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
+		Cause(err).
 		Err()
 }
 
@@ -137,8 +91,9 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 
 	var regErr *specregistry.Error
 	if !errors.As(err, &regErr) || regErr.Code != specregistry.ErrorCodeNotFound {
-		return crex.UserError("failed to check resource", err.Error()).
+		return crex.UserError("failed to check resource", "could not verify the resource exists").
 			Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
+			Cause(err).
 			Err()
 	}
 
@@ -149,8 +104,9 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 	}
 	_, err = client.CreateResource(ctx, namespace, resInfo)
 	if err != nil {
-		return crex.UserError("failed to create resource", err.Error()).
+		return crex.UserError("failed to create resource", "the resource could not be registered").
 			Fallback("Check Hub connectivity and permissions.").
+			Cause(err).
 			Err()
 	}
 
@@ -175,8 +131,9 @@ func createVersion(ctx context.Context, client *registry.Client, namespace, reso
 				Fallback("Increment the version in crucible.yaml and rebuild.").
 				Err()
 		}
-		return crex.UserError("failed to create version", err.Error()).
+		return crex.UserError("failed to create version", "the version could not be registered").
 			Fallback("Check Hub connectivity and permissions.").
+			Cause(err).
 			Err()
 	}
 
@@ -196,8 +153,9 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 
 	_, err = client.UploadArchive(ctx, namespace, resource, version, archive)
 	if err != nil {
-		return crex.UserError("failed to upload archive", err.Error()).
+		return crex.UserError("failed to upload archive", "the package could not be uploaded to the registry").
 			Fallback("Check Hub connectivity and package integrity.").
+			Cause(err).
 			Err()
 	}
 
@@ -217,16 +175,19 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 func updateLocalCache(ctx context.Context, namespace, resource, version, packagePath string) error {
 	localCache, err := cache.Open(ctx, nil)
 	if err != nil {
-		return err
+		return crex.Wrap(ErrCacheOperation, err)
 	}
 	defer localCache.Close()
 
 	archive, err := os.Open(packagePath)
 	if err != nil {
-		return err
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 	defer archive.Close()
 
 	_, err = localCache.Put(ctx, namespace, resource, version, archive)
-	return err
+	if err != nil {
+		return crex.Wrap(ErrCacheOperation, err)
+	}
+	return nil
 }

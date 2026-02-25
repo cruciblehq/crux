@@ -21,16 +21,17 @@ func (c *PushCmd) Run(ctx context.Context) error {
 		registry = internal.DefaultRegistryURL
 	}
 
-	opts := resource.PushOptions{
-		Registry:         registry,
-		Manifestfile:     paths.Manifest(RootCmd.Context),
-		Package:          paths.Package(RootCmd.Context),
-		DefaultNamespace: internal.DefaultNamespace,
-	}
-
 	slog.Info("pushing package...", "registry", registry)
 
-	if err := resource.Push(ctx, opts); err != nil {
+	man, r, err := resource.Resolve(paths.Manifest(RootCmd.Context), resource.Options{
+		DefaultRegistry:  registry,
+		DefaultNamespace: internal.DefaultNamespace,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := r.Push(ctx, *man, paths.Package(RootCmd.Context)); err != nil {
 		return err
 	}
 
