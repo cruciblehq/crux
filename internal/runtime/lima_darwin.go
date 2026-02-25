@@ -168,6 +168,7 @@ type configData struct {
 	CPUs             int    // Number of virtual CPUs.
 	Memory           string // Memory allocation with unit suffix (e.g. "2GiB").
 	Disk             string // Disk size with unit suffix (e.g. "10GiB").
+	Home             string // Host home directory for the virtiofs mount.
 	GuestSocket      string // Guest socket path where cruxd listens.
 	HostSocket       string // Host socket path for forwarding the guest cruxd socket.
 	User             string // Host username (Lima creates a matching guest user).
@@ -181,11 +182,17 @@ type configData struct {
 // The configuration targets the host's native architecture and uses sensible
 // defaults for CPU, memory, and disk allocation.
 func generateConfig() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", crex.Wrap(ErrRuntimeConfig, err)
+	}
+
 	data := configData{
 		Arch:             limaArch(),
 		CPUs:             defaultCPUs,
 		Memory:           fmt.Sprintf("%dGiB", defaultMemoryGiB),
 		Disk:             fmt.Sprintf("%dGiB", defaultDiskGiB),
+		Home:             home,
 		GuestSocket:      spec.Socket(),
 		HostSocket:       paths.DaemonSocket(),
 		User:             os.Getenv("USER"),
