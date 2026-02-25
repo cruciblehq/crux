@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -53,8 +52,6 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 		Root:       b.workdir,
 		Entrypoint: entrypoint,
 	}
-
-	slog.Debug("sending build request to daemon")
 
 	result, err := b.client.Build(ctx, req)
 	if err != nil {
