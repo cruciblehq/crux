@@ -576,6 +576,7 @@ Global flags \(\-C, \-q, \-v, \-d\) live on the root command and reconfigure the
 
 ## Index
 
+- [Constants](<#constants>)
 - [Variables](<#variables>)
 - [func Execute\(\) error](<#Execute>)
 - [func configureLogger\(\)](<#configureLogger>)
@@ -583,6 +584,7 @@ Global flags \(\-C, \-q, \-v, \-d\) live on the root command and reconfigure the
 - [func removeAllVersions\(ctx context.Context, c \*cache.Cache, ref \*reference.Reference\) error](<#removeAllVersions>)
 - [func removeReference\(ctx context.Context, c \*cache.Cache, refStr string\) error](<#removeReference>)
 - [func removeVersion\(ctx context.Context, c \*cache.Cache, ref \*reference.Reference\) error](<#removeVersion>)
+- [func stripArgSeparator\(args \[\]string\) \[\]string](<#stripArgSeparator>)
 - [type BuildCmd](<#BuildCmd>)
   - [func \(c \*BuildCmd\) Run\(ctx context.Context\) error](<#BuildCmd.Run>)
   - [func \(c \*BuildCmd\) build\(ctx context.Context, registry string\) \(\*resource.BuildResult, error\)](<#BuildCmd.build>)
@@ -604,6 +606,10 @@ Global flags \(\-C, \-q, \-v, \-d\) live on the root command and reconfigure the
   - [func \(c \*PullCmd\) Run\(ctx context.Context\) error](<#PullCmd.Run>)
 - [type PushCmd](<#PushCmd>)
   - [func \(c \*PushCmd\) Run\(ctx context.Context\) error](<#PushCmd.Run>)
+- [type ResetCmd](<#ResetCmd>)
+  - [func \(c \*ResetCmd\) Run\(ctx context.Context\) error](<#ResetCmd.Run>)
+- [type RestartCmd](<#RestartCmd>)
+  - [func \(c \*RestartCmd\) Run\(ctx context.Context\) error](<#RestartCmd.Run>)
 - [type RuntimeCmd](<#RuntimeCmd>)
 - [type RuntimeDestroyCmd](<#RuntimeDestroyCmd>)
   - [func \(c \*RuntimeDestroyCmd\) Run\(ctx context.Context\) error](<#RuntimeDestroyCmd.Run>)
@@ -640,6 +646,14 @@ Global flags \(\-C, \-q, \-v, \-d\) live on the root command and reconfigure the
   - [func \(c \*VersionCmd\) Run\(ctx context.Context\) error](<#VersionCmd.Run>)
 
 
+## Constants
+
+<a name="argSeparator"></a>
+
+```go
+const argSeparator = "--"
+```
+
 ## Variables
 
 <a name="ErrFileSystem"></a>
@@ -662,11 +676,12 @@ var RootCmd struct {
     Debug   bool   `short:"d" help:"Enable debug output."`
 
     // Subcommands
-    // Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
     Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
     Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
     Start   StartCmd   `cmd:"" help:"Start a resource."`
     Stop    StopCmd    `cmd:"" help:"Stop a running resource."`
+    Restart RestartCmd `cmd:"" help:"Restart a resource."`
+    Reset   ResetCmd   `cmd:"" help:"Destroy and recreate a resource."`
     Destroy DestroyCmd `cmd:"" help:"Remove a resource and its runtime state."`
     Exec    ExecCmd    `cmd:"" help:"Execute a command inside a running resource."`
     Status  StatusCmd  `cmd:"" help:"Show the state of a resource."`
@@ -731,6 +746,17 @@ func removeVersion(ctx context.Context, c *cache.Cache, ref *reference.Reference
 ```
 
 Removes a specific version from the cache.
+
+<a name="stripArgSeparator"></a>
+## func stripArgSeparator
+
+```go
+func stripArgSeparator(args []string) []string
+```
+
+Strips a leading "\-\-" argument separator from a command slice.
+
+Kong's passthrough tag includes the "\-\-" in the captured arguments. This function removes it so the actual command is passed cleanly.
 
 <a name="BuildCmd"></a>
 ## type BuildCmd
@@ -946,6 +972,42 @@ func (c *PushCmd) Run(ctx context.Context) error
 
 Executes the push command.
 
+<a name="ResetCmd"></a>
+## type ResetCmd
+
+Represents the 'crux reset' command.
+
+```go
+type ResetCmd struct{}
+```
+
+<a name="ResetCmd.Run"></a>
+### func \(\*ResetCmd\) Run
+
+```go
+func (c *ResetCmd) Run(ctx context.Context) error
+```
+
+Destroys the resource and recreates it.
+
+<a name="RestartCmd"></a>
+## type RestartCmd
+
+Represents the 'crux restart' command.
+
+```go
+type RestartCmd struct{}
+```
+
+<a name="RestartCmd.Run"></a>
+### func \(\*RestartCmd\) Run
+
+```go
+func (c *RestartCmd) Run(ctx context.Context) error
+```
+
+Restarts the resource, preserving its filesystem state.
+
 <a name="RuntimeCmd"></a>
 ## type RuntimeCmd
 
@@ -957,8 +1019,8 @@ type RuntimeCmd struct {
     Stop    *RuntimeStopCmd    `cmd:"" help:"Stop the runtime."`
     Restart *RuntimeRestartCmd `cmd:"" help:"Stop and restart the runtime."`
     Reset   *RuntimeResetCmd   `cmd:"" help:"Destroy and recreate the runtime from scratch."`
-    Status  *RuntimeStatusCmd  `cmd:"" help:"Show runtime status."`
     Destroy *RuntimeDestroyCmd `cmd:"" help:"Destroy the runtime and all its data."`
+    Status  *RuntimeStatusCmd  `cmd:"" help:"Show runtime status."`
     Exec    *RuntimeExecCmd    `cmd:"" help:"Run a command inside the runtime."`
 }
 ```
@@ -2168,6 +2230,8 @@ err = r.Push(ctx, *man, "dist/package.tar.zst")
   - [func \(rr \*RuntimeRunner\) Exec\(\_ context.Context, \_ manifest.Manifest, \_ \[\]string\) \(\*ExecResult, error\)](<#RuntimeRunner.Exec>)
   - [func \(rr \*RuntimeRunner\) Pack\(ctx context.Context, m manifest.Manifest, manifestPath, dist, output string\) \(\*PackResult, error\)](<#RuntimeRunner.Pack>)
   - [func \(rr \*RuntimeRunner\) Push\(ctx context.Context, m manifest.Manifest, packagePath string\) error](<#RuntimeRunner.Push>)
+  - [func \(rr \*RuntimeRunner\) Reset\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#RuntimeRunner.Reset>)
+  - [func \(rr \*RuntimeRunner\) Restart\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#RuntimeRunner.Restart>)
   - [func \(rr \*RuntimeRunner\) Start\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#RuntimeRunner.Start>)
   - [func \(rr \*RuntimeRunner\) Status\(\_ context.Context, \_ manifest.Manifest\) \(\*StatusResult, error\)](<#RuntimeRunner.Status>)
   - [func \(rr \*RuntimeRunner\) Stop\(\_ context.Context, \_ manifest.Manifest\) error](<#RuntimeRunner.Stop>)
@@ -2179,6 +2243,8 @@ err = r.Push(ctx, *man, "dist/package.tar.zst")
   - [func \(r \*ServiceRunner\) Exec\(ctx context.Context, m manifest.Manifest, command \[\]string\) \(\*ExecResult, error\)](<#ServiceRunner.Exec>)
   - [func \(r \*ServiceRunner\) Pack\(ctx context.Context, m manifest.Manifest, manifestPath, dist, output string\) \(\*PackResult, error\)](<#ServiceRunner.Pack>)
   - [func \(r \*ServiceRunner\) Push\(ctx context.Context, m manifest.Manifest, packagePath string\) error](<#ServiceRunner.Push>)
+  - [func \(r \*ServiceRunner\) Reset\(ctx context.Context, m manifest.Manifest, path string\) error](<#ServiceRunner.Reset>)
+  - [func \(r \*ServiceRunner\) Restart\(ctx context.Context, m manifest.Manifest, path string\) error](<#ServiceRunner.Restart>)
   - [func \(r \*ServiceRunner\) Start\(ctx context.Context, m manifest.Manifest, path string\) error](<#ServiceRunner.Start>)
   - [func \(r \*ServiceRunner\) Status\(ctx context.Context, m manifest.Manifest\) \(\*StatusResult, error\)](<#ServiceRunner.Status>)
   - [func \(r \*ServiceRunner\) Stop\(ctx context.Context, m manifest.Manifest\) error](<#ServiceRunner.Stop>)
@@ -2191,6 +2257,8 @@ err = r.Push(ctx, *man, "dist/package.tar.zst")
   - [func \(wr \*WidgetRunner\) Exec\(\_ context.Context, \_ manifest.Manifest, \_ \[\]string\) \(\*ExecResult, error\)](<#WidgetRunner.Exec>)
   - [func \(wr \*WidgetRunner\) Pack\(ctx context.Context, m manifest.Manifest, manifestPath, dist, output string\) \(\*PackResult, error\)](<#WidgetRunner.Pack>)
   - [func \(wr \*WidgetRunner\) Push\(ctx context.Context, m manifest.Manifest, packagePath string\) error](<#WidgetRunner.Push>)
+  - [func \(wr \*WidgetRunner\) Reset\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#WidgetRunner.Reset>)
+  - [func \(wr \*WidgetRunner\) Restart\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#WidgetRunner.Restart>)
   - [func \(wr \*WidgetRunner\) Start\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#WidgetRunner.Start>)
   - [func \(wr \*WidgetRunner\) Status\(\_ context.Context, \_ manifest.Manifest\) \(\*StatusResult, error\)](<#WidgetRunner.Status>)
   - [func \(wr \*WidgetRunner\) Stop\(\_ context.Context, \_ manifest.Manifest\) error](<#WidgetRunner.Stop>)
@@ -2206,6 +2274,8 @@ err = r.Push(ctx, *man, "dist/package.tar.zst")
   - [func \(u \*runnerStub\) Exec\(\_ context.Context, \_ manifest.Manifest, \_ \[\]string\) \(\*ExecResult, error\)](<#runnerStub.Exec>)
   - [func \(u \*runnerStub\) Pack\(\_ context.Context, \_ manifest.Manifest, \_, \_, \_ string\) \(\*PackResult, error\)](<#runnerStub.Pack>)
   - [func \(u \*runnerStub\) Push\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#runnerStub.Push>)
+  - [func \(u \*runnerStub\) Reset\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#runnerStub.Reset>)
+  - [func \(u \*runnerStub\) Restart\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#runnerStub.Restart>)
   - [func \(u \*runnerStub\) Start\(\_ context.Context, \_ manifest.Manifest, \_ string\) error](<#runnerStub.Start>)
   - [func \(u \*runnerStub\) Status\(\_ context.Context, \_ manifest.Manifest\) \(\*StatusResult, error\)](<#runnerStub.Status>)
   - [func \(u \*runnerStub\) Stop\(\_ context.Context, \_ manifest.Manifest\) error](<#runnerStub.Stop>)
@@ -2719,6 +2789,16 @@ type Runner interface {
     // The resource can be restarted with [Runner.Start].
     Stop(ctx context.Context, m manifest.Manifest) error
 
+    // Stops the resource and starts it again, preserving filesystem state.
+    //
+    // path points to the build output required by the resource type.
+    Restart(ctx context.Context, m manifest.Manifest, path string) error
+
+    // Destroys the resource and starts it fresh from the image.
+    //
+    // path points to the build output required by the resource type.
+    Reset(ctx context.Context, m manifest.Manifest, path string) error
+
     // Stops the resource if running and removes all of its runtime state.
     Destroy(ctx context.Context, m manifest.Manifest) error
 
@@ -2831,6 +2911,24 @@ func (rr *RuntimeRunner) Push(ctx context.Context, m manifest.Manifest, packageP
 Uploads a runtime package archive to the Hub registry.
 
 packagePath must point to an archive created by [RuntimeRunner.Pack](<#RuntimeRunner.Pack>).
+
+<a name="RuntimeRunner.Reset"></a>
+### func \(\*RuntimeRunner\) Reset
+
+```go
+func (rr *RuntimeRunner) Reset(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
+
+<a name="RuntimeRunner.Restart"></a>
+### func \(\*RuntimeRunner\) Restart
+
+```go
+func (rr *RuntimeRunner) Restart(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
 
 <a name="RuntimeRunner.Start"></a>
 ### func \(\*RuntimeRunner\) Start
@@ -2947,6 +3045,24 @@ Uploads a service package archive to the Hub registry.
 
 packagePath must point to an archive created by [ServiceRunner.Pack](<#ServiceRunner.Pack>).
 
+<a name="ServiceRunner.Reset"></a>
+### func \(\*ServiceRunner\) Reset
+
+```go
+func (r *ServiceRunner) Reset(ctx context.Context, m manifest.Manifest, path string) error
+```
+
+Destroys the service container and starts fresh from the image.
+
+<a name="ServiceRunner.Restart"></a>
+### func \(\*ServiceRunner\) Restart
+
+```go
+func (r *ServiceRunner) Restart(ctx context.Context, m manifest.Manifest, path string) error
+```
+
+Stops the service and starts it again, preserving the container snapshot.
+
 <a name="ServiceRunner.Start"></a>
 ### func \(\*ServiceRunner\) Start
 
@@ -2954,7 +3070,9 @@ packagePath must point to an archive created by [ServiceRunner.Pack](<#ServiceRu
 func (r *ServiceRunner) Start(ctx context.Context, m manifest.Manifest, path string) error
 ```
 
-Imports the built image and starts the service.
+Ensures the service is running.
+
+The operation is idempotent: if the container is already running it is left untouched; if it is stopped a new process is started on the existing snapshot; if it does not exist the image is imported and a fresh container is created.
 
 <a name="ServiceRunner.Status"></a>
 ### func \(\*ServiceRunner\) Status
@@ -3071,6 +3189,24 @@ func (wr *WidgetRunner) Push(ctx context.Context, m manifest.Manifest, packagePa
 Uploads a widget package archive to the Hub registry.
 
 packagePath must point to an archive created by [WidgetRunner.Pack](<#WidgetRunner.Pack>).
+
+<a name="WidgetRunner.Reset"></a>
+### func \(\*WidgetRunner\) Reset
+
+```go
+func (wr *WidgetRunner) Reset(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
+
+<a name="WidgetRunner.Restart"></a>
+### func \(\*WidgetRunner\) Restart
+
+```go
+func (wr *WidgetRunner) Restart(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
 
 <a name="WidgetRunner.Start"></a>
 ### func \(\*WidgetRunner\) Start
@@ -3236,6 +3372,24 @@ func (u *runnerStub) Push(_ context.Context, _ manifest.Manifest, _ string) erro
 
 
 
+<a name="runnerStub.Reset"></a>
+### func \(\*runnerStub\) Reset
+
+```go
+func (u *runnerStub) Reset(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
+
+<a name="runnerStub.Restart"></a>
+### func \(\*runnerStub\) Restart
+
+```go
+func (u *runnerStub) Restart(_ context.Context, _ manifest.Manifest, _ string) error
+```
+
+
+
 <a name="runnerStub.Start"></a>
 ### func \(\*runnerStub\) Start
 
@@ -3324,7 +3478,7 @@ const (
     // Pinned cruxd version. This must match a published release at
     // github.com/cruciblehq/cruxd so that crux always downloads a
     // known-compatible daemon binary.
-    cruxdVersion = "0.2.3"
+    cruxdVersion = "0.2.4"
 
     // Download URL template for the cruxd release archive. The single
     // placeholder is the Linux architecture (e.g. "amd64", "aarch64").
