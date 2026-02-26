@@ -21,11 +21,12 @@ var RootCmd struct {
 	Debug   bool   `short:"d" help:"Enable debug output."`
 
 	// Subcommands
-	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
 	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
 	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
 	Start   StartCmd   `cmd:"" help:"Start a resource."`
 	Stop    StopCmd    `cmd:"" help:"Stop a running resource."`
+	Restart RestartCmd `cmd:"" help:"Restart a resource."`
+	Reset   ResetCmd   `cmd:"" help:"Destroy and recreate a resource."`
 	Destroy DestroyCmd `cmd:"" help:"Remove a resource and its runtime state."`
 	Exec    ExecCmd    `cmd:"" help:"Execute a command inside a running resource."`
 	Status  StatusCmd  `cmd:"" help:"Show the state of a resource."`
@@ -34,6 +35,7 @@ var RootCmd struct {
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
 	Runtime RuntimeCmd `cmd:"" help:"Manage the container runtime environment."`
 	Version VersionCmd `cmd:"" help:"Show version information."`
+	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`
 }
 
