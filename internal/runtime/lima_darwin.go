@@ -252,19 +252,19 @@ func (l *lima) start() error {
 		return err
 	}
 
+	if status == StateRunning {
+		return ErrRuntimeAlreadyRunning
+	}
+
 	// Remove any stale host socket left behind by a previous run (crash,
 	// forced stop, etc.) so Lima's SSH forwarding can bind fresh.
 	os.Remove(paths.DaemonSocket())
 
 	switch status {
-	case StateRunning:
-		return ErrRuntimeAlreadyRunning
-
 	case StateStopped:
 		if err := l.run("start", "--tty=false", limaInstanceName); err != nil {
 			return crex.Wrap(ErrRuntimeStart, err)
 		}
-		return nil
 
 	case StateNotCreated:
 		configPath, err := generateConfig()
@@ -274,7 +274,9 @@ func (l *lima) start() error {
 		if err := l.run("start", "--tty=false", "--name="+limaInstanceName, configPath); err != nil {
 			return crex.Wrap(ErrRuntimeStart, err)
 		}
-		return nil
+
+	default:
+		return crex.Wrapf(ErrRuntimeStart, "unexpected runtime state: %s", status)
 	}
 
 	return nil
