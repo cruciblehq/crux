@@ -1,0 +1,33 @@
+{
+    "branches": [
+        "main"
+    ],
+    "plugins": [
+        [
+            "@semantic-release/commit-analyzer",
+            {
+                "preset": "conventionalcommits"
+            }
+        ],
+        [
+            "@semantic-release/release-notes-generator",
+            {
+                "preset": "conventionalcommits"
+            }
+        ],
+        [
+            "@semantic-release/exec",
+            {
+                "prepareCmd": "echo ${nextRelease.version} > .release-version"
+            }
+        ],
+        [
+            "@semantic-release/github",
+            {
+                "draftRelease": true,
+                "successCommentCondition": false,
+                "labels": false
+            }
+        ]
+    ]
+}

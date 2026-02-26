@@ -19,7 +19,6 @@ go.work.sum
 /crux
 /crux.exe
 dist/
-build/
 
 # IDE files
 .vscode/
@@ -59,4 +58,4 @@ coverage.html
 *.pid
 
 # Test artifacts
-testdata/**/output/
+testdata/**/dist/

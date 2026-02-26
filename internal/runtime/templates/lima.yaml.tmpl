@@ -1,0 +1,122 @@
+vmType: vz
+arch: {{ .Arch }}
+cpus: {{ .CPUs }}
+memory: {{ .Memory }}
+disk: {{ .Disk }}
+images:
+  - location: https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/nocloud_alpine-3.23.2-aarch64-uefi-cloudinit-r0.qcow2
+    arch: aarch64
+    digest: "sha512:f4086df9ee84a08e4e5a9fef16d810b459d42fb6b9d7cb4690250f3d2d4290c57b8e2610103b91ac953ee2da87308771b73249f1d72e4c614045e7c2fb96043d"
+  - location: https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/nocloud_alpine-3.23.2-x86_64-uefi-cloudinit-r0.qcow2
+    arch: x86_64
+    digest: "sha512:26e10874cda1c8a63b00744b5497e74764dcadf3213fb85a6cb7e7bf06a0b9d9b1e6aae166ecb009794b7b6ccfc069d16301a7b7e10f0a5dd1860b918fdd1eb9"
+# Lima can manage containerd itself (containerd.system: true), but its
+# provisioning scripts rely on systemd, which Alpine does not provide.
+# Switching to a systemd-based image (e.g. Ubuntu, Debian) would allow
+# us to drop the manual provisioning below, at the cost of a much larger
+# base image (~350-600 MB vs ~60 MB for Alpine). This way we're buying
+# into more manual provisioning, but we get a much smaller base image.
+containerd:
+  system: false
+  user: false
+mountType: virtiofs
+mounts:
+  - location: {{ .Home }}
+    writable: true
+provision:
+  # Write the containerd config before the system script runs. The gRPC socket
+  # GID grants the Lima user access via the containerd group created in the
+  # system script below.
+  - mode: data
+    path: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [grpc]
+        gid = {{ .ContainerdGID }}
+    owner: "root:root"
+    permissions: 644
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -eu
+      if ! command -v containerd >/dev/null 2>&1; then
+        apk add --no-cache containerd containerd-ctr
+        rc-update add containerd default
+      fi
+      # Load the overlay kernel module so containerd can use the native
+      # overlayfs snapshotter. Alpine does not load it by default.
+      modprobe overlay 2>/dev/null || true
+      if ! grep -q "^overlay$" /etc/modules 2>/dev/null; then
+        echo overlay >> /etc/modules
+      fi
+      # Create a containerd group and add the Lima user so the SSH port
+      # forward can relay traffic from the host.
+      if ! getent group containerd >/dev/null 2>&1; then
+        addgroup -g {{ .ContainerdGID }} -S containerd
+      fi
+      addgroup {{ .User }} containerd 2>/dev/null || true
+      # Create /run/containerd with the containerd group before starting the
+      # service. containerd uses MkdirAll internally, which is a no-op on an
+      # existing directory. Without this, containerd creates the directory as
+      # root:root 0711 and the Lima user cannot create FIFO directories for
+      # task exec IO.
+      mkdir -p /run/containerd
+      chgrp containerd /run/containerd
+      chmod 775 /run/containerd
+      rc-service containerd start --ifnotstarted
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -eu
+      CRUXD_BIN="/usr/local/bin/cruxd"
+      if [ ! -f "$CRUXD_BIN" ]; then
+        ARCHIVE="/tmp/cruxd.tar.gz"
+        wget -q -O "$ARCHIVE" "{{ .CruxdDownloadURL }}"
+        tar -xzf "$ARCHIVE" -C /usr/local/bin cruxd
+        chmod +x "$CRUXD_BIN"
+        rm -f "$ARCHIVE"
+      fi
+      # Create cruxd group so that any member can connect to the daemon
+      # socket. The Lima user is added to the group during provisioning.
+      if ! getent group cruxd >/dev/null 2>&1; then
+        addgroup -g {{ .CruxdGID }} -S cruxd
+      fi
+      addgroup {{ .User }} cruxd 2>/dev/null || true
+      # Create OpenRC service for cruxd. The daemon runs as root so it can
+      # perform overlay mounts needed by containerd client operations. The
+      # VM itself is the security boundary. The cruxd group controls socket
+      # access; the Lima user is added to it during provisioning so the
+      # host port-forward can reach the daemon.
+      if [ ! -f /etc/init.d/cruxd ]; then
+        printf '%s\n' '#!/sbin/openrc-run' \
+          'name="cruxd"' \
+          'description="Crucible daemon"' \
+          'command="/usr/local/bin/cruxd"' \
+          'command_args="start"' \
+          'command_background="yes"' \
+          'pidfile="/run/cruxd/cruxd.pid"' \
+          'start_pre() {' \
+          '  mkdir -p /run/cruxd' \
+          '  chgrp cruxd /run/cruxd' \
+          '  chmod 775 /run/cruxd' \
+          '}' > /etc/init.d/cruxd
+        chmod +x /etc/init.d/cruxd
+        rc-update add cruxd default
+      fi
+      rc-service cruxd start --ifnotstarted
+portForwards:
+  - guestSocket: "{{ .GuestSocket }}"
+    hostSocket: "{{ .HostSocket }}"
+probes:
+  - mode: readiness
+    description: containerd to be running
+    script: |
+      #!/bin/sh
+      test -S /run/containerd/containerd.sock
+    hint: containerd is not running
+  - mode: readiness
+    description: cruxd to be running
+    script: |
+      #!/bin/sh
+      test -S /run/cruxd/cruxd.sock
+    hint: cruxd is not running

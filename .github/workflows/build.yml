@@ -1,0 +1,195 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # --- Test + Release ---
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Verify Go modules
+        uses: cruciblehq/.github/actions/go-verify-modules@main
+
+      - name: Run Go tests and coverage
+        uses: cruciblehq/.github/actions/go-test-coverage@main
+        with:
+          coverage-threshold: "15"
+
+      - name: Generate Go docs
+        uses: cruciblehq/.github/actions/go-docs@main
+
+      - name: Semantic Release
+        id: release
+        uses: cruciblehq/.github/actions/semantic-release@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # --- Build ---
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Build
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          COMMIT=$(git rev-parse --short HEAD)
+          STAGE="release"
+
+          mkdir -p dist
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -v -ldflags "\
+            -X github.com/cruciblehq/crux/internal.version=${VERSION} \
+            -X github.com/cruciblehq/crux/internal.stage=${STAGE} \
+            -X github.com/cruciblehq/crux/internal.gitCommit=${COMMIT}" \
+          -o dist/crux-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/crux
+
+      - name: Sign macOS binary
+        if: matrix.goos == 'darwin'
+        id: sign
+        uses: cruciblehq/.github/actions/sign-macos@main
+        with:
+          binary: dist/crux-${{ matrix.goos }}-${{ matrix.goarch }}
+          mac_cert_p12: ${{ secrets.MAC_CERT_P12 }}
+          mac_cert_pwd: ${{ secrets.MAC_CERT_PWD }}
+          mac_sign_identity: ${{ secrets.MAC_SIGN_IDENTITY }}
+
+      - name: Cleanup keychain
+        if: matrix.goos == 'darwin' && always()
+        run: security delete-keychain "${{ steps.sign.outputs.keychain }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crux-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
+  # --- macOS Universal + Notarization ---
+  notarize-macos:
+    name: Notarize macOS
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: crux-darwin-amd64
+          path: dist/amd64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: crux-darwin-arm64
+          path: dist/arm64
+
+      - name: Create universal binary
+        uses: cruciblehq/.github/actions/create-universal-binary@main
+        with:
+          amd64-binary: dist/amd64/crux-darwin-amd64
+          arm64-binary: dist/arm64/crux-darwin-arm64
+          output: dist/crux-darwin-universal
+
+      - name: Import signing certificate
+        id: import-cert
+        uses: cruciblehq/.github/actions/import-mac-cert@main
+        with:
+          mac_cert_p12: ${{ secrets.MAC_CERT_P12 }}
+          mac_cert_pwd: ${{ secrets.MAC_CERT_PWD }}
+
+      - name: Notarize universal binary
+        uses: cruciblehq/.github/actions/notarize-macos@main
+        with:
+          binary: dist/crux-darwin-universal
+          mac_sign_identity: ${{ secrets.MAC_SIGN_IDENTITY }}
+          apple_id: ${{ secrets.APPLE_ID }}
+          apple_team_id: ${{ secrets.APPLE_TEAM_ID }}
+          apple_app_pwd: ${{ secrets.APPLE_APP_PWD }}
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "${{ steps.import-cert.outputs.keychain }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crux-darwin-universal
+          path: dist/crux-darwin-universal
+
+  # --- Upload Release Assets ---
+  upload-assets:
+    name: Upload Release Assets
+    needs: [release, build, notarize-macos]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package archives
+        run: |
+          mkdir -p dist
+          for dir in artifacts/crux-*; do
+            [ -d "$dir" ] || continue
+            PLATFORM=$(basename "$dir" | sed 's/^crux-//')
+            BINARY=$(ls "$dir" | head -1)
+            tar -czf "dist/crux-${PLATFORM}.tar.gz" -C "$dir" "$BINARY"
+          done
+
+          cd dist && sha256sum crux-*.tar.gz > checksums.txt
+          echo "Archives:"
+          ls -lh crux-*.tar.gz checksums.txt
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.release.outputs.version }}"
+          gh release upload "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY"
+
+  # --- Publish Pages ---
+  publish-pages:
+    needs: release
+    permissions:
+      contents: write
+    uses: cruciblehq/.github/.github/workflows/publish-pages.yml@main
