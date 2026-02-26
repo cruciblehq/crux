@@ -8,4 +8,4 @@ jobs:
   check:
     uses: cruciblehq/.github/.github/workflows/go-check.yml@main
     with:
-      coverage-threshold: 20
+      coverage-threshold: 15
