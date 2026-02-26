@@ -167,6 +167,14 @@ func (wr *WidgetRunner) Stop(_ context.Context, _ manifest.Manifest) error {
 	return ErrUnsupported
 }
 
+func (wr *WidgetRunner) Restart(_ context.Context, _ manifest.Manifest, _ string) error {
+	return ErrUnsupported
+}
+
+func (wr *WidgetRunner) Reset(_ context.Context, _ manifest.Manifest, _ string) error {
+	return ErrUnsupported
+}
+
 func (wr *WidgetRunner) Destroy(_ context.Context, _ manifest.Manifest) error {
 	return ErrUnsupported
 }

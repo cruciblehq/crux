@@ -33,6 +33,16 @@ type Runner interface {
 	// The resource can be restarted with [Runner.Start].
 	Stop(ctx context.Context, m manifest.Manifest) error
 
+	// Stops the resource and starts it again, preserving filesystem state.
+	//
+	// path points to the build output required by the resource type.
+	Restart(ctx context.Context, m manifest.Manifest, path string) error
+
+	// Destroys the resource and starts it fresh from the image.
+	//
+	// path points to the build output required by the resource type.
+	Reset(ctx context.Context, m manifest.Manifest, path string) error
+
 	// Stops the resource if running and removes all of its runtime state.
 	Destroy(ctx context.Context, m manifest.Manifest) error
 

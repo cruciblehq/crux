@@ -48,24 +48,62 @@ func (r *ServiceRunner) Build(ctx context.Context, m manifest.Manifest, output s
 	return r.build(ctx, m, &cfg.Recipe, output, cfg.Entrypoint)
 }
 
-// Imports the built image and starts the service.
+// Ensures the service is running.
+//
+// The operation is idempotent: if the container is already running it is
+// left untouched; if it is stopped a new process is started on the
+// existing snapshot; if it does not exist the image is imported and a
+// fresh container is created.
 func (r *ServiceRunner) Start(ctx context.Context, m manifest.Manifest, path string) error {
-	if err := r.client.ImageImport(ctx, &protocol.ImageImportRequest{
-		Ref:     m.Resource.Name,
-		Version: m.Resource.Version,
-		Path:    path,
-	}); err != nil {
+	id := m.Resource.Name
+
+	result, err := r.client.ContainerStatus(ctx, &protocol.ContainerStatusRequest{ID: id})
+	if err != nil {
 		return crex.Wrap(ErrRunner, err)
 	}
 
-	if err := r.client.ImageStart(ctx, &protocol.ImageStartRequest{
-		Ref:     m.Resource.Name,
-		Version: m.Resource.Version,
-	}); err != nil {
-		return crex.Wrap(ErrRunner, err)
-	}
+	switch result.Status {
+	case protocol.ContainerRunning:
+		return nil
 
-	return nil
+	case protocol.ContainerStopped:
+		if err := r.client.ImageStart(ctx, &protocol.ImageStartRequest{
+			Ref:     m.Resource.Name,
+			Version: m.Resource.Version,
+		}); err != nil {
+			return crex.Wrap(ErrRunner, err)
+		}
+		return nil
+
+	default:
+		if err := r.client.ImageImport(ctx, &protocol.ImageImportRequest{
+			Ref:     m.Resource.Name,
+			Version: m.Resource.Version,
+			Path:    path,
+		}); err != nil {
+			return crex.Wrap(ErrRunner, err)
+		}
+
+		if err := r.client.ImageStart(ctx, &protocol.ImageStartRequest{
+			Ref:     m.Resource.Name,
+			Version: m.Resource.Version,
+		}); err != nil {
+			return crex.Wrap(ErrRunner, err)
+		}
+		return nil
+	}
+}
+
+// Stops the service and starts it again, preserving the container snapshot.
+func (r *ServiceRunner) Restart(ctx context.Context, m manifest.Manifest, path string) error {
+	r.client.ContainerStop(ctx, &protocol.ContainerStopRequest{ID: m.Resource.Name})
+	return r.Start(ctx, m, path)
+}
+
+// Destroys the service container and starts fresh from the image.
+func (r *ServiceRunner) Reset(ctx context.Context, m manifest.Manifest, path string) error {
+	r.client.ContainerDestroy(ctx, &protocol.ContainerDestroyRequest{ID: m.Resource.Name})
+	return r.Start(ctx, m, path)
 }
 
 // Sends a graceful stop signal to the service container.
