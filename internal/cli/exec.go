@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/daemon"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
 )
@@ -23,6 +26,12 @@ func (c *ExecCmd) Run(ctx context.Context) error {
 
 	result, err := r.Exec(ctx, *man, c.Command)
 	if err != nil {
+		if errors.Is(err, daemon.ErrConnectionRefused) {
+			return crex.SystemError("daemon connection refused", err.Error()).
+				Fallback("Wait a few seconds and try again. If the problem persists, try 'crux runtime restart' or 'crux runtime reset'.").
+				Cause(err).
+				Err()
+		}
 		return err
 	}
 

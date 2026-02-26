@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
+	"syscall"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/paths"
@@ -34,7 +36,7 @@ func (c *Client) Build(ctx context.Context, req *protocol.BuildRequest) (*protoc
 
 	result, err := protocol.DecodePayload[protocol.BuildResult](data)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 
 	return result, nil
@@ -49,7 +51,7 @@ func (c *Client) Status(ctx context.Context) (*protocol.StatusResult, error) {
 
 	result, err := protocol.DecodePayload[protocol.StatusResult](data)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 
 	return result, nil
@@ -100,7 +102,7 @@ func (c *Client) ContainerStatus(ctx context.Context, req *protocol.ContainerSta
 
 	result, err := protocol.DecodePayload[protocol.ContainerStatusResult](data)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 
 	return result, nil
@@ -115,7 +117,7 @@ func (c *Client) ContainerExec(ctx context.Context, req *protocol.ContainerExecR
 
 	result, err := protocol.DecodePayload[protocol.ContainerExecResult](data)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 
 	return result, nil
@@ -141,44 +143,52 @@ func (c *Client) send(ctx context.Context, cmd protocol.Command, payload any) (j
 
 	data, err := protocol.Encode(cmd, payload)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 	data = append(data, byte(10))
 
 	if _, err := conn.Write(data); err != nil {
-		return nil, crex.Wrap(ErrConnection, err)
+		return nil, crex.Wrap(ErrConnectionFailed, err)
 	}
 
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadBytes(byte(10))
 	if err != nil {
-		return nil, crex.Wrap(ErrConnection, err)
+		return nil, crex.Wrap(ErrConnectionFailed, err)
 	}
 
 	env, respPayload, err := protocol.Decode(line)
 	if err != nil {
-		return nil, crex.Wrap(ErrRequest, err)
+		return nil, crex.Wrap(ErrRequestFailed, err)
 	}
 
 	if env.Command == protocol.CmdError {
 		errResult, err := protocol.DecodePayload[protocol.ErrorResult](respPayload)
 		if err != nil {
-			return nil, crex.Wrap(ErrRequest, err)
+			return nil, crex.Wrap(ErrRequestFailed, err)
 		}
 		if errResult != nil {
-			return nil, crex.Wrapf(ErrRequest, "%s", errResult.Message)
+			return nil, crex.Wrapf(ErrRequestFailed, "%s", errResult.Message)
 		}
-		return nil, ErrRequest
+		return nil, ErrRequestFailed
 	}
 
 	return respPayload, nil
 }
 
 // Opens a Unix domain socket connection to the daemon.
+//
+// Returns [ErrConnectionRefused] when the socket exists but the connection is
+// refused (e.g. Lima's SSH forwarding is not ready), and [ErrNotRunning] for
+// all other dial failures.
 func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 	var d net.Dialer
+
 	conn, err := d.DialContext(ctx, "unix", c.socketPath)
 	if err != nil {
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			return nil, crex.Wrap(ErrConnectionRefused, err)
+		}
 		return nil, crex.Wrap(ErrNotRunning, err)
 	}
 	return conn, nil

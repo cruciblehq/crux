@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/spec/archive"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/spec/archive"
 	spec "github.com/cruciblehq/spec/paths"
 )
 
@@ -164,6 +164,32 @@ func Destroy() error {
 	os.RemoveAll(spec.Runtime())
 
 	return nil
+}
+
+// Restarts the container runtime environment.
+//
+// On Linux this stops the cruxd daemon process and starts a new one.
+// Blocks until the daemon socket is reachable.
+func Restart() error {
+	if isDaemonRunning() {
+		if err := Stop(); err != nil {
+			return err
+		}
+	}
+
+	return Start()
+}
+
+// Destroys and recreates the container runtime environment from scratch.
+//
+// On Linux this removes the cruxd binary and runtime state, then
+// reinstalls and starts fresh. Blocks until the daemon socket is reachable.
+func Reset() error {
+	if err := Destroy(); err != nil {
+		return err
+	}
+
+	return Start()
 }
 
 // Queries the current state of the container runtime environment.
