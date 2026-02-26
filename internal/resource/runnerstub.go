@@ -24,6 +24,14 @@ func (u *runnerStub) Stop(_ context.Context, _ manifest.Manifest) error {
 	return runnerStubNotSupportedError(u.resourceType)
 }
 
+func (u *runnerStub) Restart(_ context.Context, _ manifest.Manifest, _ string) error {
+	return runnerStubNotSupportedError(u.resourceType)
+}
+
+func (u *runnerStub) Reset(_ context.Context, _ manifest.Manifest, _ string) error {
+	return runnerStubNotSupportedError(u.resourceType)
+}
+
 func (u *runnerStub) Destroy(_ context.Context, _ manifest.Manifest) error {
 	return runnerStubNotSupportedError(u.resourceType)
 }

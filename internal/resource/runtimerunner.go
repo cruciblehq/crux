@@ -55,6 +55,14 @@ func (rr *RuntimeRunner) Stop(_ context.Context, _ manifest.Manifest) error {
 	return ErrUnsupported
 }
 
+func (rr *RuntimeRunner) Restart(_ context.Context, _ manifest.Manifest, _ string) error {
+	return ErrUnsupported
+}
+
+func (rr *RuntimeRunner) Reset(_ context.Context, _ manifest.Manifest, _ string) error {
+	return ErrUnsupported
+}
+
 func (rr *RuntimeRunner) Destroy(_ context.Context, _ manifest.Manifest) error {
 	return ErrUnsupported
 }
