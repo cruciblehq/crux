@@ -12,6 +12,19 @@ import (
 	"github.com/cruciblehq/crux/internal/resource"
 )
 
+const argSeparator = "--"
+
+// Strips a leading "--" argument separator from a command slice.
+//
+// Kong's passthrough tag includes the "--" in the captured arguments. This
+// function removes it so the actual command is passed cleanly.
+func stripArgSeparator(args []string) []string {
+	if len(args) > 0 && args[0] == argSeparator {
+		return args[1:]
+	}
+	return args
+}
+
 // Represents the 'crux exec' command.
 type ExecCmd struct {
 	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to execute."`
@@ -24,7 +37,9 @@ func (c *ExecCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	result, err := r.Exec(ctx, *man, c.Command)
+	cmd := stripArgSeparator(c.Command)
+
+	result, err := r.Exec(ctx, *man, cmd)
 	if err != nil {
 		if errors.Is(err, daemon.ErrConnectionRefused) {
 			return crex.SystemError("daemon connection refused", err.Error()).
