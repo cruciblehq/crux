@@ -14,11 +14,11 @@ import (
 const (
 
 	// Identifier registered with esbuild for the internal module resolution plugin.
-	ESPluginName = "crux-internal-es-plugin"
+	esPluginName = "crux-internal-es-plugin"
 
 	// Directory where third-party widget dependencies are resolved from
 	// during esbuild module resolution.
-	ESDependenciesDirName = "node_modules"
+	esDependenciesDirName = "node_modules"
 )
 
 // Internal esbuild plugin that handles module resolution logic via [resolveModule].
@@ -29,7 +29,7 @@ const (
 // @cruciblehq/ui-web. These are treated as externals to avoid bundling them,
 // since they are expected to be provided by the Crucible runtime.
 var esplugin = es.Plugin{
-	Name: ESPluginName,
+	Name: esPluginName,
 	Setup: func(build es.PluginBuild) {
 		type buildState struct {
 			startTime time.Time
@@ -120,7 +120,7 @@ func resolveEsImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResol
 		if projectRoot == "" {
 			projectRoot, _ = os.Getwd()
 		}
-		widgetNodeModules := filepath.Join(projectRoot, ESDependenciesDirName)
+		widgetNodeModules := filepath.Join(projectRoot, esDependenciesDirName)
 		path = filepath.Join(widgetNodeModules, args.Path)
 	}
 

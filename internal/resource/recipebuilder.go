@@ -16,10 +16,7 @@ import (
 	"github.com/cruciblehq/spec/reference"
 )
 
-// Common state and build logic embedded by [RuntimeRunner] and [ServiceRunner].
-//
-// Holds the daemon client, registry defaults, and the manifest directory
-// needed to resolve copy sources and execute the multi-stage recipe pipeline.
+// Common state and build logic for resource types that embed recipes.
 type recipeBuilder struct {
 	client           *daemon.Client // Daemon client for sending build requests.
 	registry         string         // Hub registry URL for resolving references.
@@ -34,9 +31,9 @@ type recipeBuilder struct {
 // as a [protocol.BuildRequest]. The daemon handles container creation, step
 // execution, and image export.
 func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (*BuildResult, error) {
-	options := reference.IdentifierOptions{
-		DefaultRegistry:  b.registry,
-		DefaultNamespace: b.defaultNamespace,
+	options, err := reference.NewIdentifierOptions(b.registry, b.defaultNamespace)
+	if err != nil {
+		return nil, err
 	}
 
 	resolved, cleanup, err := resolveAllSources(ctx, recipe, options)
@@ -55,7 +52,7 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 
 	result, err := b.client.Build(ctx, req)
 	if err != nil {
-		return nil, crex.Wrap(ErrRunner, err)
+		return nil, crex.Wrap(ErrBuild, err)
 	}
 
 	return &BuildResult{Output: result.Output, Manifest: &m}, nil
@@ -154,7 +151,7 @@ func resolveRefSource(ctx context.Context, ref string, options reference.Identif
 		return "", "", err
 	}
 
-	return filepath.Join(extractDir, ImageFile), extractDir, nil
+	return filepath.Join(extractDir, manifest.ImageFile), extractDir, nil
 }
 
 // Returns a label for a stage, preferring the name when available and falling

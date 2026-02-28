@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
@@ -9,20 +10,18 @@ import (
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
-// [Runner] for Crucible widgets.
+// [Builder] for Crucible widgets.
 //
-// Widgets are client-side JavaScript bundles built with esbuild. Only Build,
-// Pack, and Push are supported; lifecycle operations (Start, Stop, Destroy,
-// Exec, Status) return [ErrUnsupported].
-type WidgetRunner struct {
+// Widgets are client-side JavaScript bundles built with esbuild.
+type WidgetBuilder struct {
 	registry         string
 	defaultNamespace string
 }
 
-// Returns a [WidgetRunner] configured with the given registry and namespace
+// Returns a [WidgetBuilder] configured with the given registry and namespace
 // fallbacks for push operations.
-func NewWidgetRunner(registry, defaultNamespace string) *WidgetRunner {
-	return &WidgetRunner{
+func NewWidgetBuilder(registry, defaultNamespace string) *WidgetBuilder {
+	return &WidgetBuilder{
 		registry:         registry,
 		defaultNamespace: defaultNamespace,
 	}
@@ -33,9 +32,7 @@ func NewWidgetRunner(registry, defaultNamespace string) *WidgetRunner {
 // It converts the manifest options into esbuild build options, invokes
 // esbuild to perform the build, and processes the build result to log
 // messages and handle errors.
-func (wr *WidgetRunner) Build(ctx context.Context, m manifest.Manifest, output string) (*BuildResult, error) {
-
-	// Correct manifest type?
+func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output string) (*BuildResult, error) {
 	widget, ok := m.Config.(*manifest.Widget)
 	if !ok {
 		return nil, crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
@@ -43,7 +40,6 @@ func (wr *WidgetRunner) Build(ctx context.Context, m manifest.Manifest, output s
 			Err()
 	}
 
-	// Convert to esbuild options
 	esOptions, err := esBuildOptionsFromManifest(widget, output)
 	if err != nil {
 		return nil, err
@@ -55,11 +51,20 @@ func (wr *WidgetRunner) Build(ctx context.Context, m manifest.Manifest, output s
 		return nil, ctx.Err()
 	}
 
-	// Build with esbuild
 	result := es.Build(esOptions)
 
-	// Process build result
 	if err := processEsBuildResult(result); err != nil {
+		return nil, err
+	}
+
+	if _, err := m.ResolveName(wb.registry, wb.defaultNamespace); err != nil {
+		return nil, crex.UserError("invalid resource name", "could not resolve the resource identifier").
+			Fallback("Check the resource name in crucible.yaml.").
+			Cause(err).
+			Err()
+	}
+
+	if err := WriteManifest(&m, output); err != nil {
 		return nil, err
 	}
 
@@ -159,44 +164,42 @@ func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.Build
 	return esOptions, nil
 }
 
-func (wr *WidgetRunner) Start(_ context.Context, _ manifest.Manifest, _ string) error {
-	return ErrUnsupported
-}
+// Validates that the build directory contains the expected widget artifacts.
+//
+// A valid widget build directory must contain index.js.
+func (wb *WidgetBuilder) Validate(buildDir string) error {
+	manifestPath := filepath.Join(buildDir, manifest.ManifestFile)
+	if _, err := os.Stat(manifestPath); err != nil {
+		return crex.UserError("manifest not found", "build/crucible.yaml does not exist").
+			Fallback("Run 'crux build' first to generate the build artifacts.").
+			Cause(err).
+			Err()
+	}
 
-func (wr *WidgetRunner) Stop(_ context.Context, _ manifest.Manifest) error {
-	return ErrUnsupported
-}
+	mainPath := filepath.Join(buildDir, manifest.WidgetMainFile)
+	if _, err := os.Stat(mainPath); err != nil {
+		return crex.UserError("widget build output not found", "build/index.js does not exist").
+			Fallback("Run 'crux build' to generate the widget bundle.").
+			Cause(err).
+			Err()
+	}
 
-func (wr *WidgetRunner) Restart(_ context.Context, _ manifest.Manifest, _ string) error {
-	return ErrUnsupported
-}
-
-func (wr *WidgetRunner) Reset(_ context.Context, _ manifest.Manifest, _ string) error {
-	return ErrUnsupported
-}
-
-func (wr *WidgetRunner) Destroy(_ context.Context, _ manifest.Manifest) error {
-	return ErrUnsupported
-}
-
-func (wr *WidgetRunner) Exec(_ context.Context, _ manifest.Manifest, _ []string) (*ExecResult, error) {
-	return nil, ErrUnsupported
-}
-
-func (wr *WidgetRunner) Status(_ context.Context, _ manifest.Manifest) (*StatusResult, error) {
-	return nil, ErrUnsupported
+	return nil
 }
 
 // Packages the widget's build output into a distributable archive.
 //
-// The dist directory must contain index.js.
-func (wr *WidgetRunner) Pack(ctx context.Context, m manifest.Manifest, manifestPath, dist, output string) (*PackResult, error) {
-	return pack(ctx, m, manifestPath, dist, output)
+// The build directory must contain index.js.
+func (wb *WidgetBuilder) Pack(ctx context.Context, buildDir, output string) (*PackResult, error) {
+	if err := wb.Validate(buildDir); err != nil {
+		return nil, err
+	}
+	return pack(ctx, buildDir, output)
 }
 
 // Uploads a widget package archive to the Hub registry.
 //
-// packagePath must point to an archive created by [WidgetRunner.Pack].
-func (wr *WidgetRunner) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, wr.registry, wr.defaultNamespace)
+// packagePath must point to an archive created by [WidgetBuilder.Pack].
+func (wb *WidgetBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
+	return push(ctx, m, packagePath, wb.registry, wb.defaultNamespace)
 }

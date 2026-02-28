@@ -48,7 +48,7 @@ type PullResult struct {
 func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 	refOpts, err := reference.NewIdentifierOptions(opts.DefaultRegistry, opts.DefaultNamespace)
 	if err != nil {
-		return nil, crex.Wrap(ErrRunner, err)
+		return nil, err
 	}
 	ref, err := reference.Parse(opts.Reference, string(opts.Type), refOpts)
 	if err != nil {

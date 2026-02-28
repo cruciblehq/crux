@@ -31,13 +31,10 @@ type esbuildResultSortHelper struct {
 // It normalizes the messages, sorts them, and logs them. If there are errors,
 // it returns an error indicating a general failure of the build.
 func processEsBuildResult(result es.BuildResult) error {
-
-	// Clean build
 	if len(result.Errors) == 0 && len(result.Warnings) == 0 {
 		return nil
 	}
 
-	// Normalize and sort
 	helpers := normalizeAndSortEsBuildResult(result)
 
 	// Log everything
@@ -69,12 +66,10 @@ func processEsBuildResult(result es.BuildResult) error {
 func normalizeAndSortEsBuildResult(result es.BuildResult) []esbuildResultSortHelper {
 	var helpers []esbuildResultSortHelper
 
-	// Process errors
 	for _, err := range result.Errors {
 		helpers = append(helpers, normalizeEsBuildMessage(err, esbuildSeverityError))
 	}
 
-	// Process warnings
 	for _, warn := range result.Warnings {
 		helpers = append(helpers, normalizeEsBuildMessage(warn, esbuildSeverityWarning))
 	}
