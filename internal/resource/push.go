@@ -11,25 +11,26 @@ import (
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
 	specregistry "github.com/cruciblehq/spec/registry"
 )
 
-// Pushes a resource package using a pre-loaded manifest.
+// Pushes a resource package to the Hub registry.
+//
+// The manifest is used to determine the target registry, namespace, and
+// resource name. The resource name is re-resolved here using the provided
+// defaults rather than read from the archive, because extracting a
+// compressed archive solely to read the manifest would be wasteful. The
+// resolved manifest inside the archive (written by [Builder.Build]) is
+// functionally equivalent since the same defaults produce the same result.
 func push(ctx context.Context, m manifest.Manifest, packagePath, defaultRegistry, defaultNamespace string) error {
-	if err := validatePackage(packagePath); err != nil {
+	if _, err := os.Stat(packagePath); err != nil {
 		return crex.UserError("package not found", "package does not exist").
 			Fallback("Run 'crux pack' first to create the package.").
 			Cause(err).
 			Err()
 	}
 
-	refOpts, err := reference.NewIdentifierOptions(defaultRegistry, defaultNamespace)
-	if err != nil {
-		return crex.Wrap(ErrRunner, err)
-	}
-
-	id, err := reference.ParseIdentifier(m.Resource.Name, string(m.Resource.Type), refOpts)
+	id, err := m.ResolveName(defaultRegistry, defaultNamespace)
 	if err != nil {
 		return crex.UserError("invalid resource name", "could not parse the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
