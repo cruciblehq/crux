@@ -1,16 +1,14 @@
 package cache
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
-	"time"
 
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/registry"
@@ -18,11 +16,17 @@ import (
 
 const (
 
+	// The root subdirectory within the XDG cache directory.
+	cacheRoot = "registry"
+
 	// The lock filename within the cache directory.
 	lockFilename = "cache.lock"
 
-	// The data subdirectory within the cache directory.
-	dataDir = "data"
+	// The archives subdirectory within the cache directory.
+	archivesDir = "archives"
+
+	// The extracted subdirectory within the cache directory.
+	extractedDir = "extracted"
 
 	// Metadata filename within each version directory.
 	metaFilename = "meta.json"
@@ -46,12 +50,15 @@ type Cache struct {
 //
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
-func Open(ctx context.Context, _ any) (*Cache, error) {
-	return OpenAt(ctx, paths.Store())
+func Open() (*Cache, error) {
+	return OpenAt(filepath.Join(paths.Cache(), cacheRoot))
 }
 
 // Opens a cache at the specified directory.
-func OpenAt(_ context.Context, root string) (*Cache, error) {
+//
+// A file lock is acquired to ensure exclusive write access across processes.
+// The caller must call Close when done with the cache.
+func OpenAt(root string) (*Cache, error) {
 	if err := os.MkdirAll(root, paths.DefaultDirMode); err != nil {
 		return nil, err
 	}
@@ -70,14 +77,16 @@ func OpenAt(_ context.Context, root string) (*Cache, error) {
 	return &Cache{root: root, lock: lf}, nil
 }
 
-// Releases the file lock.
+// Closes the cache and releases the file lock.
 func (c *Cache) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.lock != nil {
-		unlockFile(c.lock)
-		err := c.lock.Close()
+		err := errors.Join(
+			unlockFile(c.lock),
+			c.lock.Close(),
+		)
 		c.lock = nil
 		return err
 	}
@@ -85,102 +94,215 @@ func (c *Cache) Close() error {
 }
 
 // Checks whether an entry exists in the cache.
-func (c *Cache) Has(_ context.Context, namespace, resource, version string) (bool, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	_, err := os.Stat(c.metaPath(namespace, resource, version))
-	if os.IsNotExist(err) {
-		return false, nil
-	}
+func (c *Cache) Has(namespace, resource, version string) (bool, error) {
+	meta, err := c.metaPath(namespace, resource, version)
 	if err != nil {
 		return false, err
 	}
-	return true, nil
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return pathExists(meta)
 }
 
 // Retrieves version metadata from the cache.
-//
-// Returns ErrNotFound if the entry doesn't exist.
-func (c *Cache) Get(_ context.Context, namespace, resource, version string) (*registry.Version, error) {
+func (c *Cache) Get(namespace, resource, version string) (*registry.Version, error) {
+	meta, err := c.metaPath(namespace, resource, version)
+	if err != nil {
+		return nil, err
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
-	return c.readMeta(namespace, resource, version)
+	return readMeta(meta)
 }
 
 // Returns a reader for a cached archive.
 //
-// The caller is responsible for closing the returned reader. Returns
-// ErrNotFound if the entry doesn't exist or has no archive.
-func (c *Cache) OpenArchive(_ context.Context, namespace, resource, version string) (io.ReadCloser, error) {
+// The caller is responsible for closing the returned reader. The cache's read
+// lock is held until the reader is closed, preventing concurrent writes from
+// modifying the archive during the read.
+func (c *Cache) OpenArchive(namespace, resource, version string) (io.ReadCloser, error) {
+	path, err := c.archivePath(namespace, resource, version)
+	if err != nil {
+		return nil, err
+	}
+	c.mu.RLock()
+
+	f, err := openFile(path)
+	if err != nil {
+		c.mu.RUnlock()
+		return nil, err
+	}
+	return &lockedReadCloser{file: f, unlock: c.mu.RUnlock}, nil
+}
+
+// Checks whether an entry has been extracted.
+func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) {
+	dir, err := c.extractedVersionDir(namespace, resource, version)
+	if err != nil {
+		return false, err
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return pathExists(dir)
+}
 
-	archivePath := c.archivePath(namespace, resource, version)
-	f, err := os.Open(archivePath)
-	if os.IsNotExist(err) {
-		return nil, ErrNotFound
-	}
-	return f, err
+// Returns the path to the extracted contents of a cached archive.
+//
+// If the archive has already been extracted, the existing path is returned.
+// Otherwise, the archive is extracted atomically into the extracted tree.
+// The archive format is assumed to be Zstandard-compressed tar (tar.zst).
+func (c *Cache) Extract(namespace, resource, version string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.extract(namespace, resource, version)
 }
 
 // Stores an entry in the cache.
 //
 // Creates the directory structure and writes the archive and metadata. If an
-// entry already exists for the same namespace/resource/version, it is replaced.
-func (c *Cache) Put(_ context.Context, namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
+// entry already exists for the same namespace/resource/version, it is removed
+// first (including any extracted contents).
+func (c *Cache) Put(namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	return c.writeEntry(namespace, resource, version, archive)
+	return c.put(namespace, resource, version, archive)
 }
 
 // Stores an entry in the cache, verifying the digest.
 //
 // Like Put, but verifies that the archive's computed digest matches the
 // expected digest. Returns ErrDigestMismatch if they don't match.
-func (c *Cache) PutWithDigest(ctx context.Context, namespace, resource, version, expectedDigest string, archive io.Reader) (*registry.Version, error) {
-	ver, err := c.Put(ctx, namespace, resource, version, archive)
+func (c *Cache) PutWithDigest(namespace, resource, version, expectedDigest string, archive io.Reader) (*registry.Version, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ver, err := c.put(namespace, resource, version, archive)
 	if err != nil {
 		return nil, err
 	}
 
-	if ver.Digest != nil && *ver.Digest != expectedDigest {
-		// Remove the bad entry
-		os.RemoveAll(c.versionDir(namespace, resource, version))
+	if *ver.Digest != expectedDigest {
+		if err := c.removeVersion(namespace, resource, version); err != nil {
+			slog.Warn("failed to clean up after digest mismatch", "error", err)
+		}
 		return nil, ErrDigestMismatch
 	}
 
 	return ver, nil
 }
 
-// Removes an entry from the cache.
+// Removes an entry from the cache, including any extracted contents.
 //
 // Returns nil if the entry doesn't exist (idempotent).
-func (c *Cache) Delete(_ context.Context, namespace, resource, version string) error {
+func (c *Cache) Delete(namespace, resource, version string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	dir := c.versionDir(namespace, resource, version)
-	err := os.RemoveAll(dir)
-	if os.IsNotExist(err) {
-		return nil
-	}
-
-	// Clean up empty parent directories.
-	c.pruneEmpty(c.resourceDir(namespace, resource))
-	c.pruneEmpty(c.namespaceDir(namespace))
-	return err
+	return c.removeVersion(namespace, resource, version)
 }
 
 // Returns all versions across all namespaces and resources.
-func (c *Cache) List(_ context.Context) ([]*registry.Version, error) {
+func (c *Cache) List() ([]*registry.Version, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return c.list()
+}
 
-	var versions []*registry.Version
-	root := filepath.Join(c.root, dataDir)
+// Removes all entries from the cache, including extracted contents.
+func (c *Cache) Clear() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.clear()
+}
+
+// Returns the archives root directory path.
+func (c *Cache) archivesRoot() string {
+	return filepath.Join(c.root, archivesDir)
+}
+
+// Returns the extracted root directory path.
+func (c *Cache) extractedRoot() string {
+	return filepath.Join(c.root, extractedDir)
+}
+
+// Returns the archives/<namespace>/<resource>/<version> directory path.
+func (c *Cache) versionDir(namespace, resource, version string) (string, error) {
+	return safeJoin(c.archivesRoot(), namespace, resource, version)
+}
+
+// Returns the extracted/<namespace>/<resource>/<version> directory path.
+func (c *Cache) extractedVersionDir(namespace, resource, version string) (string, error) {
+	return safeJoin(c.extractedRoot(), namespace, resource, version)
+}
+
+// Returns the path to the metadata file for a version.
+func (c *Cache) metaPath(namespace, resource, version string) (string, error) {
+	dir, err := c.versionDir(namespace, resource, version)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, metaFilename), nil
+}
+
+// Returns the path to the archive file for a version.
+func (c *Cache) archivePath(namespace, resource, version string) (string, error) {
+	dir, err := c.versionDir(namespace, resource, version)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, archiveFilename), nil
+}
+
+// Opens the archive file for a version. Returns ErrNotFound if the entry
+// doesn't exist or has no archive.
+func (c *Cache) openArchiveFile(namespace, resource, version string) (*os.File, error) {
+	path, err := c.archivePath(namespace, resource, version)
+	if err != nil {
+		return nil, err
+	}
+	return openFile(path)
+}
+
+// Extracts a cached archive into the extracted tree, returning the directory path.
+func (c *Cache) extract(namespace, resource, version string) (string, error) {
+	dir, err := c.extractedVersionDir(namespace, resource, version)
+	if err != nil {
+		return "", err
+	}
+
+	// Already extracted.
+	exists, err := pathExists(dir)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return dir, nil
+	}
+
+	// Open the cached archive.
+	f, err := c.openArchiveFile(namespace, resource, version)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if err := extractDirAtomic(f, dir); err != nil {
+		return "", err
+	}
+
+	return dir, nil
+}
+
+// Removes any existing entry and writes a new one.
+func (c *Cache) put(namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
+	if err := c.removeVersion(namespace, resource, version); err != nil {
+		return nil, err
+	}
+	return c.writeEntry(namespace, resource, version, archive)
+}
+
+// Walks the archives tree and returns all stored versions.
+func (c *Cache) list() ([]*registry.Version, error) {
+	root := c.archivesRoot()
 
 	namespaces, err := listSubdirs(root)
 	if err != nil {
@@ -190,159 +312,122 @@ func (c *Cache) List(_ context.Context) ([]*registry.Version, error) {
 		return nil, err
 	}
 
+	var versions []*registry.Version
 	for _, ns := range namespaces {
-		resources, _ := listSubdirs(filepath.Join(root, ns))
-		for _, res := range resources {
-			versionDirs, _ := listSubdirs(filepath.Join(root, ns, res))
-			for _, ver := range versionDirs {
-				v, err := c.readMeta(ns, res, ver)
-				if err != nil {
-					continue
-				}
-				versions = append(versions, v)
-			}
-		}
+		versions = append(versions, listNamespace(root, ns)...)
 	}
-
 	return versions, nil
 }
 
-// Removes all entries from the cache.
-func (c *Cache) Clear(_ context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	root := filepath.Join(c.root, dataDir)
-	if err := os.RemoveAll(root); err != nil {
-		return err
+// Returns all versions within a single namespace directory.
+func listNamespace(root, ns string) []*registry.Version {
+	resources, err := listSubdirs(filepath.Join(root, ns))
+	if err != nil {
+		slog.Warn("failed to list resources", "namespace", ns, "error", err)
+		return nil
 	}
-	return nil
-}
 
-// Returns the data/<namespace> directory path.
-func (c *Cache) namespaceDir(namespace string) string {
-	return filepath.Join(c.root, dataDir, namespace)
-}
-
-// Returns the data/<namespace>/<resource> directory path.
-func (c *Cache) resourceDir(namespace, resource string) string {
-	return filepath.Join(c.root, dataDir, namespace, resource)
-}
-
-// Returns the data/<namespace>/<resource>/<version> directory path.
-func (c *Cache) versionDir(namespace, resource, version string) string {
-	return filepath.Join(c.root, dataDir, namespace, resource, version)
-}
-
-// Returns the path to the metadata file for a version.
-func (c *Cache) metaPath(namespace, resource, version string) string {
-	return filepath.Join(c.versionDir(namespace, resource, version), metaFilename)
-}
-
-// Returns the path to the archive file for a version.
-func (c *Cache) archivePath(namespace, resource, version string) string {
-	return filepath.Join(c.versionDir(namespace, resource, version), archiveFilename)
-}
-
-// Reads and parses the metadata file for a version.
-func (c *Cache) readMeta(namespace, resource, version string) (*registry.Version, error) {
-	data, err := os.ReadFile(c.metaPath(namespace, resource, version))
-	if os.IsNotExist(err) {
-		return nil, ErrNotFound
+	var versions []*registry.Version
+	for _, res := range resources {
+		versionDirs, err := listSubdirs(filepath.Join(root, ns, res))
+		if err != nil {
+			slog.Warn("failed to list versions", "namespace", ns, "resource", res, "error", err)
+			continue
+		}
+		for _, ver := range versionDirs {
+			metPath := filepath.Join(root, ns, res, ver, metaFilename)
+			v, err := readMeta(metPath)
+			if err != nil {
+				slog.Warn("failed to read metadata", "namespace", ns, "resource", res, "version", ver, "error", err)
+				continue
+			}
+			versions = append(versions, v)
+		}
 	}
+	return versions
+}
+
+// Removes both the archives and extracted trees.
+func (c *Cache) clear() error {
+	return errors.Join(
+		os.RemoveAll(c.archivesRoot()),
+		os.RemoveAll(c.extractedRoot()),
+	)
+}
+
+// Creates the directory structure, writes the archive, and stores metadata.
+func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*registry.Version, error) {
+	dir, err := c.versionDir(namespace, resource, version)
 	if err != nil {
 		return nil, err
 	}
-
-	var ver registry.Version
-	if err := json.Unmarshal(data, &ver); err != nil {
-		return nil, err
-	}
-	return &ver, nil
-}
-
-// Writes an archive and its metadata to the version directory. Returns the
-// populated Version with digest and size.
-func (c *Cache) writeEntry(namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
-	dir := c.versionDir(namespace, resource, version)
 	if err := os.MkdirAll(dir, paths.DefaultDirMode); err != nil {
 		return nil, err
 	}
 
-	archivePath := c.archivePath(namespace, resource, version)
-
-	// Write archive to a temp file first, computing digest as we go.
-	tmpFile, err := os.CreateTemp(dir, ".archive-*.tmp")
+	archPath := filepath.Join(dir, archiveFilename)
+	digest, size, err := writeFileAtomic(r, dir, archPath)
 	if err != nil {
 		return nil, err
 	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath) // Clean up on failure.
 
-	h := sha256.New()
-	w := io.MultiWriter(tmpFile, h)
-
-	size, err := io.Copy(w, archive)
-	if err != nil {
-		tmpFile.Close()
-		return nil, err
-	}
-	if err := tmpFile.Close(); err != nil {
-		return nil, err
-	}
-
-	// Atomic rename.
-	if err := os.Rename(tmpPath, archivePath); err != nil {
-		return nil, err
-	}
-
-	digest := fmt.Sprintf("sha256:%s", hex.EncodeToString(h.Sum(nil)))
-	now := time.Now().Unix()
-	archiveStr := archiveFilename
-
-	ver := &registry.Version{
-		Namespace: namespace,
-		Resource:  resource,
-		String:    version,
-		Archive:   &archiveStr,
-		Size:      &size,
-		Digest:    &digest,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-
-	// Write metadata.
-	meta, err := json.Marshal(ver)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(c.metaPath(namespace, resource, version), meta, paths.DefaultFileMode); err != nil {
-		return nil, err
-	}
-
-	return ver, nil
+	metPath := filepath.Join(dir, metaFilename)
+	return writeMeta(metPath, namespace, resource, version, digest, size)
 }
 
-// Removes a directory if it is empty.
-func (c *Cache) pruneEmpty(dir string) {
-	entries, err := os.ReadDir(dir)
-	if err != nil || len(entries) > 0 {
-		return
-	}
-	os.Remove(dir)
-}
-
-// Lists immediate subdirectory names.
-func listSubdirs(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+// Removes a version's archive and extracted contents, pruning empty parent
+// directories afterward.
+func (c *Cache) removeVersion(namespace, resource, version string) error {
+	vDir, err := c.versionDir(namespace, resource, version)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
+	eDir, err := c.extractedVersionDir(namespace, resource, version)
+	if err != nil {
+		return err
+	}
+
+	err = errors.Join(
+		os.RemoveAll(vDir),
+		os.RemoveAll(eDir),
+	)
+
+	// Best-effort parent directory cleanup.
+	for _, dir := range []string{
+		filepath.Dir(vDir),
+		filepath.Dir(filepath.Dir(vDir)),
+		filepath.Dir(eDir),
+		filepath.Dir(filepath.Dir(eDir)),
+	} {
+		if pErr := pruneEmpty(dir); pErr != nil {
+			slog.Warn("failed to prune empty directory", "dir", dir, "error", pErr)
 		}
 	}
-	return names, nil
+
+	return err
+}
+
+// Joins base with safe path components. Each component must be a non-empty
+// directory name, not "." or "..", and containing no path separators.
+func safeJoin(base string, components ...string) (string, error) {
+	for _, c := range components {
+		if err := validatePathComponent(c); err != nil {
+			return "", err
+		}
+	}
+	return filepath.Join(append([]string{base}, components...)...), nil
+}
+
+// Validates a single path component.
+func validatePathComponent(s string) error {
+	if s == "" {
+		return errors.New("empty path component")
+	}
+	if s == "." || s == ".." {
+		return fmt.Errorf("invalid path component: %q", s)
+	}
+	if strings.ContainsAny(s, "/\\") {
+		return fmt.Errorf("path component contains separator: %q", s)
+	}
+	return nil
 }
