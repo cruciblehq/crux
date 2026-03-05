@@ -1,29 +1,37 @@
 // Package cache provides a local file-locked cache for downloaded resources.
 //
 // The cache stores downloaded resource archives locally, avoiding redundant
-// downloads from remote registries. Artifacts are organized into
-// <namespace>/<resource>/<version> directories with metadata stored as JSON
-// alongside the archive files. All operations are protected by file locks to
-// allow safe concurrent access from multiple processes.
+// downloads from remote registries. All operations are protected by a file
+// lock and an in-process mutex to allow safe concurrent access.
+//
+// The cache root is a subdirectory of the XDG cache directory (e.g.
+// ~/Library/Caches/crux/registry on macOS, ~/.cache/crux/registry on Linux).
+//
+//	<cache-root>/
+//	  cache.lock                                  File lock
+//	  archives/                                   Downloaded archives
+//	    <namespace>/<resource>/<version>/
+//	      meta.json                               Version metadata (JSON)
+//	      archive.tar.zst                         Compressed archive
+//	  extracted/                                  Extracted contents (on demand)
+//	    <namespace>/<resource>/<version>/
+//	      ...                                     Archive contents
+//
+// Archives and extracted contents are stored in parallel trees. Removing an
+// entry via [Cache.Delete] or [Cache.Clear] removes both the archive and any
+// extracted contents.
 //
 // Opening the cache and storing an archive:
 //
-//	c, err := cache.Open(ctx, nil)
+//	c, err := cache.Open()
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	defer c.Close()
 //
-//	ver, err := c.Put(ctx, "my-namespace", "my-resource", "1.0.0", archiveReader)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
+//	ver, err := c.Put("my-namespace", "my-resource", "1.0.0", archiveReader)
 //
-// Retrieving a cached version:
+// Extracting cached contents:
 //
-//	ver, err := c.Get(ctx, "my-namespace", "my-resource", "1.0.0")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println(ver.String, *ver.Digest)
+//	dir, err := c.Extract("my-namespace", "my-resource", "1.0.0")
 package cache
