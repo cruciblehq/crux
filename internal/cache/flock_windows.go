@@ -10,6 +10,6 @@ func lockFile(_ *os.File) error {
 }
 
 // Not supported on Windows.
-func unlockFile(_ *os.File) {
+func unlockFile(_ *os.File) error {
 	panic("file locking is not supported on Windows")
 }
