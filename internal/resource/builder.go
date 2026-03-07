@@ -5,9 +5,19 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/provider"
 	"github.com/cruciblehq/spec/manifest"
 )
+
+// Creates a new [Options] with the given defaults.
+//
+// Both defaultRegistry and defaultNamespace are required.
+func NewOptions(client BuildClient, defaultRegistry, defaultNamespace string) Options {
+	return Options{
+		Client:           client,
+		DefaultRegistry:  defaultRegistry,
+		DefaultNamespace: defaultNamespace,
+	}
+}
 
 // Handles artifact operations for a single Crucible resource type.
 //
@@ -44,24 +54,15 @@ type Builder interface {
 	//
 	// packagePath must point to an archive created by [Builder.Pack]. The
 	// target registry is determined by the resource name in the manifest,
-	// falling back to the DefaultRegistry provided in [Options].
+	// falling back to the default registry configured in [Options].
 	Push(ctx context.Context, m manifest.Manifest, packagePath string) error
 }
 
 // Configures a [Builder] obtained through [ResolveBuilder].
-//
-// Compute and NodeID are required for resource types that interact with
-// the daemon (services, runtimes, and machines). They can be zero-valued
-// for widgets. DefaultRegistry and DefaultNamespace are required for Build
-// and Push. Build uses them to resolve references and writes the fully
-// resolved manifest to the build output directory. Push uses them to
-// determine the target registry. Pack does not need them because it reads
-// the already-resolved manifest from the build directory.
 type Options struct {
-	Compute          provider.ComputeService // Compute backend that hosts the cruxd daemon.
-	NodeID           string                  // Compute node running cruxd.
-	DefaultRegistry  string                  // Fallback registry URL.
-	DefaultNamespace string                  // Fallback resource namespace.
+	Client           BuildClient // Connection to the cruxd instance.
+	DefaultRegistry  string      // Fallback registry for unqualified references.
+	DefaultNamespace string      // Fallback namespace for unqualified references.
 }
 
 // Holds the output of a successful [Builder.Build] call.
@@ -78,33 +79,26 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 		return nil, nil, err
 	}
 
+	defaults, err := NewDefaults(opts.DefaultRegistry, opts.DefaultNamespace)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	workdir := filepath.Dir(manifestPath)
 
 	var b Builder
 	switch man.Resource.Type {
 	case manifest.TypeRuntime:
-		client, err := opts.Compute.Client(ctx, opts.NodeID)
-		if err != nil {
-			return nil, nil, crex.Wrap(ErrResolveBuilder, err)
-		}
-		b = NewRuntimeBuilder(client, opts.DefaultRegistry, opts.DefaultNamespace, workdir)
+		b = NewRuntimeBuilder(opts.Client, defaults, workdir)
 
 	case manifest.TypeService:
-		client, err := opts.Compute.Client(ctx, opts.NodeID)
-		if err != nil {
-			return nil, nil, crex.Wrap(ErrResolveBuilder, err)
-		}
-		b = NewServiceBuilder(client, opts.DefaultRegistry, opts.DefaultNamespace, workdir)
+		b = NewServiceBuilder(opts.Client, defaults, workdir)
 
 	case manifest.TypeWidget:
-		b = NewWidgetBuilder(opts.DefaultRegistry, opts.DefaultNamespace)
+		b = NewWidgetBuilder(defaults)
 
 	case manifest.TypeMachine:
-		client, err := opts.Compute.Client(ctx, opts.NodeID)
-		if err != nil {
-			return nil, nil, crex.Wrap(ErrResolveBuilder, err)
-		}
-		b = NewMachineBuilder(client, opts.DefaultRegistry, opts.DefaultNamespace, workdir)
+		b = NewMachineBuilder(opts.Client, defaults, workdir)
 
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)

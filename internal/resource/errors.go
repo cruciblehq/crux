@@ -10,4 +10,5 @@ var (
 	ErrInvalidPath         = errors.New("invalid path")
 	ErrCacheOperation      = errors.New("cache operation failed")
 	ErrUnsupported         = errors.New("unsupported operation")
+	ErrMachineResolve      = errors.New("failed to resolve machine image")
 )
