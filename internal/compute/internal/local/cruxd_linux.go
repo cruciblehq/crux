@@ -1,0 +1,124 @@
+//go:build linux
+
+package local
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/compute/internal/provider"
+	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/spec/archive"
+)
+
+// Ensures the cruxd binary is available, downloading it if necessary.
+func ensureCruxd(ctx context.Context, version string) error {
+	bin := paths.CruxdBin()
+	if _, err := os.Stat(bin); err == nil {
+		return nil
+	}
+
+	binDir := filepath.Dir(bin)
+	if err := os.MkdirAll(binDir, paths.DefaultDirMode); err != nil {
+		return crex.Wrap(ErrCruxdInstall, err)
+	}
+
+	return downloadCruxd(ctx, provider.CruxdDownloadURL(version, runtime.GOARCH), binDir)
+}
+
+// Downloads the cruxd release archive and extracts the binary into dest.
+func downloadCruxd(ctx context.Context, url, dest string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return crex.Wrap(ErrCruxdInstall, err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return crex.Wrap(ErrCruxdInstall, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return crex.Wrapf(ErrCruxdInstall, "unexpected status %d from %s", resp.StatusCode, url)
+	}
+
+	if err := archive.ExtractFromReader(resp.Body, dest, archive.Gzip); err != nil {
+		return crex.Wrap(ErrCruxdInstall, err)
+	}
+
+	bin := filepath.Join(dest, "cruxd")
+	if err := os.Chmod(bin, paths.DefaultExecMode); err != nil {
+		return crex.Wrap(ErrCruxdInstall, err)
+	}
+
+	return nil
+}
+
+// Checks whether the cruxd socket for an instance is reachable.
+func isCruxdRunning(name string) bool {
+	conn, err := net.Dial("unix", paths.CruxdSocket(name))
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// Starts the cruxd process for an instance.
+//
+// The caller must ensure the cruxd binary is available before calling this
+// function (see [ensureCruxd]).
+func startCruxd(name string) error {
+	if isCruxdRunning(name) {
+		return ErrRuntimeAlreadyRunning
+	}
+
+	if err := os.MkdirAll(paths.CruxdInstanceDir(name), paths.DefaultDirMode); err != nil {
+		return crex.Wrap(ErrRuntimeStart, err)
+	}
+
+	cmd := exec.Command(paths.CruxdBin(), "--socket", paths.CruxdSocket(name), "--pid-file", paths.CruxdPIDFile(name))
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Start(); err != nil {
+		return crex.Wrap(ErrRuntimeStart, err)
+	}
+
+	return nil
+}
+
+// Signals the cruxd process to stop and returns its PID.
+func stopCruxd(name string) (int, error) {
+	if !isCruxdRunning(name) {
+		return 0, ErrRuntimeNotRunning
+	}
+
+	data, err := os.ReadFile(paths.CruxdPIDFile(name))
+	if err != nil {
+		return 0, crex.Wrap(ErrRuntimeStop, err)
+	}
+
+	var pid int
+	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
+		return 0, crex.Wrap(ErrRuntimeStop, err)
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return 0, crex.Wrap(ErrRuntimeStop, err)
+	}
+
+	if err := proc.Signal(os.Interrupt); err != nil {
+		return 0, crex.Wrap(ErrRuntimeStop, err)
+	}
+
+	return pid, nil
+}
