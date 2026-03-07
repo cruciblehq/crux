@@ -7,21 +7,9 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
-	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
 	specregistry "github.com/cruciblehq/spec/registry"
 )
-
-// Configures a [Pull] call.
-//
-// Type and Reference are required. DefaultRegistry and DefaultNamespace are
-// used as fallbacks when the reference string does not include them explicitly.
-type PullOptions struct {
-	Type             manifest.ResourceType // Resource type context for parsing.
-	Reference        string                // Resource reference (e.g., namespace/resource 1.0.0).
-	DefaultRegistry  string                // Hub registry URL when not specified in the reference.
-	DefaultNamespace string                // Default namespace for resource identifiers.
-}
 
 // Holds the output of a successful [Pull] call.
 //
@@ -41,24 +29,11 @@ type PullResult struct {
 //
 // If the resource is already in the cache with the correct digest, no download
 // occurs and Cached is set to true in the result. Otherwise, the archive is
-// downloaded from the registry and stored in the cache. Supports both version-
-// based references (namespace/resource 1.0.0) and channel-based references
-// (namespace/resource :stable). Channels are resolved to their current version
-// before downloading.
-func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
-	refOpts, err := reference.NewIdentifierOptions(opts.DefaultRegistry, opts.DefaultNamespace)
-	if err != nil {
-		return nil, err
-	}
-	ref, err := reference.Parse(opts.Reference, string(opts.Type), refOpts)
-	if err != nil {
-		return nil, crex.UserError("invalid reference", "could not parse the resource reference").
-			Fallback("Use the format 'namespace/resource version'.").
-			Cause(err).
-			Err()
-	}
-
-	localCache, err := cache.Open(ctx, nil)
+// downloaded from the registry and stored in the cache. Supports both
+// version-based and channel-based references. Channels are resolved to their
+// current version before downloading.
+func Pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
+	localCache, err := cache.Open()
 	if err != nil {
 		return nil, crex.Wrap(ErrCacheOperation, err)
 	}
@@ -78,7 +53,7 @@ func Pull(ctx context.Context, opts PullOptions) (*PullResult, error) {
 			Err()
 	}
 
-	if result, ok := checkCache(ctx, localCache, ref, ver, *ver.Digest); ok {
+	if result, ok := checkCache(localCache, ref, ver, *ver.Digest); ok {
 		return result, nil
 	}
 
@@ -118,14 +93,14 @@ func handleResolveError(err error) error {
 }
 
 // Returns a cached result if the entry exists with matching digest.
-func checkCache(ctx context.Context, c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*PullResult, bool) {
-	entry, err := c.Get(ctx, ref.Namespace(), ref.Name(), ver.String)
+func checkCache(c *cache.Cache, ref *reference.Reference, ver *specregistry.Version, expectedDigest string) (*PullResult, bool) {
+	entry, err := c.Get(ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, false
 	}
 
 	if entry.Digest == nil || *entry.Digest != expectedDigest {
-		c.Delete(ctx, ref.Namespace(), ref.Name(), ver.String)
+		c.Delete(ref.Namespace(), ref.Name(), ver.String)
 		return nil, false
 	}
 
@@ -150,7 +125,7 @@ func downloadAndCache(ctx context.Context, client *registry.Client, c *cache.Cac
 	}
 	defer archiveReader.Close()
 
-	entry, err := c.PutWithDigest(ctx, ref.Namespace(), ref.Name(), ver.String, expectedDigest, archiveReader)
+	entry, err := c.PutWithDigest(ref.Namespace(), ref.Name(), ver.String, expectedDigest, archiveReader)
 	if err != nil {
 		if errors.Is(err, cache.ErrDigestMismatch) {
 			return nil, crex.UserError("digest mismatch", "downloaded archive doesn't match expected digest").
