@@ -14,16 +14,14 @@ import (
 //
 // Widgets are client-side JavaScript bundles built with esbuild.
 type WidgetBuilder struct {
-	registry         string
-	defaultNamespace string
+	defaults Defaults
 }
 
-// Returns a [WidgetBuilder] configured with the given registry and namespace
-// fallbacks for push operations.
-func NewWidgetBuilder(registry, defaultNamespace string) *WidgetBuilder {
+// Returns a [WidgetBuilder] configured with the given defaults
+// for push operations.
+func NewWidgetBuilder(defaults Defaults) *WidgetBuilder {
 	return &WidgetBuilder{
-		registry:         registry,
-		defaultNamespace: defaultNamespace,
+		defaults: defaults,
 	}
 }
 
@@ -57,7 +55,7 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output 
 		return nil, err
 	}
 
-	if _, err := m.ResolveName(wb.registry, wb.defaultNamespace); err != nil {
+	if _, err := m.ResolveName(wb.defaults.IdentifierOptions()); err != nil {
 		return nil, crex.UserError("invalid resource name", "could not resolve the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
 			Cause(err).
@@ -201,5 +199,5 @@ func (wb *WidgetBuilder) Pack(ctx context.Context, buildDir, output string) (*Pa
 //
 // packagePath must point to an archive created by [WidgetBuilder.Pack].
 func (wb *WidgetBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, wb.registry, wb.defaultNamespace)
+	return push(ctx, m, packagePath, wb.defaults)
 }

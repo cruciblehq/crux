@@ -18,11 +18,11 @@ import (
 //
 // The manifest is used to determine the target registry, namespace, and
 // resource name. The resource name is re-resolved here using the provided
-// defaults rather than read from the archive, because extracting a
-// compressed archive solely to read the manifest would be wasteful. The
+// reference options rather than read from the archive, because extracting
+// a compressed archive solely to read the manifest would be wasteful. The
 // resolved manifest inside the archive (written by [Builder.Build]) is
-// functionally equivalent since the same defaults produce the same result.
-func push(ctx context.Context, m manifest.Manifest, packagePath, defaultRegistry, defaultNamespace string) error {
+// functionally equivalent since the same options produce the same result.
+func push(ctx context.Context, m manifest.Manifest, packagePath string, defaults Defaults) error {
 	if _, err := os.Stat(packagePath); err != nil {
 		return crex.UserError("package not found", "package does not exist").
 			Fallback("Run 'crux pack' first to create the package.").
@@ -30,7 +30,7 @@ func push(ctx context.Context, m manifest.Manifest, packagePath, defaultRegistry
 			Err()
 	}
 
-	id, err := m.ResolveName(defaultRegistry, defaultNamespace)
+	id, err := m.ResolveName(defaults.IdentifierOptions())
 	if err != nil {
 		return crex.UserError("invalid resource name", "could not parse the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
@@ -161,7 +161,7 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 	}
 
 	// Update local cache with pushed package
-	if err := updateLocalCache(ctx, namespace, resource, version, packageOutput); err != nil {
+	if err := updateLocalCache(namespace, resource, version, packageOutput); err != nil {
 		// Log warning but don't fail the push - the remote was updated successfully
 		slog.Warn("failed to update local cache", "error", err)
 	}
@@ -173,8 +173,8 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 //
 // This ensures the local cache is in sync with the remote after a push,
 // avoiding the need to re-download the package if it's needed locally.
-func updateLocalCache(ctx context.Context, namespace, resource, version, packagePath string) error {
-	localCache, err := cache.Open(ctx, nil)
+func updateLocalCache(namespace, resource, version, packagePath string) error {
+	localCache, err := cache.Open()
 	if err != nil {
 		return crex.Wrap(ErrCacheOperation, err)
 	}
@@ -186,7 +186,7 @@ func updateLocalCache(ctx context.Context, namespace, resource, version, package
 	}
 	defer archive.Close()
 
-	_, err = localCache.Put(ctx, namespace, resource, version, archive)
+	_, err = localCache.Put(namespace, resource, version, archive)
 	if err != nil {
 		return crex.Wrap(ErrCacheOperation, err)
 	}

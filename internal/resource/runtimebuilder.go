@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/daemon"
 	"github.com/cruciblehq/spec/manifest"
 )
 
@@ -22,13 +21,12 @@ type RuntimeBuilder struct {
 //
 // workdir is the directory containing the manifest and is used as the root
 // for resolving copy sources during builds.
-func NewRuntimeBuilder(client *daemon.Client, registry, defaultNamespace, workdir string) *RuntimeBuilder {
+func NewRuntimeBuilder(client BuildClient, defaults Defaults, workdir string) *RuntimeBuilder {
 	return &RuntimeBuilder{
 		recipeBuilder: recipeBuilder{
-			client:           client,
-			registry:         registry,
-			defaultNamespace: defaultNamespace,
-			workdir:          workdir,
+			client:   client,
+			defaults: defaults,
+			workdir:  workdir,
 		},
 	}
 }
@@ -46,7 +44,7 @@ func (rb *RuntimeBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	if _, err := m.ResolveName(rb.registry, rb.defaultNamespace); err != nil {
+	if _, err := m.ResolveName(rb.defaults.IdentifierOptions()); err != nil {
 		return nil, crex.UserError("invalid resource name", "could not resolve the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
 			Cause(err).
@@ -102,5 +100,5 @@ func (rb *RuntimeBuilder) Pack(ctx context.Context, buildDir, output string) (*P
 //
 // packagePath must point to an archive created by [RuntimeBuilder.Pack].
 func (rb *RuntimeBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, rb.registry, rb.defaultNamespace)
+	return push(ctx, m, packagePath, rb.defaults)
 }
