@@ -4,8 +4,8 @@
 // system directories on Windows and macOS. This package centralizes path
 // definitions to ensure consistency across implementations. Project-relative
 // functions like BuildDir and Manifest accept a base directory, while
-// system-level functions like Data, Config, and Cache return absolute paths
-// based on the current platform.
+// system-level functions like DataDir, ConfigDir, and CacheDir return
+// absolute paths based on the current platform.
 //
 // Resolving project paths from a working directory:
 //
@@ -16,7 +16,6 @@
 //
 // Locating system directories for data and cache storage:
 //
-//	fmt.Println(paths.Data())   // e.g., ~/Library/Application Support/crux
-//	fmt.Println(paths.Cache())  // e.g., ~/Library/Caches/crux
-//	fmt.Println(paths.Store())  // e.g., ~/Library/Caches/crux/store
+//	fmt.Println(paths.DataDir())   // e.g., ~/Library/Application Support/crux
+//	fmt.Println(paths.CacheDir())  // e.g., ~/Library/Caches/crux
 package paths
