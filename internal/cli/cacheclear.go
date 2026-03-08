@@ -11,16 +11,16 @@ import (
 type CacheClearCmd struct{}
 
 // Executes the cache clear command.
-func (c *CacheClearCmd) Run(ctx context.Context) error {
+func (c *CacheClearCmd) Run(_ context.Context) error {
 	slog.Info("clearing cache...")
 
-	localCache, err := cache.Open(ctx, nil)
+	localCache, err := cache.Open()
 	if err != nil {
 		return err
 	}
 	defer localCache.Close()
 
-	if err := localCache.Clear(ctx); err != nil {
+	if err := localCache.Clear(); err != nil {
 		return err
 	}
 

@@ -18,20 +18,19 @@ type PushCmd struct {
 func (c *PushCmd) Run(ctx context.Context) error {
 	registry := c.Registry
 	if registry == "" {
-		registry = internal.DefaultRegistryURL
+		registry = internal.RegistryURL
 	}
 
 	slog.Info("pushing package...", "registry", registry)
 
-	man, r, err := resource.Resolve(paths.Manifest(RootCmd.Context), resource.Options{
-		DefaultRegistry:  registry,
-		DefaultNamespace: internal.DefaultNamespace,
-	})
+	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), resource.NewOptions(
+		nil, registry, internal.DefaultNamespace,
+	))
 	if err != nil {
 		return err
 	}
 
-	if err := r.Push(ctx, *man, paths.Package(RootCmd.Context)); err != nil {
+	if err := b.Push(ctx, *man, paths.Package(RootCmd.Context)); err != nil {
 		return err
 	}
 

@@ -23,12 +23,12 @@ func (c *PackCmd) Run(ctx context.Context) error {
 
 	manifestPath := paths.Manifest(RootCmd.Context)
 
-	man, r, err := resource.Resolve(manifestPath)
+	_, b, err := resource.ResolveBuilder(ctx, manifestPath, resource.Options{})
 	if err != nil {
 		return err
 	}
 
-	result, err := r.Pack(ctx, *man, manifestPath, paths.BuildDir(RootCmd.Context), paths.Package(RootCmd.Context))
+	result, err := b.Pack(ctx, paths.BuildDir(RootCmd.Context), paths.Package(RootCmd.Context))
 	if err != nil {
 		return err
 	}
