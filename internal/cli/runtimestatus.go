@@ -4,19 +4,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/internal/runtime"
+	"github.com/cruciblehq/crux/internal"
+	"github.com/cruciblehq/crux/internal/compute"
 )
 
 // Represents the 'crux runtime status' command.
 type RuntimeStatusCmd struct{}
 
-// Shows the current state of the container runtime environment.
+// Shows the current state of the cruxd runtime instance.
 func (c *RuntimeStatusCmd) Run(ctx context.Context) error {
-	status, err := runtime.Status()
+	b, err := compute.BackendFor(compute.Local)
+	if err != nil {
+		return err
+	}
+	name := internal.InstanceName
+	state, err := b.Status(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(status)
+	fmt.Println(state)
 	return nil
 }

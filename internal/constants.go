@@ -2,12 +2,19 @@ package internal
 
 const (
 
-	// Application name used in logging and identification.
-	Name = "crux"
+	// Identifier for the cruxd instance, also used as the slog group name.
+	InstanceName = "crux"
 
-	// Default Crucible Hub registry URL.
-	DefaultRegistryURL = "http://hub.cruciblehq.xyz:8080"
+	// Crucible Hub registry URL.
+	RegistryURL = "http://hub.cruciblehq.xyz:8080"
 
-	// Default namespace for resources in the default registry.
+	// Default namespace for resources in the registry.
 	DefaultNamespace = "official"
+
+	// Cruxd version to provision.
+	//
+	// This version is embedded at build time and determines which cruxd release
+	// is downloaded during provisioning. It should be bumped whenever a new
+	// cruxd release is adopted.
+	CruxdVersion = "0.1.3"
 )

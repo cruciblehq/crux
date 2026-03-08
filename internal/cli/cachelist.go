@@ -13,14 +13,14 @@ type CacheListCmd struct {
 }
 
 // Executes the cache list command.
-func (c *CacheListCmd) Run(ctx context.Context) error {
-	localCache, err := cache.Open(ctx, nil)
+func (c *CacheListCmd) Run(_ context.Context) error {
+	localCache, err := cache.Open()
 	if err != nil {
 		return err
 	}
 	defer localCache.Close()
 
-	entries, err := localCache.List(ctx)
+	entries, err := localCache.List()
 	if err != nil {
 		return err
 	}
