@@ -37,7 +37,7 @@ func TestLockedReadCloser_ReadAll(t *testing.T) {
 	content := "the quick brown fox"
 	f := tempFileWithContent(t, content)
 
-	rc := &lockedReadCloser{file: f, unlock: func() {}}
+	rc := &lockedReadCloser{file: f, unlock: func() { /* no-op */ }}
 
 	data, err := io.ReadAll(rc)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestLockedReadCloser_ReadAll(t *testing.T) {
 func TestLockedReadCloser_ReadEmpty(t *testing.T) {
 	f := tempFileWithContent(t, "")
 
-	rc := &lockedReadCloser{file: f, unlock: func() {}}
+	rc := &lockedReadCloser{file: f, unlock: func() { /* no-op */ }}
 
 	data, err := io.ReadAll(rc)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestLockedReadCloser_ReadEmpty(t *testing.T) {
 func TestLockedReadCloser_ReadEOF(t *testing.T) {
 	f := tempFileWithContent(t, "ab")
 
-	rc := &lockedReadCloser{file: f, unlock: func() {}}
+	rc := &lockedReadCloser{file: f, unlock: func() { /* no-op */ }}
 
 	buf := make([]byte, 10)
 	n, err := rc.Read(buf)
@@ -136,7 +136,7 @@ func TestLockedReadCloser_MultipleReads(t *testing.T) {
 	content := "abcdefghij"
 	f := tempFileWithContent(t, content)
 
-	rc := &lockedReadCloser{file: f, unlock: func() {}}
+	rc := &lockedReadCloser{file: f, unlock: func() { /* no-op */ }}
 
 	var result bytes.Buffer
 	buf := make([]byte, 3)
@@ -161,7 +161,7 @@ func TestLockedReadCloser_MultipleReads(t *testing.T) {
 func TestLockedReadCloser_ImplementsReadCloser(t *testing.T) {
 	f := tempFileWithContent(t, "data")
 
-	rc := &lockedReadCloser{file: f, unlock: func() {}}
+	rc := &lockedReadCloser{file: f, unlock: func() { /* no-op */ }}
 
 	// Verify the interface is satisfied at compile time via assignment.
 	var _ io.ReadCloser = rc
