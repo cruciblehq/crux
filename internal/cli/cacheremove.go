@@ -5,9 +5,9 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/internal/cache"
-	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal"
+	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/spec/reference"
 )
 
@@ -17,17 +17,17 @@ type CacheRemoveCmd struct {
 }
 
 // Executes the cache remove command.
-func (c *CacheRemoveCmd) Run(ctx context.Context) error {
+func (c *CacheRemoveCmd) Run(_ context.Context) error {
 	slog.Info("removing cache entries...")
 
-	localCache, err := cache.Open(ctx, nil)
+	localCache, err := cache.Open()
 	if err != nil {
 		return err
 	}
 	defer localCache.Close()
 
 	for _, refStr := range c.References {
-		if err := removeReference(ctx, localCache, refStr); err != nil {
+		if err := removeReference(localCache, refStr); err != nil {
 			return err
 		}
 	}
@@ -38,8 +38,8 @@ func (c *CacheRemoveCmd) Run(ctx context.Context) error {
 }
 
 // Removes cache entries matching a reference.
-func removeReference(ctx context.Context, c *cache.Cache, refStr string) error {
-	opts, err := reference.NewIdentifierOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+func removeReference(c *cache.Cache, refStr string) error {
+	opts, err := reference.NewOptions(internal.RegistryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -51,34 +51,34 @@ func removeReference(ctx context.Context, c *cache.Cache, refStr string) error {
 	}
 
 	if ref.IsVersionBased() {
-		return removeVersion(ctx, c, ref)
+		return removeVersion(c, ref)
 	}
 
-	return removeAllVersions(ctx, c, ref)
+	return removeAllVersions(c, ref)
 }
 
 // Removes a specific version from the cache.
-func removeVersion(ctx context.Context, c *cache.Cache, ref *reference.Reference) error {
-	_, err := c.Get(ctx, ref.Namespace(), ref.Name(), ref.Version().String())
+func removeVersion(c *cache.Cache, ref *reference.Reference) error {
+	_, err := c.Get(ref.Namespace(), ref.Name(), ref.Version().String())
 	if errors.Is(err, cache.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return c.Delete(ctx, ref.Namespace(), ref.Name(), ref.Version().String())
+	return c.Delete(ref.Namespace(), ref.Name(), ref.Version().String())
 }
 
 // Removes all versions of a resource from the cache.
-func removeAllVersions(ctx context.Context, c *cache.Cache, ref *reference.Reference) error {
-	entries, err := c.List(ctx)
+func removeAllVersions(c *cache.Cache, ref *reference.Reference) error {
+	entries, err := c.List()
 	if err != nil {
 		return err
 	}
 
 	for _, entry := range entries {
 		if entry.Namespace == ref.Namespace() && entry.Resource == ref.Name() {
-			if err := c.Delete(ctx, entry.Namespace, entry.Resource, entry.String); err != nil {
+			if err := c.Delete(entry.Namespace, entry.Resource, entry.String); err != nil {
 				return err
 			}
 		}

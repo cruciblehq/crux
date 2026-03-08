@@ -16,9 +16,6 @@ import (
 
 const (
 
-	// The root subdirectory within the XDG cache directory.
-	cacheRoot = "registry"
-
 	// The lock filename within the cache directory.
 	lockFilename = "cache.lock"
 
@@ -51,7 +48,7 @@ type Cache struct {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func Open() (*Cache, error) {
-	return OpenAt(filepath.Join(paths.Cache(), cacheRoot))
+	return OpenAt(paths.RegistryCacheDir())
 }
 
 // Opens a cache at the specified directory.

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cruciblehq/crux/internal/runtime"
+	"github.com/cruciblehq/crux/internal"
+	"github.com/cruciblehq/crux/internal/compute"
 )
 
 // Represents the 'crux runtime exec' command.
@@ -17,7 +18,12 @@ type RuntimeExecCmd struct {
 //
 // The process exit code is propagated from the executed command.
 func (c *RuntimeExecCmd) Run(ctx context.Context) error {
-	result, err := runtime.Exec(c.Command[0], c.Command[1:]...)
+	b, err := compute.BackendFor(compute.Local)
+	if err != nil {
+		return err
+	}
+	name := internal.InstanceName
+	result, err := b.Exec(ctx, name, c.Command[0], c.Command[1:]...)
 	if err != nil {
 		return err
 	}
