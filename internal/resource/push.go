@@ -162,8 +162,8 @@ func uploadPackage(ctx context.Context, client *registry.Client, namespace, reso
 
 	// Update local cache with pushed package
 	if err := updateLocalCache(namespace, resource, version, packageOutput); err != nil {
-		// Log warning but don't fail the push - the remote was updated successfully
-		slog.Warn("failed to update local cache", "error", err)
+		// Log, but don't fail the push; the remote was updated successfully
+		slog.Error("failed to update local cache", "error", err)
 	}
 
 	return nil
