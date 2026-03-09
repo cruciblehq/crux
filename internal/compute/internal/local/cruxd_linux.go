@@ -16,6 +16,7 @@ import (
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/archive"
+	"github.com/cruciblehq/spec/protocol"
 )
 
 // Ensures the cruxd binary is available, downloading it if necessary.
@@ -75,7 +76,11 @@ func isCruxdRunning(name string) bool {
 // Starts the cruxd process for an instance.
 //
 // The caller must ensure the cruxd binary is available before calling this
-// function (see [ensureCruxd]).
+// function (see [ensureCruxd]). Readiness is detected via ready-fd: a pipe
+// is created, the write end is passed to cruxd as an extra file descriptor
+// via --ready-fd, and this function blocks reading the read end. cruxd writes
+// a CmdOK message once the socket is bound, unblocking the reader. If cruxd
+// exits before signaling, the read returns EOF and an error is raised.
 func startCruxd(name string) error {
 	if isCruxdRunning(name) {
 		return ErrRuntimeAlreadyRunning
@@ -85,11 +90,35 @@ func startCruxd(name string) error {
 		return crex.Wrap(ErrRuntimeStart, err)
 	}
 
-	cmd := exec.Command(paths.CruxdBin(), "--socket", paths.CruxdSocket(name), "--pid-file", paths.CruxdPIDFile(name))
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return crex.Wrap(ErrRuntimeStart, err)
+	}
+	defer pr.Close()
+
+	// ExtraFiles[0] becomes fd 3 in the child process.
+	cmd := exec.Command(
+		paths.CruxdBin(), "start",
+		"--socket", paths.CruxdSocket(name),
+		"--pid-file", paths.CruxdPIDFile(name),
+		"--ready-fd", "3",
+	)
+	cmd.ExtraFiles = []*os.File{pw}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
+
 	if err := cmd.Start(); err != nil {
+		pw.Close()
 		return crex.Wrap(ErrRuntimeStart, err)
+	}
+	// Close the write end in the parent so reads get EOF if cruxd exits.
+	pw.Close()
+
+	line := make([]byte, 128)
+	n, readErr := pr.Read(line)
+	env, _, decErr := protocol.Decode(line[:n])
+	if readErr != nil || decErr != nil || env.Command != protocol.CmdOK {
+		return crex.Wrapf(ErrRuntimeStart, "cruxd did not signal readiness")
 	}
 
 	return nil

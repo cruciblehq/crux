@@ -14,9 +14,8 @@ import (
 // Provisions a cruxd instance.
 //
 // The shared VM is created and started if it does not already exist. A cruxd
-// process is then started inside the VM for the given instance. If the cruxd
-// process does not become reachable, the instance is torn down and an error
-// is returned.
+// process is then started inside the VM for the given instance. The call
+// blocks until cruxd signals readiness via the ready-fd protocol.
 func provision(ctx context.Context, config *provider.Config) error {
 	if err := ensureRuntimeRunning(ctx, config.Version); err != nil {
 		slog.Debug("provision failed, VM did not start", "name", config.Name, "error", err)
@@ -28,22 +27,14 @@ func provision(ctx context.Context, config *provider.Config) error {
 		return err
 	}
 
-	conn, err := dial(ctx, config.Name)
-	if err != nil {
-		slog.Debug("provision failed, cruxd not reachable", "name", config.Name, "error", err)
-		stopCruxd(ctx, config.Name)
-		return err
-	}
-	conn.Close()
-
 	return nil
 }
 
 // Starts a cruxd instance inside an already-running VM.
 //
 // The VM must have been provisioned and be running. A cruxd process is
-// started inside the VM. If the instance does not become reachable, it is
-// stopped and an error is returned.
+// started inside the VM. The call blocks until cruxd signals readiness
+// via the ready-fd protocol.
 func start(ctx context.Context, name string) error {
 	state, err := runtimeStatus(ctx)
 	if err != nil {
@@ -58,14 +49,6 @@ func start(ctx context.Context, name string) error {
 		slog.Debug("start failed, cruxd did not start", "name", name, "error", err)
 		return err
 	}
-
-	conn, err := dial(ctx, name)
-	if err != nil {
-		slog.Debug("start failed, cruxd not reachable", "name", name, "error", err)
-		stopCruxd(ctx, name)
-		return err
-	}
-	conn.Close()
 
 	return nil
 }
