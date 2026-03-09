@@ -20,25 +20,14 @@ func provision(ctx context.Context, config *provider.Config) error {
 	if err := startCruxd(config.Name); err != nil {
 		return err
 	}
-	conn, err := dial(ctx, config.Name)
-	if err != nil {
-		os.RemoveAll(paths.CruxdInstanceDir(config.Name))
-		return err
-	}
-	conn.Close()
 	return nil
 }
 
 // Starts the cruxd process.
-func start(ctx context.Context, name string) error {
+func start(_ context.Context, name string) error {
 	if err := startCruxd(name); err != nil {
 		return err
 	}
-	conn, err := dial(ctx, name)
-	if err != nil {
-		return err
-	}
-	conn.Close()
 	return nil
 }
 

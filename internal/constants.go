@@ -16,5 +16,5 @@ const (
 	// This version is embedded at build time and determines which cruxd release
 	// is downloaded during provisioning. It should be bumped whenever a new
 	// cruxd release is adopted.
-	CruxdVersion = "0.1.3"
+	CruxdVersion = "0.3.1"
 )
