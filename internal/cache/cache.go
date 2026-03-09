@@ -180,7 +180,7 @@ func (c *Cache) PutWithDigest(namespace, resource, version, expectedDigest strin
 
 	if *ver.Digest != expectedDigest {
 		if err := c.removeVersion(namespace, resource, version); err != nil {
-			slog.Warn("failed to clean up after digest mismatch", "error", err)
+			slog.Error("failed to clean up after digest mismatch", "error", err)
 		}
 		return nil, ErrDigestMismatch
 	}
@@ -320,7 +320,7 @@ func (c *Cache) list() ([]*registry.Version, error) {
 func listNamespace(root, ns string) []*registry.Version {
 	resources, err := listSubdirs(filepath.Join(root, ns))
 	if err != nil {
-		slog.Warn("failed to list resources", "namespace", ns, "error", err)
+		slog.Error("failed to list resources", "namespace", ns, "error", err)
 		return nil
 	}
 
@@ -328,14 +328,14 @@ func listNamespace(root, ns string) []*registry.Version {
 	for _, res := range resources {
 		versionDirs, err := listSubdirs(filepath.Join(root, ns, res))
 		if err != nil {
-			slog.Warn("failed to list versions", "namespace", ns, "resource", res, "error", err)
+			slog.Error("failed to list versions", "namespace", ns, "resource", res, "error", err)
 			continue
 		}
 		for _, ver := range versionDirs {
 			metPath := filepath.Join(root, ns, res, ver, metaFilename)
 			v, err := readMeta(metPath)
 			if err != nil {
-				slog.Warn("failed to read metadata", "namespace", ns, "resource", res, "version", ver, "error", err)
+				slog.Error("failed to read metadata", "namespace", ns, "resource", res, "version", ver, "error", err)
 				continue
 			}
 			versions = append(versions, v)
@@ -397,7 +397,7 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 		filepath.Dir(filepath.Dir(eDir)),
 	} {
 		if pErr := pruneEmpty(dir); pErr != nil {
-			slog.Warn("failed to prune empty directory", "dir", dir, "error", pErr)
+			slog.Error("failed to prune empty directory", "dir", dir, "error", pErr)
 		}
 	}
 
