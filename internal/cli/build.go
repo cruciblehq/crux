@@ -29,7 +29,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	registry := c.Registry
 	if registry == "" {
-		registry = internal.RegistryURL
+		registry = internal.DefaultRegistryURL
 	}
 
 	// Build first (don't wait for changes)
@@ -96,7 +96,7 @@ func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildR
 	if err != nil {
 		return nil, err
 	}
-	client, err := backend.Client(ctx, internal.InstanceName)
+	client, err := backend.Client(ctx, internal.DefaultInstanceName)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-// Package compute provisions cruxd runtime instances for Crucible.
+// Package compute provisions cruxd host instances for Crucible.
 //
 // The package maintains a registry of compute backends, initialised lazily.
 // Callers select a backend via [BackendFor] with a [Provider] constant,
@@ -9,7 +9,7 @@
 // Provider implementations live in sub-packages (e.g. compute/internal/local)
 // and implement the [provider.Backend] interface defined in compute/internal/provider.
 //
-// Lifecycle methods are synchronous: they block until the underlying runtime
+// Lifecycle methods are synchronous: they block until the underlying host
 // reaches the expected target state. If it does not converge, the provider
 // reverts any partial changes and returns an error. Context cancellation is
 // the mechanism for aborting a long-running call.
@@ -17,8 +17,7 @@
 // Provisioning creates and starts the instance. If it fails, the provider
 // tears down any partial state automatically.
 //
-//	cfg := &compute.Config{Name: "local", Version: "0.1.3"}
-//	err := b.Provision(ctx, cfg)
+//	err = b.Provision(ctx, "local", "/path/to/image")
 //
 //	err = b.Stop(ctx, "local")
 //	err = b.Start(ctx, "local")

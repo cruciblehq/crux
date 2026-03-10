@@ -8,6 +8,8 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/cache"
+	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
 )
 
@@ -20,6 +22,11 @@ type CacheRemoveCmd struct {
 func (c *CacheRemoveCmd) Run(_ context.Context) error {
 	slog.Info("removing cache entries...")
 
+	source, err := resource.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+
 	localCache, err := cache.Open()
 	if err != nil {
 		return err
@@ -27,7 +34,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 	defer localCache.Close()
 
 	for _, refStr := range c.References {
-		if err := removeReference(localCache, refStr); err != nil {
+		if err := removeReference(localCache, source, refStr); err != nil {
 			return err
 		}
 	}
@@ -38,12 +45,8 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 }
 
 // Removes cache entries matching a reference.
-func removeReference(c *cache.Cache, refStr string) error {
-	opts, err := reference.NewOptions(internal.RegistryURL, internal.DefaultNamespace)
-	if err != nil {
-		return err
-	}
-	ref, err := reference.Parse(refStr, "widget", opts)
+func removeReference(c *cache.Cache, source resource.Source, refStr string) error {
+	ref, err := source.Parse(manifest.TypeWidget, refStr)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).
 			Fallback("Use the format 'namespace/resource version'.").

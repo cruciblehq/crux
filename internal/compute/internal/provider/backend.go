@@ -1,25 +1,31 @@
 package provider
 
-import "context"
+import (
+	"context"
+
+	"github.com/cruciblehq/crux/internal/resource"
+)
 
 // Interface for provider implementations.
 //
-// A provider provisions cruxd runtime instances. How the runtime is hosted
-// is an implementation detail: the local provider starts a cruxd process on
-// Linux and a Lima VM on macOS; a remote provider could create a cloud
-// compute instance. Lifecycle methods ([Provision], [Deprovision], [Start],
-// and [Stop]) block until the runtime reaches the expected target state. If
-// it does not converge, the provider must revert any partial changes and
-// return an error. Long-running operations must support context cancellation.
-// When cancelled, the provider should stop in-flight work and revert changes.
+// A provider provisions cruxd host instances. How the host is managed is an
+// implementation detail: the local provider starts a cruxd process on Linux
+// and a Lima VM on macOS; a remote provider could create a cloud compute
+// instance. Lifecycle methods ([Provision], [Deprovision], [Start], and
+// [Stop]) block until the host reaches the expected target state. If it does
+// not converge, the provider must revert any partial changes and return an
+// error. Long-running operations must support context cancellation. When
+// cancelled, the provider should stop in-flight work and revert changes.
 type Backend interface {
 
-	// Provisions a cruxd runtime instance.
+	// Provisions a cruxd host instance.
 	//
-	// If a runtime with the configured name is already running, it is reused.
-	// If provisioning fails or the runtime does not reach [StateRunning], the
-	// provider tears down any partial state and returns an error.
-	Provision(ctx context.Context, config *Config) error
+	// If a host with the given name is already running, it is reused. If
+	// provisioning fails or the host does not reach [StateRunning], the
+	// provider tears down any partial state and returns an error. The
+	// [resource.Source] is used by platforms that require a machine image
+	// (e.g., Darwin/Lima). Platforms that run cruxd natively ignore it.
+	Provision(ctx context.Context, name string, source resource.Source) error
 
 	// Tears down a cruxd instance and all its persistent state.
 	//
@@ -40,8 +46,8 @@ type Backend interface {
 
 	// Returns the current lifecycle state of an instance.
 	//
-	// Must reflect the actual state of the underlying runtime. If the name
-	// has never been provisioned, returns [StateNotProvisioned].
+	// Must reflect the actual state of the underlying host. If the name has
+	// never been provisioned, returns [StateNotProvisioned].
 	Status(ctx context.Context, name string) (State, error)
 
 	// Runs a command on the instance's host.

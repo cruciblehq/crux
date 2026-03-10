@@ -32,7 +32,7 @@ type PullResult struct {
 // downloaded from the registry and stored in the cache. Supports both
 // version-based and channel-based references. Channels are resolved to their
 // current version before downloading.
-func Pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
+func pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
 	localCache, err := cache.Open()
 	if err != nil {
 		return nil, crex.Wrap(ErrCacheOperation, err)
@@ -40,7 +40,7 @@ func Pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
 	defer localCache.Close()
 
 	registryURL := ref.Registry()
-	client := registry.NewClient(registryURL.String(), nil)
+	client := registry.NewClient(registryURL, nil)
 
 	ver, err := registry.ResolveVersion(ctx, client, ref)
 	if err != nil {

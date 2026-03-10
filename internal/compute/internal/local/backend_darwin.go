@@ -9,21 +9,22 @@ import (
 
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/resource"
 )
 
 // Provisions a cruxd instance.
 //
-// The shared VM is created and started if it does not already exist. A cruxd
-// process is then started inside the VM for the given instance. The call
-// blocks until cruxd signals readiness via the ready-fd protocol.
-func provision(ctx context.Context, config *provider.Config) error {
-	if err := ensureRuntimeRunning(ctx, config.Version); err != nil {
-		slog.Debug("provision failed, VM did not start", "name", config.Name, "error", err)
+// The shared VM is created and started if it does not already exist. The
+// machine image is resolved through the [resource.Source] passed by the
+// caller. A cruxd process is then started inside the VM for the given
+// instance. The call blocks until cruxd signals readiness via the
+// ready-fd protocol.
+func provision(ctx context.Context, name string, source resource.Source) error {
+	if err := ensureHostRunning(ctx, source); err != nil {
 		return err
 	}
 
-	if err := startCruxd(ctx, config.Name); err != nil {
-		slog.Debug("provision failed, cruxd did not start", "name", config.Name, "error", err)
+	if err := startCruxd(ctx, name); err != nil {
 		return err
 	}
 
@@ -36,13 +37,13 @@ func provision(ctx context.Context, config *provider.Config) error {
 // started inside the VM. The call blocks until cruxd signals readiness
 // via the ready-fd protocol.
 func start(ctx context.Context, name string) error {
-	state, err := runtimeStatus(ctx)
+	state, err := hostStatus(ctx)
 	if err != nil {
 		return err
 	}
 	if state != provider.StateRunning {
 		slog.Debug("start failed, VM is not running", "name", name, "state", state)
-		return ErrRuntimeNotRunning
+		return ErrHostNotRunning
 	}
 
 	if err := startCruxd(ctx, name); err != nil {
@@ -63,18 +64,20 @@ func deprovision(ctx context.Context, name string) error {
 	// Best-effort: stop the cruxd instance if running.
 	stopCruxd(ctx, name)
 
-	return destroyRuntime(ctx)
+	return destroyHost(ctx)
 }
 
 // Queries the current state of a cruxd instance.
 //
-// If the runtime has not been provisioned, the instance is in a
-// [provider.StateNotProvisioned] state. If the runtime exists but is not
-// running (or the cruxd process is not reachable), the instance is in a
-// [provider.StateStopped] state. If the cruxd socket is reachable, the
-// instance is in a [provider.StateRunning] state.
+// State is determined by probing two layers: the Lima VM and the cruxd
+// process inside it. The returned state is the least-healthy of the two:
+//
+//   - [provider.StateNotProvisioned] — the VM does not exist.
+//   - [provider.StateStopped] — the VM exists but is not running, or the
+//     VM is running but the cruxd socket for this instance is not reachable.
+//   - [provider.StateRunning] — both the VM and the cruxd socket are up.
 func status(ctx context.Context, name string) (provider.State, error) {
-	rtState, err := runtimeStatus(ctx)
+	rtState, err := hostStatus(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -95,7 +98,7 @@ func status(ctx context.Context, name string) (provider.State, error) {
 	return provider.StateRunning, nil
 }
 
-// Runs a command inside the runtime VM.
+// Runs a command inside the host VM.
 func execute(ctx context.Context, _ string, command string, args ...string) (*provider.ExecResult, error) {
-	return runtimeExec(ctx, command, args...)
+	return hostExec(ctx, command, args...)
 }

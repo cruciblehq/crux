@@ -6,9 +6,10 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
+	"github.com/cruciblehq/crux/internal/resource"
 )
 
-func provision(_ context.Context, _ *provider.Config) error {
+func provision(_ context.Context, _ string, _ resource.Source) error {
 	return ErrUnsupportedPlatform
 }
 

@@ -79,7 +79,7 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 		return nil, nil, err
 	}
 
-	defaults, err := NewDefaults(opts.DefaultRegistry, opts.DefaultNamespace)
+	source, err := NewSource(opts.DefaultRegistry, opts.DefaultNamespace)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,16 +89,16 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 	var b Builder
 	switch man.Resource.Type {
 	case manifest.TypeRuntime:
-		b = NewRuntimeBuilder(opts.Client, defaults, workdir)
+		b = NewRuntimeBuilder(opts.Client, source, workdir)
 
 	case manifest.TypeService:
-		b = NewServiceBuilder(opts.Client, defaults, workdir)
+		b = NewServiceBuilder(opts.Client, source, workdir)
 
 	case manifest.TypeWidget:
-		b = NewWidgetBuilder(defaults)
+		b = NewWidgetBuilder(source)
 
 	case manifest.TypeMachine:
-		b = NewMachineBuilder(opts.Client, defaults, workdir)
+		b = NewMachineBuilder(opts.Client, source, workdir)
 
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)

@@ -2,19 +2,23 @@ package internal
 
 const (
 
-	// Identifier for the cruxd instance, also used as the slog group name.
-	InstanceName = "crux"
+	// Application name, used as the slog group name.
+	Name = "crux"
 
-	// Crucible Hub registry URL.
-	RegistryURL = "http://hub.cruciblehq.xyz:8080"
+	// Default cruxd instance name used when no instance is specified.
+	DefaultInstanceName = "local"
+
+	// Default Crucible Hub registry URL.
+	DefaultRegistryURL = "http://hub.cruciblehq.xyz:8080"
 
 	// Default namespace for resources in the registry.
 	DefaultNamespace = "official"
 
-	// Cruxd version to provision.
+	// Default machine image reference for the runtime VM (Darwin only).
 	//
-	// This version is embedded at build time and determines which cruxd release
-	// is downloaded during provisioning. It should be bumped whenever a new
-	// cruxd release is adopted.
-	CruxdVersion = "0.3.1"
+	// This reference is embedded at build time and determines which machine
+	// resource is pulled from the registry during provisioning. The machine
+	// image includes cruxd, containerd, and all required services pre-
+	// configured. Bump this when adopting a new machine image release.
+	DefaultMachineImage = "crucible/machine 0.1.0"
 )

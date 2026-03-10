@@ -7,6 +7,7 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
@@ -14,14 +15,13 @@ import (
 //
 // Widgets are client-side JavaScript bundles built with esbuild.
 type WidgetBuilder struct {
-	defaults Defaults
+	source Source
 }
 
-// Returns a [WidgetBuilder] configured with the given defaults
-// for push operations.
-func NewWidgetBuilder(defaults Defaults) *WidgetBuilder {
+// Returns a [WidgetBuilder] configured with the given source for push operations.
+func NewWidgetBuilder(source Source) *WidgetBuilder {
 	return &WidgetBuilder{
-		defaults: defaults,
+		source: source,
 	}
 }
 
@@ -55,8 +55,8 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output 
 		return nil, err
 	}
 
-	if _, err := m.ResolveName(wb.defaults.IdentifierOptions()); err != nil {
-		return nil, crex.UserError("invalid resource name", "could not resolve the resource identifier").
+	if _, err := reference.ParseIdentifier(m.Resource.Name, string(m.Resource.Type)); err != nil {
+		return nil, crex.UserError("invalid resource name", "could not parse the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
 			Cause(err).
 			Err()
@@ -199,5 +199,5 @@ func (wb *WidgetBuilder) Pack(ctx context.Context, buildDir, output string) (*Pa
 //
 // packagePath must point to an archive created by [WidgetBuilder.Pack].
 func (wb *WidgetBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, wb.defaults)
+	return push(ctx, m, packagePath, wb.source)
 }

@@ -8,23 +8,23 @@ import (
 	"github.com/cruciblehq/crux/internal/compute"
 )
 
-// Represents the 'crux runtime stop' command.
-type RuntimeStopCmd struct{}
+// Represents the 'crux host stop' command.
+type HostStopCmd struct{}
 
-// Stops the cruxd runtime instance.
-func (c *RuntimeStopCmd) Run(ctx context.Context) error {
-	slog.Info("stopping runtime...")
+// Stops the cruxd host instance.
+func (c *HostStopCmd) Run(ctx context.Context) error {
+	slog.Info("stopping host...")
 
 	b, err := compute.BackendFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := internal.InstanceName
+	name := internal.DefaultInstanceName
 
 	if err := b.Stop(ctx, name); err != nil {
 		return err
 	}
 
-	slog.Info("runtime stopped")
+	slog.Info("host stopped")
 	return nil
 }

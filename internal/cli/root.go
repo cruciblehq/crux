@@ -33,7 +33,7 @@ var RootCmd struct {
 	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
 	Pull    PullCmd    `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
-	Runtime RuntimeCmd `cmd:"" help:"Manage the container runtime environment."`
+	Host    HostCmd    `cmd:"" help:"Manage the Crucible host environment."`
 	Version VersionCmd `cmd:"" help:"Show version information."`
 	// Scaffold ScaffoldCmd `cmd:"" aliases:"init,create,new" help:"Scaffold a Crucible resource."`
 	// Server   ServerCmd   `cmd:"" help:"Manage the local development server."`

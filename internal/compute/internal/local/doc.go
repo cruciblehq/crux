@@ -1,11 +1,10 @@
 // Package local implements the local compute backend.
 //
-// On macOS, the local provider manages a Lima virtual machine that runs
-// cruxd. On Linux, it manages a native cruxd process. On unsupported
-// platforms every method returns [ErrUnsupportedPlatform].
+// On macOS, the local provider manages a Lima virtual machine that runs cruxd.
+// On Linux, it manages a native cruxd process. On unsupported platforms every
+// method returns [ErrUnsupportedPlatform].
 //
-// [NewBackend] returns a [provider.Backend] whose lifecycle methods
-// ([provider.Backend.Provision], [provider.Backend.Start], etc.) are
+// [NewBackend] returns a [provider.Backend] whose lifecycle methods are
 // synchronous: they block until the underlying process exits. On macOS
 // this is achieved by running limactl inline; on Linux, process exit is
 // detected via pidfd.
@@ -17,11 +16,7 @@
 // a client, and tears it down when done:
 //
 //	b := local.NewBackend()
-//
-//	err := b.Provision(ctx, &provider.Config{
-//		Name:    "my-instance",
-//		Version: "0.1.0",
-//	})
+//	err := b.Provision(ctx, "my-instance", source)
 //
 //	state, _ := b.Status(ctx, "my-instance") // provider.StateRunning
 //
@@ -36,7 +31,7 @@
 //
 //	b.Start(ctx, "my-instance")
 //
-// [provider.Backend.Exec] runs a command inside the runtime environment
+// [provider.Backend.Exec] runs a command inside the host environment
 // and returns its output:
 //
 //	result, err := b.Exec(ctx, "my-instance", "uname", "-a")
