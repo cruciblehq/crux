@@ -10,14 +10,15 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/internal/resource"
 )
 
-// Provisions a cruxd instance for the given config.
-func provision(ctx context.Context, config *provider.Config) error {
-	if err := ensureCruxd(ctx, config.Version); err != nil {
+// Provisions a cruxd instance.
+func provision(ctx context.Context, name string, _ resource.Source) error {
+	if err := ensureCruxd(ctx); err != nil {
 		return err
 	}
-	if err := startCruxd(config.Name); err != nil {
+	if err := startCruxd(name); err != nil {
 		return err
 	}
 	return nil
@@ -69,7 +70,7 @@ func status(_ context.Context, name string) (provider.State, error) {
 // Runs a command on the host and captures its output.
 func execute(ctx context.Context, name string, command string, args ...string) (*provider.ExecResult, error) {
 	if !isCruxdRunning(name) {
-		return nil, ErrRuntimeNotRunning
+		return nil, ErrHostNotRunning
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -82,13 +83,9 @@ func execute(ctx context.Context, name string, command string, args ...string) (
 			exitCode = exitErr.ExitCode()
 			stderr = string(exitErr.Stderr)
 		} else {
-			return nil, crex.Wrap(ErrRuntimeExec, err)
+			return nil, crex.Wrap(ErrHostExec, err)
 		}
 	}
 
-	return &provider.ExecResult{
-		Stdout:   string(stdout),
-		Stderr:   stderr,
-		ExitCode: exitCode,
-	}, nil
+	return provider.NewExecResult(string(stdout), stderr, exitCode), nil
 }

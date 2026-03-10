@@ -39,7 +39,7 @@ func main() {
 func logger() *slog.Logger {
 	handler := crex.NewHandler()
 	handler.SetLevel(logLevel())
-	return slog.New(handler.WithGroup(internal.InstanceName))
+	return slog.New(handler.WithGroup(internal.Name))
 }
 
 // Returns the log level derived from build-time linker flags.

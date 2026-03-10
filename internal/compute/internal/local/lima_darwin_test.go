@@ -77,15 +77,15 @@ func TestExtractLima(t *testing.T) {
 
 func TestConfigTemplate_IsValid(t *testing.T) {
 	data := limaConfig{
-		Arch:             "aarch64",
-		CPUs:             2,
-		Memory:           "2GiB",
-		Disk:             "10GiB",
-		Home:             "/Users/testuser",
-		User:             "testuser",
-		ContainerdGID:    999,
-		CruxdDownloadURL: "https://example.com/cruxd-linux-aarch64.tar.gz",
-		ImagePath:        "/tmp/vm/alpine.qcow2",
+		Arch:        "aarch64",
+		CPUs:        2,
+		Memory:      "2GiB",
+		Disk:        "10GiB",
+		Home:        "/Users/testuser",
+		User:        "testuser",
+		ImagePath:   "/tmp/vm/machine.qcow2",
+		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -106,6 +106,9 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"containerd:",
 		"system: false",
 		"user: false",
+		"portForwards:",
+		"guestSocket: \"/run/cruxd/instances/crux/cruxd.sock\"",
+		"hostSocket: \"/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock\"",
 	}
 	for _, s := range required {
 		if !strings.Contains(output, s) {
@@ -116,15 +119,15 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 
 func TestConfigTemplate_x86(t *testing.T) {
 	data := limaConfig{
-		Arch:             "x86_64",
-		CPUs:             4,
-		Memory:           "4GiB",
-		Disk:             "20GiB",
-		Home:             "/Users/testuser",
-		User:             "testuser",
-		ContainerdGID:    999,
-		CruxdDownloadURL: "https://example.com/cruxd-linux-x86_64.tar.gz",
-		ImagePath:        "/tmp/vm/alpine.qcow2",
+		Arch:        "x86_64",
+		CPUs:        4,
+		Memory:      "4GiB",
+		Disk:        "20GiB",
+		Home:        "/Users/testuser",
+		User:        "testuser",
+		ImagePath:   "/tmp/vm/machine.qcow2",
+		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -140,15 +143,15 @@ func TestConfigTemplate_x86(t *testing.T) {
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
 	data := limaConfig{
-		Arch:             "aarch64",
-		CPUs:             2,
-		Memory:           "2GiB",
-		Disk:             "10GiB",
-		Home:             "/Users/testuser",
-		User:             "testuser",
-		ContainerdGID:    990,
-		CruxdDownloadURL: "https://example.com/cruxd-linux-aarch64.tar.gz",
-		ImagePath:        "/tmp/vm/alpine.qcow2",
+		Arch:        "aarch64",
+		CPUs:        2,
+		Memory:      "2GiB",
+		Disk:        "10GiB",
+		Home:        "/Users/testuser",
+		User:        "testuser",
+		ImagePath:   "/tmp/vm/machine.qcow2",
+		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -157,7 +160,7 @@ func TestConfigTemplate_ImagePath(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "/tmp/vm/alpine.qcow2") {
+	if !strings.Contains(output, "/tmp/vm/machine.qcow2") {
 		t.Errorf("expected image path in output:\n%s", output)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
 )
 
 // Represents the 'crux pull' command.
@@ -23,7 +22,7 @@ type PullCmd struct {
 func (c *PullCmd) Run(ctx context.Context) error {
 	registry := c.Registry
 	if registry == "" {
-		registry = internal.RegistryURL
+		registry = internal.DefaultRegistryURL
 	}
 
 	resType, err := manifest.ParseResourceType(c.Type)
@@ -33,24 +32,19 @@ func (c *PullCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	raw := strings.Join(c.Reference, " ")
-
-	opts, err := reference.NewOptions(registry, internal.DefaultNamespace)
+	source, err := resource.NewSource(registry, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
 
-	ref, err := reference.Parse(raw, string(resType), opts)
-	if err != nil {
-		return crex.UserError("invalid reference", "could not parse the resource reference").
-			Fallback("Use the format 'namespace/resource version'.").
-			Cause(err).
-			Err()
-	}
+	raw := strings.Join(c.Reference, " ")
 
-	slog.Info("pulling resource...", "reference", raw, "registry", ref.Registry())
+	slog.Info("pulling resource...",
+		"reference", raw,
+		"registry", registry,
+	)
 
-	result, err := resource.Pull(ctx, ref)
+	result, _, err := source.Pull(ctx, resType, raw)
 	if err != nil {
 		return err
 	}

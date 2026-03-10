@@ -6,3 +6,8 @@ type ExecResult struct {
 	Stderr   string // Standard error from the command.
 	ExitCode int    // Process exit code (0 = success).
 }
+
+// Returns a new [ExecResult].
+func NewExecResult(stdout, stderr string, exitCode int) *ExecResult {
+	return &ExecResult{Stdout: stdout, Stderr: stderr, ExitCode: exitCode}
+}

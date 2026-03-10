@@ -22,13 +22,6 @@ func LimactlBin() string {
 	return filepath.Join(LimaDir(), "bin", "limactl")
 }
 
-// Path to the cached Alpine Linux qcow2 disk image used by the VM.
-//
-//	~/Library/Application Support/crux/vm/alpine.qcow2
-func AlpineImage() string {
-	return filepath.Join(VMDir(), "alpine.qcow2")
-}
-
 // Path to the Lima YAML configuration file for the shared crux VM.
 //
 //	~/Library/Application Support/crux/vm/lima.yaml
@@ -38,8 +31,9 @@ func LimaConfig() string {
 
 // Path to the cruxd Unix socket for an instance.
 //
-// Returns a path under the user's cache directory on a virtiofs mount shared
-// with the VM, so the host can connect directly.
+// On Darwin, cruxd binds a guest-local socket inside the Lima VM. Lima's
+// portForwards tunnels the guest socket to this host path over SSH, so the
+// host dials this path transparently.
 //
 //	~/Library/Caches/cruxd/instances/<name>/cruxd.sock
 func CruxdSocket(name string) string {

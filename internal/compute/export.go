@@ -14,11 +14,11 @@ type Backend = provider.Backend
 // Interface for communicating with a cruxd instance.
 type Client = provider.Client
 
-// Config holds parameters for provisioning a cruxd instance.
-type Config = provider.Config
-
 // Lifecycle state of a cruxd instance.
 type State = provider.State
 
 // Output captured from a command executed on the instance's host.
 type ExecResult = provider.ExecResult
+
+// Returns a new [ExecResult].
+var NewExecResult = provider.NewExecResult

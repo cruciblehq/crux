@@ -35,7 +35,7 @@ func (c *RestartCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client, err := b.Client(ctx, internal.InstanceName)
+	client, err := b.Client(ctx, internal.DefaultInstanceName)
 	if err != nil {
 		return err
 	}

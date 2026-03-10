@@ -11,6 +11,7 @@ import (
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/registry"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 	specregistry "github.com/cruciblehq/spec/registry"
 )
 
@@ -22,7 +23,7 @@ import (
 // a compressed archive solely to read the manifest would be wasteful. The
 // resolved manifest inside the archive (written by [Builder.Build]) is
 // functionally equivalent since the same options produce the same result.
-func push(ctx context.Context, m manifest.Manifest, packagePath string, defaults Defaults) error {
+func push(ctx context.Context, m manifest.Manifest, packagePath string, source Source) error {
 	if _, err := os.Stat(packagePath); err != nil {
 		return crex.UserError("package not found", "package does not exist").
 			Fallback("Run 'crux pack' first to create the package.").
@@ -30,7 +31,7 @@ func push(ctx context.Context, m manifest.Manifest, packagePath string, defaults
 			Err()
 	}
 
-	id, err := m.ResolveName(defaults.IdentifierOptions())
+	id, err := reference.ParseIdentifier(m.Resource.Name, string(m.Resource.Type))
 	if err != nil {
 		return crex.UserError("invalid resource name", "could not parse the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
@@ -38,8 +39,7 @@ func push(ctx context.Context, m manifest.Manifest, packagePath string, defaults
 			Err()
 	}
 
-	registryURL := id.Registry()
-	client := registry.NewClient(registryURL.String(), nil)
+	client := registry.NewClient(source.Registry, nil)
 
 	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err

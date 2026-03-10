@@ -2,7 +2,6 @@ package cache
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/registry"
 )
@@ -421,10 +421,10 @@ func validatePathComponent(s string) error {
 		return errors.New("empty path component")
 	}
 	if s == "." || s == ".." {
-		return fmt.Errorf("invalid path component: %q", s)
+		return crex.Wrapf(ErrInvalidPath, "%q", s)
 	}
 	if strings.ContainsAny(s, "/\\") {
-		return fmt.Errorf("path component contains separator: %q", s)
+		return crex.Wrapf(ErrInvalidPath, "%q contains separator", s)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
 )
 
 // [Builder] for Crucible services.
@@ -20,12 +21,12 @@ type ServiceBuilder struct {
 //
 // workdir is the directory containing the manifest and is used as the root
 // for resolving copy sources during builds.
-func NewServiceBuilder(client BuildClient, defaults Defaults, workdir string) *ServiceBuilder {
+func NewServiceBuilder(client BuildClient, source Source, workdir string) *ServiceBuilder {
 	return &ServiceBuilder{
 		recipeBuilder: recipeBuilder{
-			client:   client,
-			defaults: defaults,
-			workdir:  workdir,
+			client:  client,
+			source:  source,
+			workdir: workdir,
 		},
 	}
 }
@@ -43,8 +44,8 @@ func (sb *ServiceBuilder) Build(ctx context.Context, m manifest.Manifest, output
 			Err()
 	}
 
-	if _, err := m.ResolveName(sb.defaults.IdentifierOptions()); err != nil {
-		return nil, crex.UserError("invalid resource name", "could not resolve the resource identifier").
+	if _, err := reference.ParseIdentifier(m.Resource.Name, string(m.Resource.Type)); err != nil {
+		return nil, crex.UserError("invalid resource name", "could not parse the resource identifier").
 			Fallback("Check the resource name in crucible.yaml.").
 			Cause(err).
 			Err()
@@ -99,5 +100,5 @@ func (sb *ServiceBuilder) Pack(ctx context.Context, buildDir, output string) (*P
 //
 // packagePath must point to an archive created by [ServiceBuilder.Pack].
 func (sb *ServiceBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, sb.defaults)
+	return push(ctx, m, packagePath, sb.source)
 }

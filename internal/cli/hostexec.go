@@ -9,20 +9,21 @@ import (
 	"github.com/cruciblehq/crux/internal/compute"
 )
 
-// Represents the 'crux runtime exec' command.
-type RuntimeExecCmd struct {
-	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to run inside the runtime."`
+// Represents the 'crux host exec' command.
+type HostExecCmd struct {
+	Command []string `arg:"" required:"" passthrough:"" help:"Command and arguments to run inside the host."`
 }
 
-// Executes a command inside the runtime and prints its output.
+// Executes a command inside the host and prints its output.
 //
 // The process exit code is propagated from the executed command.
-func (c *RuntimeExecCmd) Run(ctx context.Context) error {
+func (c *HostExecCmd) Run(ctx context.Context) error {
 	b, err := compute.BackendFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := internal.InstanceName
+	name := internal.DefaultInstanceName
+
 	result, err := b.Exec(ctx, name, c.Command[0], c.Command[1:]...)
 	if err != nil {
 		return err

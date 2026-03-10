@@ -13,14 +13,25 @@ import (
 	"runtime"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/spec/archive"
 	"github.com/cruciblehq/spec/protocol"
 )
 
+const (
+
+	// Cruxd version to provision on Linux.
+	//
+	// The cruxd binary is downloaded directly from the GitHub release. Bump
+	// this when adopting a new cruxd release.
+	cruxdVersion = "0.3.2"
+
+	// Download URL template for cruxd releases.
+	cruxdDownloadURL = "https://github.com/cruciblehq/cruxd/releases/download/v%s/cruxd-linux-%s.tar.gz"
+)
+
 // Ensures the cruxd binary is available, downloading it if necessary.
-func ensureCruxd(ctx context.Context, version string) error {
+func ensureCruxd(ctx context.Context) error {
 	bin := paths.CruxdBin()
 	if _, err := os.Stat(bin); err == nil {
 		return nil
@@ -31,7 +42,7 @@ func ensureCruxd(ctx context.Context, version string) error {
 		return crex.Wrap(ErrCruxdInstall, err)
 	}
 
-	return downloadCruxd(ctx, provider.CruxdDownloadURL(version, runtime.GOARCH), binDir)
+	return downloadCruxd(ctx, fmt.Sprintf(cruxdDownloadURL, cruxdVersion, runtime.GOARCH), binDir)
 }
 
 // Downloads the cruxd release archive and extracts the binary into dest.
@@ -83,16 +94,16 @@ func isCruxdRunning(name string) bool {
 // exits before signaling, the read returns EOF and an error is raised.
 func startCruxd(name string) error {
 	if isCruxdRunning(name) {
-		return ErrRuntimeAlreadyRunning
+		return ErrHostAlreadyRunning
 	}
 
 	if err := os.MkdirAll(paths.CruxdInstanceDir(name), paths.DefaultDirMode); err != nil {
-		return crex.Wrap(ErrRuntimeStart, err)
+		return crex.Wrap(ErrHostStart, err)
 	}
 
 	pr, pw, err := os.Pipe()
 	if err != nil {
-		return crex.Wrap(ErrRuntimeStart, err)
+		return crex.Wrap(ErrHostStart, err)
 	}
 	defer pr.Close()
 
@@ -109,7 +120,7 @@ func startCruxd(name string) error {
 
 	if err := cmd.Start(); err != nil {
 		pw.Close()
-		return crex.Wrap(ErrRuntimeStart, err)
+		return crex.Wrap(ErrHostStart, err)
 	}
 	// Close the write end in the parent so reads get EOF if cruxd exits.
 	pw.Close()
@@ -118,7 +129,7 @@ func startCruxd(name string) error {
 	n, readErr := pr.Read(line)
 	env, _, decErr := protocol.Decode(line[:n])
 	if readErr != nil || decErr != nil || env.Command != protocol.CmdOK {
-		return crex.Wrapf(ErrRuntimeStart, "cruxd did not signal readiness")
+		return crex.Wrapf(ErrHostStart, "cruxd did not signal readiness")
 	}
 
 	return nil
@@ -127,26 +138,26 @@ func startCruxd(name string) error {
 // Signals the cruxd process to stop and returns its PID.
 func stopCruxd(name string) (int, error) {
 	if !isCruxdRunning(name) {
-		return 0, ErrRuntimeNotRunning
+		return 0, ErrHostNotRunning
 	}
 
 	data, err := os.ReadFile(paths.CruxdPIDFile(name))
 	if err != nil {
-		return 0, crex.Wrap(ErrRuntimeStop, err)
+		return 0, crex.Wrap(ErrHostStop, err)
 	}
 
 	var pid int
 	if _, err := fmt.Sscanf(string(data), "%d", &pid); err != nil {
-		return 0, crex.Wrap(ErrRuntimeStop, err)
+		return 0, crex.Wrap(ErrHostStop, err)
 	}
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return 0, crex.Wrap(ErrRuntimeStop, err)
+		return 0, crex.Wrap(ErrHostStop, err)
 	}
 
 	if err := proc.Signal(os.Interrupt); err != nil {
-		return 0, crex.Wrap(ErrRuntimeStop, err)
+		return 0, crex.Wrap(ErrHostStop, err)
 	}
 
 	return pid, nil

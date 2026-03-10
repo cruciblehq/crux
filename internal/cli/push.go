@@ -18,7 +18,7 @@ type PushCmd struct {
 func (c *PushCmd) Run(ctx context.Context) error {
 	registry := c.Registry
 	if registry == "" {
-		registry = internal.RegistryURL
+		registry = internal.DefaultRegistryURL
 	}
 
 	slog.Info("pushing package...", "registry", registry)

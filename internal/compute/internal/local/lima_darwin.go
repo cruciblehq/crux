@@ -28,8 +28,8 @@ const (
 	limaInstanceName = "crux"  // Lima instance name used for the crux VM.
 
 	// Status strings returned by limactl list.
-	limaStatusRunning = "Running"
-	limaStatusStopped = "Stopped"
+	limaStatusRunning = "Running" // Lima instance is running.
+	limaStatusStopped = "Stopped" // Lima instance is stopped.
 
 	// Download URL template for Lima releases. Uses placeholders for version,
 	// OS, and architecture.
@@ -142,15 +142,11 @@ func limaExec(ctx context.Context, command string, args ...string) (*provider.Ex
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			return nil, crex.Wrap(ErrRuntimeExec, err)
+			return nil, crex.Wrap(ErrHostExec, err)
 		}
 	}
 
-	return &provider.ExecResult{
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		ExitCode: exitCode,
-	}, nil
+	return provider.NewExecResult(stdout.String(), stderr.String(), exitCode), nil
 }
 
 // Runs a limactl subcommand synchronously.

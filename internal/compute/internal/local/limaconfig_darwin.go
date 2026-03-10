@@ -6,12 +6,12 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"runtime"
+	"os/user"
 	"text/template"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
+	specpaths "github.com/cruciblehq/spec/paths"
 )
 
 const (
@@ -20,11 +20,6 @@ const (
 	defaultLimaCPUs      = 2  // Default number of virtual CPUs allocated to the VM.
 	defaultLimaMemoryGiB = 2  // Default memory in GiB allocated to the VM.
 	defaultLimaDiskGiB   = 10 // Default disk size in GiB allocated to the VM.
-
-	// Default GID for the containerd group inside the VM. The containerd
-	// socket is configured with this group so the Lima user can access it.
-	// Alpine reserves GID 999 for the ping group, so we use 990.
-	defaultLimaContainerdGID = 990
 )
 
 //go:embed templates/lima.yaml.tmpl
@@ -38,55 +33,55 @@ var limaConfigTemplate = template.Must(template.New("lima").Parse(limaConfigSour
 
 // Values injected into the Lima YAML template.
 type limaConfig struct {
-	Arch             string // Lima architecture identifier (e.g. "aarch64", "x86_64").
-	CPUs             int    // Number of virtual CPUs.
-	Memory           string // Memory allocation with unit suffix (e.g. "2GiB").
-	Disk             string // Disk size with unit suffix (e.g. "10GiB").
-	Home             string // Host home directory for the virtiofs mount.
-	User             string // Host username (Lima creates a matching guest user).
-	ContainerdGID    int    // GID for the containerd group (controls socket access).
-	CruxdDownloadURL string // URL to download the cruxd binary from.
-	ImagePath        string // Local path to the cached Alpine qcow2 image.
+	Arch        string // Lima architecture identifier (e.g. "aarch64", "x86_64").
+	CPUs        int    // Number of virtual CPUs.
+	Memory      string // Memory allocation with unit suffix (e.g. "2GiB").
+	Disk        string // Disk size with unit suffix (e.g. "10GiB").
+	Home        string // Host home directory for the virtiofs mount.
+	User        string // Host username (Lima creates a matching guest user).
+	ImagePath   string // Local path to the cached machine disk image.
+	GuestSocket string // cruxd socket path inside the VM (guest-local, under /run).
+	HostSocket  string // cruxd socket path on the host (Lima forwards guest → host).
 }
 
 // Generates the Lima YAML configuration for the shared crux VM.
 //
 // The configuration targets the host's native architecture and uses sensible
 // defaults for CPU, memory, and disk allocation. The VM boots from the
-// provided Alpine Linux image. The cruxd binary is installed during
-// provisioning; individual cruxd instances are started on demand, not at
-// VM creation time.
-func generateLimaConfig(cruxdVersion string, imagePath string) (string, error) {
-	home, err := os.UserHomeDir()
+// provided machine disk image. All required services (cruxd, containerd) are
+// pre-installed in the image; only Lima-specific host setup (user group
+// membership, socket directory permissions) is performed during provisioning.
+func generateLimaConfig(imagePath string) (string, error) {
+	u, err := user.Current()
 	if err != nil {
-		return "", crex.Wrap(ErrRuntimeConfig, err)
+		return "", crex.Wrap(ErrHostConfig, err)
 	}
 
 	data := limaConfig{
-		Arch:             limaArch(),
-		CPUs:             defaultLimaCPUs,
-		Memory:           fmt.Sprintf("%dGiB", defaultLimaMemoryGiB),
-		Disk:             fmt.Sprintf("%dGiB", defaultLimaDiskGiB),
-		Home:             home,
-		User:             os.Getenv("USER"),
-		ContainerdGID:    defaultLimaContainerdGID,
-		CruxdDownloadURL: provider.CruxdDownloadURL(cruxdVersion, runtime.GOARCH),
-		ImagePath:        imagePath,
+		Arch:        limaArch(),
+		CPUs:        defaultLimaCPUs,
+		Memory:      fmt.Sprintf("%dGiB", defaultLimaMemoryGiB),
+		Disk:        fmt.Sprintf("%dGiB", defaultLimaDiskGiB),
+		Home:        u.HomeDir,
+		User:        u.Username,
+		ImagePath:   imagePath,
+		GuestSocket: specpaths.Socket("crux"),
+		HostSocket:  paths.CruxdSocket("crux"),
 	}
 
 	if err := os.MkdirAll(paths.VMDir(), paths.DefaultDirMode); err != nil {
-		return "", crex.Wrap(ErrRuntimeConfig, err)
+		return "", crex.Wrap(ErrHostConfig, err)
 	}
 
 	configPath := paths.LimaConfig()
 	f, err := os.Create(configPath)
 	if err != nil {
-		return "", crex.Wrap(ErrRuntimeConfig, err)
+		return "", crex.Wrap(ErrHostConfig, err)
 	}
 	defer f.Close()
 
 	if err := limaConfigTemplate.Execute(f, data); err != nil {
-		return "", crex.Wrap(ErrRuntimeConfig, err)
+		return "", crex.Wrap(ErrHostConfig, err)
 	}
 
 	return configPath, nil
