@@ -97,9 +97,6 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 	case manifest.TypeWidget:
 		b = NewWidgetBuilder(source)
 
-	case manifest.TypeMachine:
-		b = NewMachineBuilder(opts.Client, source, workdir)
-
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)
 	}

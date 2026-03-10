@@ -6,7 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/alecthomas/kong v1.13.0
 	github.com/cruciblehq/crex v0.1.0
-	github.com/cruciblehq/spec v0.3.6
+	github.com/cruciblehq/spec v0.3.9
 	github.com/evanw/esbuild v0.27.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/klauspost/compress v1.18.4
