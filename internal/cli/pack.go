@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
 )
@@ -22,8 +23,8 @@ func (c *PackCmd) Run(ctx context.Context) error {
 	slog.Info("packaging resource...", "output", paths.Package(RootCmd.Context))
 
 	manifestPath := paths.Manifest(RootCmd.Context)
-
-	_, b, err := resource.ResolveBuilder(ctx, manifestPath, resource.Options{})
+	opts := resource.NewOptions(nil, internal.DefaultRegistryURL, internal.DefaultNamespace)
+	_, b, err := resource.ResolveBuilder(ctx, manifestPath, opts)
 	if err != nil {
 		return err
 	}

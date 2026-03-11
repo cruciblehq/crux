@@ -8,17 +8,6 @@ import (
 	"github.com/cruciblehq/spec/manifest"
 )
 
-// Creates a new [Options] with the given defaults.
-//
-// Both defaultRegistry and defaultNamespace are required.
-func NewOptions(client BuildClient, defaultRegistry, defaultNamespace string) Options {
-	return Options{
-		Client:           client,
-		DefaultRegistry:  defaultRegistry,
-		DefaultNamespace: defaultNamespace,
-	}
-}
-
 // Handles artifact operations for a single Crucible resource type.
 //
 // Each resource type provides its own Builder implementation. A Builder is
@@ -65,6 +54,17 @@ type Options struct {
 	DefaultNamespace string      // Fallback namespace for unqualified references.
 }
 
+// Creates a new [Options] with the given defaults.
+//
+// Both defaultRegistry and defaultNamespace are required.
+func NewOptions(client BuildClient, defaultRegistry, defaultNamespace string) Options {
+	return Options{
+		Client:           client,
+		DefaultRegistry:  defaultRegistry,
+		DefaultNamespace: defaultNamespace,
+	}
+}
+
 // Holds the output of a successful [Builder.Build] call.
 type BuildResult struct {
 	Output   string             // Directory where the build artifacts were written.
@@ -96,6 +96,9 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 
 	case manifest.TypeWidget:
 		b = NewWidgetBuilder(source)
+
+	case manifest.TypeMachine:
+		b = NewMachineBuilder(source)
 
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)
