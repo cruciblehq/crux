@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/spec/manifest"
@@ -52,11 +53,10 @@ func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *
 
 // Resolves all stage sources in a recipe to forms the daemon can handle.
 //
-// Crucible runtime references (space-separated name and version constraint)
-// are pulled, extracted, and rewritten to file paths. File and OCI sources
-// are passed through unchanged — OCI references (single-token image names)
-// are resolved by the daemon at build time. Returns a copy of the recipe
-// with resolved sources and any error encountered during resolution.
+// Runtime references are pulled, extracted, and rewritten to file paths. File
+// and OCI sources are passed through unchanged. OCI references (single-token
+// image names) are resolved by the daemon at build time. Returns a copy of the
+// recipe with resolved sources, and any error encountered during resolution.
 func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, source Source) (*manifest.Recipe, error) {
 	resolved := *recipe
 	resolved.Stages = make([]manifest.Stage, len(recipe.Stages))
@@ -71,11 +71,11 @@ func resolveAllSources(ctx context.Context, recipe *manifest.Recipe, source Sour
 		}
 
 		if src.Type == manifest.SourceRef {
-			filePath, _, err := source.Resolve(ctx, manifest.TypeRuntime, src.Value)
+			dir, _, err := source.Resolve(ctx, manifest.TypeRuntime, src.Value)
 			if err != nil {
 				return nil, crex.Wrapf(ErrBuild, "stage %s: %w", stageLabel(stage.Name, i), err)
 			}
-			stage.From = fmt.Sprintf("file %s", filePath)
+			stage.From = fmt.Sprintf("file %s", filepath.Join(dir, manifest.ImageFile))
 		}
 	}
 

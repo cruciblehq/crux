@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"errors"
-	"path/filepath"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
@@ -59,13 +58,14 @@ func (s Source) Pull(ctx context.Context, resourceType manifest.ResourceType, re
 	return result, resolved, nil
 }
 
-// Resolves a resource reference string to a local file path.
+// Resolves a resource reference string to a local directory path.
 //
 // The reference is parsed, defaults from this Source are applied for any
 // missing registry or namespace, and then the resource is pulled from the
 // registry (with caching) and extracted. The returned path points to the
-// image file inside the extracted archive. If the resource is already cached
-// and extracted, no download occurs.
+// extracted archive directory. Callers select the specific artifact they
+// need from the directory contents. If the resource is already cached and
+// extracted, no download occurs.
 func (s Source) Resolve(ctx context.Context, resourceType manifest.ResourceType, ref string) (string, *reference.Reference, error) {
 	result, resolved, err := s.Pull(ctx, resourceType, ref)
 	if err != nil {
@@ -83,6 +83,5 @@ func (s Source) Resolve(ctx context.Context, resourceType manifest.ResourceType,
 		return "", nil, crex.Wrap(ErrSourceResolve, err)
 	}
 
-	path := filepath.Join(extractDir, manifest.ImageFile)
-	return path, resolved, nil
+	return extractDir, resolved, nil
 }

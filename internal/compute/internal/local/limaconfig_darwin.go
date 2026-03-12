@@ -51,7 +51,7 @@ type limaConfig struct {
 // provided machine disk image. All required services (cruxd, containerd) are
 // pre-installed in the image; only Lima-specific host setup (user group
 // membership, socket directory permissions) is performed during provisioning.
-func generateLimaConfig(imagePath string) (string, error) {
+func generateLimaConfig(name string, imagePath string) (string, error) {
 	u, err := user.Current()
 	if err != nil {
 		return "", crex.Wrap(ErrHostConfig, err)
@@ -65,8 +65,8 @@ func generateLimaConfig(imagePath string) (string, error) {
 		Home:        u.HomeDir,
 		User:        u.Username,
 		ImagePath:   imagePath,
-		GuestSocket: specpaths.Socket("crux"),
-		HostSocket:  paths.CruxdSocket("crux"),
+		GuestSocket: specpaths.Socket(name),
+		HostSocket:  paths.CruxdSocket(name),
 	}
 
 	if err := os.MkdirAll(paths.VMDir(), paths.DefaultDirMode); err != nil {

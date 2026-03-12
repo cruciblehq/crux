@@ -84,8 +84,8 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		Home:        "/Users/testuser",
 		User:        "testuser",
 		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
-		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
+		GuestSocket: "/run/cruxd/instances/local/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/local/cruxd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -107,8 +107,8 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		"system: false",
 		"user: false",
 		"portForwards:",
-		"guestSocket: \"/run/cruxd/instances/crux/cruxd.sock\"",
-		"hostSocket: \"/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock\"",
+		"guestSocket: \"/run/cruxd/instances/local/cruxd.sock\"",
+		"hostSocket: \"/Users/testuser/Library/Caches/cruxd/instances/local/cruxd.sock\"",
 	}
 	for _, s := range required {
 		if !strings.Contains(output, s) {
@@ -126,8 +126,8 @@ func TestConfigTemplate_x86(t *testing.T) {
 		Home:        "/Users/testuser",
 		User:        "testuser",
 		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
-		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
+		GuestSocket: "/run/cruxd/instances/local/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/local/cruxd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -150,8 +150,8 @@ func TestConfigTemplate_ImagePath(t *testing.T) {
 		Home:        "/Users/testuser",
 		User:        "testuser",
 		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/cruxd/instances/crux/cruxd.sock",
-		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/crux/cruxd.sock",
+		GuestSocket: "/run/cruxd/instances/local/cruxd.sock",
+		HostSocket:  "/Users/testuser/Library/Caches/cruxd/instances/local/cruxd.sock",
 	}
 
 	var buf bytes.Buffer

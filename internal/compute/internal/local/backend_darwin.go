@@ -20,7 +20,7 @@ import (
 // instance. The call blocks until cruxd signals readiness via the
 // ready-fd protocol.
 func provision(ctx context.Context, name string, source resource.Source) error {
-	if err := ensureHostRunning(ctx, source); err != nil {
+	if err := ensureHostRunning(ctx, name, source); err != nil {
 		return err
 	}
 

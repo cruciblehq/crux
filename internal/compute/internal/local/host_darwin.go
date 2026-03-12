@@ -9,7 +9,6 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
@@ -21,7 +20,7 @@ import (
 // [resource.Source], a Lima YAML configuration is generated, and the VM is
 // created and started. If the VM exists but is stopped, it is resumed. If
 // already running, this is a no-op. Blocks until the VM is ready.
-func ensureHostRunning(ctx context.Context, source resource.Source) error {
+func ensureHostRunning(ctx context.Context, name string, source resource.Source) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
@@ -42,28 +41,14 @@ func ensureHostRunning(ctx context.Context, source resource.Source) error {
 		return nil
 
 	case provider.StateNotProvisioned:
-		// Pull the machine package and extract it to the local cache.
-		// source.Resolve cannot be used here because it assumes image.tar,
-		// but machine packages contain architecture-specific qcow2 files.
-		result, _, err := source.Pull(ctx, manifest.TypeMachine, internal.DefaultMachineImage)
+		dir, _, err := source.Resolve(ctx, manifest.TypeMachine, internal.DefaultMachineImage)
 		if err != nil {
 			return crex.Wrap(ErrHostStart, err)
 		}
 
-		localCache, err := cache.Open()
-		if err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-		defer localCache.Close()
+		imagePath := filepath.Join(dir, machineImageForArch())
 
-		extractDir, err := localCache.Extract(result.Namespace, result.Resource, result.Version)
-		if err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-
-		imagePath := filepath.Join(extractDir, machineImageForArch())
-
-		configPath, err := generateLimaConfig(imagePath)
+		configPath, err := generateLimaConfig(name, imagePath)
 		if err != nil {
 			return err
 		}
