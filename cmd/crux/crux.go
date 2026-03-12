@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
@@ -26,7 +29,21 @@ func main() {
 		"args", os.Args,
 	)
 
-	if err := cli.Execute(); err != nil {
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	// Restore default signal behaviour after the first cancellation so a
+	// second CTRL-C terminates the process immediately.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+
+	if err := cli.Execute(ctx); err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}

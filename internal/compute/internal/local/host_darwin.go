@@ -4,9 +4,12 @@ package local
 
 import (
 	"context"
+	"path/filepath"
+	"runtime"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
+	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/spec/manifest"
@@ -39,10 +42,27 @@ func ensureHostRunning(ctx context.Context, source resource.Source) error {
 		return nil
 
 	case provider.StateNotProvisioned:
-		imagePath, _, err := source.Resolve(ctx, manifest.TypeMachine, internal.DefaultMachineImage)
+		// Pull the machine package and extract it to the local cache.
+		// source.Resolve cannot be used here because it assumes image.tar,
+		// but machine packages contain architecture-specific qcow2 files.
+		result, _, err := source.Pull(ctx, manifest.TypeMachine, internal.DefaultMachineImage)
 		if err != nil {
 			return crex.Wrap(ErrHostStart, err)
 		}
+
+		localCache, err := cache.Open()
+		if err != nil {
+			return crex.Wrap(ErrHostStart, err)
+		}
+		defer localCache.Close()
+
+		extractDir, err := localCache.Extract(result.Namespace, result.Resource, result.Version)
+		if err != nil {
+			return crex.Wrap(ErrHostStart, err)
+		}
+
+		imagePath := filepath.Join(extractDir, machineImageForArch())
+
 		configPath, err := generateLimaConfig(imagePath)
 		if err != nil {
 			return err
@@ -91,5 +111,15 @@ func hostStatus(ctx context.Context) (provider.State, error) {
 		return provider.StateStopped, nil
 	default:
 		return provider.StateNotProvisioned, nil
+	}
+}
+
+// Returns the machine qcow2 image filename for the host architecture.
+func machineImageForArch() string {
+	switch runtime.GOARCH {
+	case goarchARM64:
+		return manifest.MachineImageAarch64
+	default:
+		return manifest.MachineImageX86_64
 	}
 }

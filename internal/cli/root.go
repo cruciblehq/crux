@@ -40,9 +40,7 @@ var RootCmd struct {
 }
 
 // Parses arguments and runs the CLI.
-func Execute() error {
-
-	ctx := context.Background()
+func Execute(ctx context.Context) error {
 
 	kongCtx := kong.Parse(&RootCmd,
 		kong.Name("crux"),
