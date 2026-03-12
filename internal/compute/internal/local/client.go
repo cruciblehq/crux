@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net"
 	"syscall"
+	"time"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
@@ -122,12 +123,23 @@ func (c *client) send(ctx context.Context, cmd protocol.Command, payload any) (j
 	}
 	defer conn.Close()
 
+	// Unblock the socket read when the context is cancelled (e.g. SIGINT) by
+	// setting a deadline in the past, causing ReadBytes to return immediately
+	// with a timeout error.
+	go func() {
+		<-ctx.Done()
+		conn.SetReadDeadline(time.Now())
+	}()
+
 	if err := writeCommand(conn, cmd, payload); err != nil {
 		return nil, err
 	}
 
 	env, data, err := readResponse(conn)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 

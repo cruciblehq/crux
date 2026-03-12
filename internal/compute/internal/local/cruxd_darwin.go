@@ -58,6 +58,7 @@ func startCruxd(ctx context.Context, name string) error {
 		"--pid-file", pidPath,
 		"--ready-fd", "1",
 	)
+	cmd.WaitDelay = commandWaitDelay
 	cmd.Env = limaEnv()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 

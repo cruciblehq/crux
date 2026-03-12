@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
@@ -26,6 +27,10 @@ const (
 	// Lima configuration.
 	limaVersion      = "2.0.3" // Lima version to use for the crux VM.
 	limaInstanceName = "crux"  // Lima instance name used for the crux VM.
+
+	// Maximum time to wait for child process I/O pipes to drain after context
+	// cancellation kills the process.
+	commandWaitDelay = 5 * time.Second
 
 	// Status strings returned by limactl list.
 	limaStatusRunning = "Running" // Lima instance is running.
@@ -133,6 +138,7 @@ func limaExec(ctx context.Context, command string, args ...string) (*provider.Ex
 
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, paths.LimactlBin(), shellArgs...)
+	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Env = limaEnv()
@@ -157,6 +163,7 @@ func limaExec(ctx context.Context, command string, args ...string) (*provider.Ex
 // the appropriate sentinel.
 func limaRun(ctx context.Context, args ...string) error {
 	cmd := exec.CommandContext(ctx, paths.LimactlBin(), args...)
+	cmd.WaitDelay = commandWaitDelay
 	cmd.Env = limaEnv()
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -174,6 +181,7 @@ func limaShell(ctx context.Context, command string, args ...string) error {
 	shellArgs = append(shellArgs, args...)
 
 	cmd := exec.CommandContext(ctx, paths.LimactlBin(), shellArgs...)
+	cmd.WaitDelay = commandWaitDelay
 	cmd.Env = limaEnv()
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -188,6 +196,7 @@ func limaShell(ctx context.Context, command string, args ...string) error {
 func limaInstanceStatus(ctx context.Context) string {
 	var stdout bytes.Buffer
 	cmd := exec.CommandContext(ctx, paths.LimactlBin(), "list", "--format={{.Status}}", limaInstanceName)
+	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdout = &stdout
 	cmd.Env = limaEnv()
 

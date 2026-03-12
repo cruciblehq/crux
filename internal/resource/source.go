@@ -64,8 +64,8 @@ func (s Source) Pull(ctx context.Context, resourceType manifest.ResourceType, re
 // The reference is parsed, defaults from this Source are applied for any
 // missing registry or namespace, and then the resource is pulled from the
 // registry (with caching) and extracted. The returned path points to the
-// image file inside the extracted archive. Idempotent: if the resource is
-// already cached and extracted, no download occurs.
+// image file inside the extracted archive. If the resource is already cached
+// and extracted, no download occurs.
 func (s Source) Resolve(ctx context.Context, resourceType manifest.ResourceType, ref string) (string, *reference.Reference, error) {
 	result, resolved, err := s.Pull(ctx, resourceType, ref)
 	if err != nil {
