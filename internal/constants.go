@@ -20,5 +20,5 @@ const (
 	// resource is pulled from the registry during provisioning. The machine
 	// image includes cruxd, containerd, and all required services pre-
 	// configured. Bump this when adopting a new machine image release.
-	DefaultMachineImage = "crucible/machine 0.1.0"
+	DefaultMachineImage = "crucible/machine 0.1.8"
 )
