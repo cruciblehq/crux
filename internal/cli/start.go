@@ -61,9 +61,19 @@ func (c *StartCmd) Run(ctx context.Context) error {
 // existing snapshot; if it does not exist the image is imported and a
 // fresh container is created.
 func containerStart(ctx context.Context, client compute.Client, m manifest.Manifest, path string) error {
+	cfg := m.Config.(*manifest.Service)
+
 	result, err := client.ContainerStatus(ctx, &protocol.ContainerStatusRequest{ID: m.Resource.Name})
 	if err != nil {
 		return err
+	}
+
+	outputStage := cfg.Stages[len(cfg.Stages)-1]
+
+	startReq := &protocol.ImageStartRequest{
+		Ref:         m.Resource.Name,
+		Version:     m.Resource.Version,
+		Affordances: outputStage.Affordances,
 	}
 
 	switch result.Status {
@@ -71,10 +81,7 @@ func containerStart(ctx context.Context, client compute.Client, m manifest.Manif
 		return nil
 
 	case protocol.ContainerStopped:
-		return client.ImageStart(ctx, &protocol.ImageStartRequest{
-			Ref:     m.Resource.Name,
-			Version: m.Resource.Version,
-		})
+		return client.ImageStart(ctx, startReq)
 
 	default:
 		if err := client.ImageImport(ctx, &protocol.ImageImportRequest{
@@ -85,9 +92,6 @@ func containerStart(ctx context.Context, client compute.Client, m manifest.Manif
 			return err
 		}
 
-		return client.ImageStart(ctx, &protocol.ImageStartRequest{
-			Ref:     m.Resource.Name,
-			Version: m.Resource.Version,
-		})
+		return client.ImageStart(ctx, startReq)
 	}
 }
