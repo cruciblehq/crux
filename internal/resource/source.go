@@ -2,12 +2,10 @@ package resource
 
 import (
 	"context"
-	"errors"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/cache"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/internal/reference"
 )
 
 // Configures the default registry and namespace used when resolving resource
@@ -22,10 +20,10 @@ type Source struct {
 // Both parameters are required. Returns an error if either is empty.
 func NewSource(registry, namespace string) (Source, error) {
 	if registry == "" {
-		return Source{}, errors.New("default registry is required")
+		return Source{}, crex.Wrap(ErrMissingOption, ErrMissingRegistry)
 	}
 	if namespace == "" {
-		return Source{}, errors.New("default namespace is required")
+		return Source{}, crex.Wrap(ErrMissingOption, ErrMissingNamespace)
 	}
 	return Source{Registry: registry, Namespace: namespace}, nil
 }
@@ -40,48 +38,12 @@ func (s Source) Parse(resourceType manifest.ResourceType, ref string) (*referenc
 	return parsed.WithDefaults(s.Registry, s.Namespace), nil
 }
 
-// Pulls a resource from the registry using the local cache.
-//
-// The reference is parsed and the resource is fetched (or retrieved from cache).
-// Returns both the pull result and the fully resolved reference.
-func (s Source) Pull(ctx context.Context, resourceType manifest.ResourceType, ref string) (*PullResult, *reference.Reference, error) {
-	resolved, err := s.Parse(resourceType, ref)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	result, err := pull(ctx, resolved)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return result, resolved, nil
+// Pulls a resource from the registry and extracts it locally.
+func (s Source) Pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
+	return pull(ctx, ref)
 }
 
-// Resolves a resource reference string to a local directory path.
-//
-// The reference is parsed, defaults from this Source are applied for any
-// missing registry or namespace, and then the resource is pulled from the
-// registry (with caching) and extracted. The returned path points to the
-// extracted archive directory. Callers select the specific artifact they
-// need from the directory contents. If the resource is already cached and
-// extracted, no download occurs.
-func (s Source) Resolve(ctx context.Context, resourceType manifest.ResourceType, ref string) (string, *reference.Reference, error) {
-	result, resolved, err := s.Pull(ctx, resourceType, ref)
-	if err != nil {
-		return "", nil, err
-	}
-
-	localCache, err := cache.Open()
-	if err != nil {
-		return "", nil, crex.Wrap(ErrSourceResolve, err)
-	}
-	defer localCache.Close()
-
-	extractDir, err := localCache.Extract(result.Namespace, result.Resource, result.Version)
-	if err != nil {
-		return "", nil, crex.Wrap(ErrSourceResolve, err)
-	}
-
-	return extractDir, resolved, nil
+// Pushes a resource package to the Hub registry.
+func (s Source) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
+	return push(ctx, s.Registry, m, packagePath)
 }

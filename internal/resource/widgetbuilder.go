@@ -2,12 +2,11 @@ package resource
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/internal/reference"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
@@ -162,42 +161,17 @@ func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.Build
 	return esOptions, nil
 }
 
-// Validates that the build directory contains the expected widget artifacts.
-//
-// A valid widget build directory must contain index.js.
-func (wb *WidgetBuilder) Validate(buildDir string) error {
-	manifestPath := filepath.Join(buildDir, manifest.ManifestFile)
-	if _, err := os.Stat(manifestPath); err != nil {
-		return crex.UserError("manifest not found", "build/crucible.yaml does not exist").
-			Fallback("Run 'crux build' first to generate the build artifacts.").
-			Cause(err).
-			Err()
-	}
-
-	mainPath := filepath.Join(buildDir, manifest.WidgetMainFile)
-	if _, err := os.Stat(mainPath); err != nil {
-		return crex.UserError("widget build output not found", "build/index.js does not exist").
-			Fallback("Run 'crux build' to generate the widget bundle.").
-			Cause(err).
-			Err()
-	}
-
-	return nil
+// Verifies that the build directory contains the expected widget artifacts.
+func (wb *WidgetBuilder) Verify(buildDir string) error {
+	return verify(buildDir, manifest.TypeWidget, manifest.WidgetMainFile)
 }
 
 // Packages the widget's build output into a distributable archive.
-//
-// The build directory must contain index.js.
 func (wb *WidgetBuilder) Pack(ctx context.Context, buildDir, output string) (*PackResult, error) {
-	if err := wb.Validate(buildDir); err != nil {
-		return nil, err
-	}
 	return pack(ctx, buildDir, output)
 }
 
 // Uploads a widget package archive to the Hub registry.
-//
-// packagePath must point to an archive created by [WidgetBuilder.Pack].
 func (wb *WidgetBuilder) Push(ctx context.Context, m manifest.Manifest, packagePath string) error {
-	return push(ctx, m, packagePath, wb.source)
+	return push(ctx, wb.source.Registry, m, packagePath)
 }

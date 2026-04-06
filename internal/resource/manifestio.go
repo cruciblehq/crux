@@ -6,8 +6,17 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/crux/internal/codec"
+	"github.com/cruciblehq/crux/internal/manifest"
 )
+
+// Reads and decodes the manifest inside the given directory.
+//
+// Looks for the standard manifest filename ([manifest.ManifestFile]) inside
+// dir. Use [ReadManifest] when you already have the full path.
+func ReadManifestIn(dir string) (*manifest.Manifest, error) {
+	return ReadManifest(filepath.Join(dir, manifest.ManifestFile))
+}
 
 // Reads and decodes the manifest at the given path.
 func ReadManifest(manifestPath string) (*manifest.Manifest, error) {
@@ -15,16 +24,16 @@ func ReadManifest(manifestPath string) (*manifest.Manifest, error) {
 	if err != nil {
 		return nil, crex.Wrap(ErrReadManifest, err)
 	}
-	m, err := manifest.Decode(data)
-	if err != nil {
+	var m manifest.Manifest
+	if err := codec.Decode(data, &m, codec.YAML); err != nil {
 		return nil, crex.Wrap(ErrReadManifest, err)
 	}
-	return m, nil
+	return &m, nil
 }
 
 // Serializes a manifest and writes it to a directory.
 func WriteManifest(m *manifest.Manifest, dir string) error {
-	data, err := manifest.Encode(m)
+	data, err := codec.Encode(m, codec.YAML)
 	if err != nil {
 		return err
 	}

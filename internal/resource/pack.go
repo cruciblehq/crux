@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/spec/archive"
 )
 
 // Holds the output of a successful [Builder.Pack] call.

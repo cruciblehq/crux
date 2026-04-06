@@ -9,21 +9,16 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
+	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/internal/reference"
 	"github.com/cruciblehq/crux/internal/registry"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
-	specregistry "github.com/cruciblehq/spec/registry"
 )
 
 // Pushes a resource package to the Hub registry.
 //
-// The manifest is used to determine the target registry, namespace, and
-// resource name. The resource name is re-resolved here using the provided
-// reference options rather than read from the archive, because extracting
-// a compressed archive solely to read the manifest would be wasteful. The
-// resolved manifest inside the archive (written by [Builder.Build]) is
-// functionally equivalent since the same options produce the same result.
-func push(ctx context.Context, m manifest.Manifest, packagePath string, source Source) error {
+// The manifest is used to determine the target namespace and resource name.
+// registryURL is used as the upload destination.
+func push(ctx context.Context, registryURL string, m manifest.Manifest, packagePath string) error {
 	if _, err := os.Stat(packagePath); err != nil {
 		return crex.UserError("package not found", "package does not exist").
 			Fallback("Run 'crux pack' first to create the package.").
@@ -39,7 +34,7 @@ func push(ctx context.Context, m manifest.Manifest, packagePath string, source S
 			Err()
 	}
 
-	client := registry.NewClient(source.Registry, nil)
+	client := registry.NewClient(registryURL, nil)
 
 	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err
@@ -67,8 +62,8 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 		return nil // Namespace exists
 	}
 
-	var regErr *specregistry.Error
-	if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeNotFound {
+	var regErr *registry.Error
+	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
 		return crex.UserError("namespace not found", fmt.Sprintf("namespace '%s' does not exist", namespace)).
 			Fallback("Create the namespace first.").
 			Err()
@@ -90,15 +85,15 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 		return nil // Resource exists
 	}
 
-	var regErr *specregistry.Error
-	if !errors.As(err, &regErr) || regErr.Code != specregistry.ErrorCodeNotFound {
+	var regErr *registry.Error
+	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
 		return crex.UserError("failed to check resource", "could not verify the resource exists").
 			Fallback("Crucible's Hub connectivity may be impaired. Try again later.").
 			Cause(err).
 			Err()
 	}
 
-	resInfo := specregistry.ResourceInfo{
+	resInfo := registry.ResourceInfo{
 		Name:        resource,
 		Type:        string(man.Resource.Type),
 		Description: "",
@@ -120,14 +115,14 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 // already exists, an error is returned prompting the user to increment the
 // version in the manifest.
 func createVersion(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
-	versionInfo := specregistry.VersionInfo{
+	versionInfo := registry.VersionInfo{
 		String: version,
 	}
 
 	_, err := client.CreateVersion(ctx, namespace, resource, versionInfo)
 	if err != nil {
-		var regErr *specregistry.Error
-		if errors.As(err, &regErr) && regErr.Code == specregistry.ErrorCodeVersionExists {
+		var regErr *registry.Error
+		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists {
 			return crex.UserError("version already exists", fmt.Sprintf("version %s already exists", version)).
 				Fallback("Increment the version in crucible.yaml and rebuild.").
 				Err()
