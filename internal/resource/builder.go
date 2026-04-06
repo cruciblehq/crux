@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/crux/internal/manifest"
 )
 
 // Handles artifact operations for a single Crucible resource type.
@@ -23,13 +23,14 @@ type Builder interface {
 	// crucible.yaml in the output directory alongside the build artifacts.
 	Build(ctx context.Context, m manifest.Manifest, output string) (*BuildResult, error)
 
-	// Validates that a build directory contains the expected artifacts for
+	// Verifies that a build directory contains the expected artifacts for
 	// the resource type.
 	//
-	// Each resource type defines what constitutes a valid build output. For
-	// example, image-based resources (runtimes, services, machines) require
-	// image.tar, while widgets require index.js.
-	Validate(buildDir string) error
+	// The build directory must contain a crucible.yaml whose resource type
+	// matches the builder. Each resource type then checks for its own
+	// type-specific artifacts (e.g. image.tar for services, index.js for
+	// widgets, plan.yaml for blueprints).
+	Verify(buildDir string) error
 
 	// Packages built artifacts into a distributable archive.
 	//
@@ -49,26 +50,24 @@ type Builder interface {
 
 // Configures a [Builder] obtained through [ResolveBuilder].
 type Options struct {
-	Client           BuildClient // Connection to the cruxd instance.
-	DefaultRegistry  string      // Fallback registry for unqualified references.
-	DefaultNamespace string      // Fallback namespace for unqualified references.
+	DefaultRegistry  string // Fallback registry for unqualified references.
+	DefaultNamespace string // Fallback namespace for unqualified references.
 }
 
 // Creates a new [Options] with the given defaults.
 //
 // Both defaultRegistry and defaultNamespace are required.
-func NewOptions(client BuildClient, defaultRegistry, defaultNamespace string) Options {
+func NewOptions(defaultRegistry, defaultNamespace string) (Options, error) {
+	if defaultRegistry == "" {
+		return Options{}, crex.Wrap(ErrMissingOption, ErrMissingRegistry)
+	}
+	if defaultNamespace == "" {
+		return Options{}, crex.Wrap(ErrMissingOption, ErrMissingNamespace)
+	}
 	return Options{
-		Client:           client,
 		DefaultRegistry:  defaultRegistry,
 		DefaultNamespace: defaultNamespace,
-	}
-}
-
-// Holds the output of a successful [Builder.Build] call.
-type BuildResult struct {
-	Output   string             // Directory where the build artifacts were written.
-	Manifest *manifest.Manifest // The fully resolved manifest used for the build.
+	}, nil
 }
 
 // Reads the manifest at the given path and returns the appropriate [Builder]
@@ -89,20 +88,38 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 	var b Builder
 	switch man.Resource.Type {
 	case manifest.TypeRuntime:
-		b = NewRuntimeBuilder(opts.Client, source, workdir)
+		b = NewRuntimeBuilder(source, workdir)
 
 	case manifest.TypeService:
-		b = NewServiceBuilder(opts.Client, source, workdir)
+		b = NewServiceBuilder(source, workdir)
 
 	case manifest.TypeWidget:
 		b = NewWidgetBuilder(source)
 
-	case manifest.TypeMachine:
-		b = NewMachineBuilder(source)
+	case manifest.TypeAffordance:
+		b = NewAffordanceBuilder(source)
+
+	case manifest.TypeBlueprint:
+		b = NewBlueprintBuilder(source, "")
 
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)
 	}
 
 	return man, b, nil
+}
+
+// Extracts the typed config from a manifest.
+//
+// Returns the config cast to the expected type T, or a programming error if
+// the manifest config does not match.
+func manifestConfig[T any](m *manifest.Manifest) (T, error) {
+	cfg, ok := m.Config.(T)
+	if !ok {
+		var zero T
+		return zero, crex.ProgrammingError("build failed", "an internal configuration type mismatch occurred").
+			Fallback("Please report this issue to the Crucible team.").
+			Err()
+	}
+	return cfg, nil
 }
