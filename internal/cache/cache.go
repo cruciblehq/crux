@@ -11,7 +11,7 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/crux/internal/registry"
 )
 
 const (
