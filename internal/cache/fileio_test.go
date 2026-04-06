@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/crux/internal/registry"
 )
 
 func TestPathExists(t *testing.T) {

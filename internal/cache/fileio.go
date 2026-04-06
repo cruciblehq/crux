@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/spec/archive"
-	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/registry"
 )
 
 // Checks whether a path exists on the filesystem.
