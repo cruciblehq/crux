@@ -9,7 +9,6 @@ import (
 	"net/url"
 
 	"github.com/cruciblehq/crex"
-	specregistry "github.com/cruciblehq/spec/registry"
 )
 
 // HTTP client for interacting with the Crucible Hub registry.
@@ -37,7 +36,7 @@ func NewClient(baseURL string, httpClient *http.Client) *Client {
 }
 
 // Creates a new namespace.
-func (c *Client) CreateNamespace(ctx context.Context, info specregistry.NamespaceInfo) (*specregistry.Namespace, error) {
+func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Namespace, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -47,10 +46,10 @@ func (c *Client) CreateNamespace(ctx context.Context, info specregistry.Namespac
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeNamespaceInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeNamespace)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeNamespaceInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
 
-	var ns specregistry.Namespace
+	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -58,15 +57,15 @@ func (c *Client) CreateNamespace(ctx context.Context, info specregistry.Namespac
 }
 
 // Retrieves namespace metadata and resource summaries.
-func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*specregistry.Namespace, error) {
+func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*Namespace, error) {
 	path, _ := url.JoinPath("/namespaces", namespace)
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeNamespace)+"+json")
+	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
 
-	var ns specregistry.Namespace
+	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -74,7 +73,7 @@ func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*specregi
 }
 
 // Updates mutable namespace metadata.
-func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info specregistry.NamespaceInfo) (*specregistry.Namespace, error) {
+func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info NamespaceInfo) (*Namespace, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -85,10 +84,10 @@ func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info spe
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeNamespaceInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeNamespace)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeNamespaceInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
 
-	var ns specregistry.Namespace
+	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -106,14 +105,14 @@ func (c *Client) DeleteNamespace(ctx context.Context, namespace string) error {
 }
 
 // Lists all namespaces.
-func (c *Client) ListNamespaces(ctx context.Context) (*specregistry.NamespaceList, error) {
+func (c *Client) ListNamespaces(ctx context.Context) (*NamespaceList, error) {
 	req, err := c.newRequest(ctx, "GET", "/namespaces", nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeNamespaceList)+"+json")
+	req.Header.Set("Accept", string(MediaTypeNamespaceList)+"+json")
 
-	var list specregistry.NamespaceList
+	var list NamespaceList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -121,7 +120,7 @@ func (c *Client) ListNamespaces(ctx context.Context) (*specregistry.NamespaceLis
 }
 
 // Creates a new resource in the specified namespace.
-func (c *Client) CreateResource(ctx context.Context, namespace string, info specregistry.ResourceInfo) (*specregistry.Resource, error) {
+func (c *Client) CreateResource(ctx context.Context, namespace string, info ResourceInfo) (*Resource, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -132,10 +131,10 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info spec
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeResourceInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeResource)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeResourceInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
 
-	var resource specregistry.Resource
+	var resource Resource
 	if err := c.do(req, &resource); err != nil {
 		return nil, err
 	}
@@ -143,15 +142,15 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info spec
 }
 
 // Retrieves resource metadata with version and channel summaries.
-func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*specregistry.Resource, error) {
+func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*Resource, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource)
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeResource)+"+json")
+	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
 
-	var res specregistry.Resource
+	var res Resource
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (
 }
 
 // Updates mutable resource metadata.
-func (c *Client) UpdateResource(ctx context.Context, namespace, resource string, info specregistry.ResourceInfo) (*specregistry.Resource, error) {
+func (c *Client) UpdateResource(ctx context.Context, namespace, resource string, info ResourceInfo) (*Resource, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -170,10 +169,10 @@ func (c *Client) UpdateResource(ctx context.Context, namespace, resource string,
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeResourceInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeResource)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeResourceInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
 
-	var res specregistry.Resource
+	var res Resource
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
@@ -191,15 +190,15 @@ func (c *Client) DeleteResource(ctx context.Context, namespace, resource string)
 }
 
 // Lists all resources in a namespace.
-func (c *Client) ListResources(ctx context.Context, namespace string) (*specregistry.ResourceList, error) {
+func (c *Client) ListResources(ctx context.Context, namespace string) (*ResourceList, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources")
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeResourceList)+"+json")
+	req.Header.Set("Accept", string(MediaTypeResourceList)+"+json")
 
-	var list specregistry.ResourceList
+	var list ResourceList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -207,7 +206,7 @@ func (c *Client) ListResources(ctx context.Context, namespace string) (*specregi
 }
 
 // Creates a new version for a resource.
-func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, info specregistry.VersionInfo) (*specregistry.Version, error) {
+func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, info VersionInfo) (*Version, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -218,10 +217,10 @@ func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, 
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeVersionInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeVersion)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeVersionInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
 
-	var version specregistry.Version
+	var version Version
 	if err := c.do(req, &version); err != nil {
 		return nil, err
 	}
@@ -229,15 +228,15 @@ func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, 
 }
 
 // Retrieves version metadata with archive details.
-func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version string) (*specregistry.Version, error) {
+func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version string) (*Version, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version)
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeVersion)+"+json")
+	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
 
-	var ver specregistry.Version
+	var ver Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -245,7 +244,7 @@ func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version s
 }
 
 // Updates mutable version metadata.
-func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version string, info specregistry.VersionInfo) (*specregistry.Version, error) {
+func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version string, info VersionInfo) (*Version, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -256,10 +255,10 @@ func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeVersionInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeVersion)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeVersionInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
 
-	var ver specregistry.Version
+	var ver Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -277,15 +276,15 @@ func (c *Client) DeleteVersion(ctx context.Context, namespace, resource, version
 }
 
 // Lists all versions for a resource.
-func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (*specregistry.VersionList, error) {
+func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (*VersionList, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions")
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeVersionList)+"+json")
+	req.Header.Set("Accept", string(MediaTypeVersionList)+"+json")
 
-	var list specregistry.VersionList
+	var list VersionList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -293,16 +292,16 @@ func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (
 }
 
 // Uploads a version archive.
-func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*specregistry.Version, error) {
+func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*Version, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version, "archive")
 	req, err := c.newRequest(ctx, "PUT", path, archive)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeArchive))
-	req.Header.Set("Accept", string(specregistry.MediaTypeVersion)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeArchive))
+	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
 
-	var ver specregistry.Version
+	var ver Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -316,7 +315,7 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeArchive))
+	req.Header.Set("Accept", string(MediaTypeArchive))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -325,7 +324,7 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		var regErr specregistry.Error
+		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
 			return nil, crex.Wrapf(ErrHTTPStatus, "HTTP %d: %s", resp.StatusCode, resp.Status)
 		}
@@ -336,7 +335,7 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 }
 
 // Creates a new channel.
-func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info specregistry.ChannelInfo) (*specregistry.Channel, error) {
+func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info ChannelInfo) (*Channel, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -347,10 +346,10 @@ func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, 
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeChannelInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeChannel)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeChannelInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
 
-	var channel specregistry.Channel
+	var channel Channel
 	if err := c.do(req, &channel); err != nil {
 		return nil, err
 	}
@@ -358,15 +357,15 @@ func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, 
 }
 
 // Retrieves channel metadata with full version details.
-func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*specregistry.Channel, error) {
+func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*Channel, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels", channel)
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeChannel)+"+json")
+	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
 
-	var ch specregistry.Channel
+	var ch Channel
 	if err := c.do(req, &ch); err != nil {
 		return nil, err
 	}
@@ -374,7 +373,7 @@ func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel s
 }
 
 // Updates a channel's mutable metadata.
-func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info specregistry.ChannelInfo) (*specregistry.Channel, error) {
+func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info ChannelInfo) (*Channel, error) {
 	body, err := json.Marshal(info)
 	if err != nil {
 		return nil, crex.Wrap(ErrMarshal, err)
@@ -385,10 +384,10 @@ func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(specregistry.MediaTypeChannelInfo)+"+json")
-	req.Header.Set("Accept", string(specregistry.MediaTypeChannel)+"+json")
+	req.Header.Set("Content-Type", string(MediaTypeChannelInfo)+"+json")
+	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
 
-	var ch specregistry.Channel
+	var ch Channel
 	if err := c.do(req, &ch); err != nil {
 		return nil, err
 	}
@@ -406,15 +405,15 @@ func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel
 }
 
 // Lists all channels for a resource.
-func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*specregistry.ChannelList, error) {
+func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*ChannelList, error) {
 	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels")
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(specregistry.MediaTypeChannelList)+"+json")
+	req.Header.Set("Accept", string(MediaTypeChannelList)+"+json")
 
-	var list specregistry.ChannelList
+	var list ChannelList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -445,7 +444,7 @@ func (c *Client) do(req *http.Request, result interface{}) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var regErr specregistry.Error
+		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
 			return crex.Wrapf(ErrHTTPStatus, "HTTP %d: %s", resp.StatusCode, resp.Status)
 		}
