@@ -3,7 +3,6 @@ package manifest
 import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/codec"
-	"github.com/go-viper/mapstructure/v2"
 )
 
 // The canonical filename for Crucible resource manifests.
@@ -85,11 +84,11 @@ func (m *Manifest) validateConfig() error {
 	return m.Config.(codec.Validatable).Validate()
 }
 
-// Encodes the manifest in the given format.
+// Encodes the manifest to a serializable map.
 //
-// Implements [codec.Encoder]. [Manifest.Config] is merged into the base fields
-// so that the output matches the flat canonical manifest format.
-func (m *Manifest) Encode(f codec.Format) ([]byte, error) {
+// Implements [codec.Encodable]. [Manifest.Config] is merged into the base
+// fields so that the output matches the flat canonical manifest format.
+func (m *Manifest) Encode() (any, error) {
 	base, err := codec.ToMap(m)
 	if err != nil {
 		return nil, crex.Wrap(ErrEncodeFailed, err)
@@ -104,25 +103,19 @@ func (m *Manifest) Encode(f codec.Format) ([]byte, error) {
 		base[k] = v
 	}
 
-	data, err := codec.Encode(base, f)
-	if err != nil {
-		return nil, crex.Wrap(ErrEncodeFailed, err)
-	}
-	return data, nil
+	return base, nil
 }
 
-// Decodes data in the given format into the manifest.
+// Decodes a raw parsed map into the manifest.
 //
-// Implements [codec.Decoder]. The common fields are decoded first to determine
-// [Resource.Type]. The raw map is then decoded into the concrete configuration
-// type for that resource.
-func (m *Manifest) Decode(data []byte, f codec.Format) error {
-	var raw map[string]any
-	if err := codec.Decode(data, &raw, f); err != nil {
+// Implements [codec.Decodable]. The common fields are decoded first to
+// determine [Resource.Type]. The raw map is then decoded into the concrete
+// configuration type for that resource.
+func (m *Manifest) Decode(raw map[string]any) error {
+	if err := codec.Field(raw, m, "Version"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
-
-	if err := codec.FromMap(raw, m); err != nil {
+	if err := codec.Field(raw, m, "Resource"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 
@@ -140,12 +133,7 @@ func (m *Manifest) Decode(data []byte, f codec.Format) error {
 		return crex.Wrap(ErrDecodeFailed, ErrInvalidResourceType)
 	}
 
-	var hooks []mapstructure.DecodeHookFunc
-	if m.Resource.Type == TypeAffordance || m.Resource.Type == TypeBlueprint {
-		hooks = append(hooks, GrantDecodeHookFunc())
-	}
-
-	if err := codec.FromMap(raw, target, hooks...); err != nil {
+	if err := codec.Decode(raw, target); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 
