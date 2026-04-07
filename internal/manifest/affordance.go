@@ -1,6 +1,9 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import (
+	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/codec"
+)
 
 // Holds configuration specific to affordance resources.
 //
@@ -21,14 +24,39 @@ type Affordance struct {
 
 	// Sandbox grants that compose this affordance.
 	//
-	// Each grant targets a subsystem with an expression. Domain grants use
-	// dot-prefixed syntax (".seccomp openat") and are decoded with the
-	// subsystem extracted from the prefix. References use bare Crucible
-	// references and are decoded with subsystem [SubRef]; they are resolved
-	// recursively by AffordanceBuilder. Platform groups in the YAML are
-	// preserved as nested [Grant] nodes, each group carrying a [Grant.Platform]
-	// selector and a [Grant.Grants] list of children.
+	// Each grant targets a subsystem with an expression. Domain grants
+	// use dot-prefixed syntax (e.g. ".seccomp openat") and are decoded
+	// with the subsystem domain extracted from the prefix. References
+	// use bare Crucible references and are decoded with the [DomainRef]
+	// subsystem; they are resolved recursively by AffordanceBuilder.
+	// Platform groups in the YAML are preserved as nested [Grant] nodes,
+	// each group carrying a [Grant.Platform] selector and a [Grant.Grants]
+	// list of children.
 	Grants []Grant `codec:"grants,omitempty"`
+}
+
+// Decodes a raw parsed map into the affordance.
+//
+// Implements [codec.Decodable]. The grants field uses compact YAML syntax
+// (strings and maps) that requires manual iteration.
+func (a *Affordance) Decode(raw map[string]any) error {
+	if err := codec.Field(raw, a, "Schema"); err != nil {
+		return crex.Wrap(ErrInvalidAffordance, err)
+	}
+
+	if v, ok := raw["grants"]; ok {
+		list, ok := v.([]any)
+		if !ok {
+			return crex.Wrapf(ErrInvalidAffordance, "grants must be a list")
+		}
+		grants, err := decodeGrantSlice(list)
+		if err != nil {
+			return err
+		}
+		a.Grants = grants
+	}
+
+	return nil
 }
 
 // Validates the affordance configuration.

@@ -1,36 +1,34 @@
 package manifest
 
 import (
-	"reflect"
 	"strings"
 
 	"github.com/cruciblehq/crex"
-	"github.com/go-viper/mapstructure/v2"
 )
 
 // An element in an affordance's grant list.
 //
-// Fields are either leaf or group fields. Leaf fields are [Grant.Subsystem],
+// Fields are either leaf or group fields. Leaf fields are [Grant.Domain],
 // [Grant.Expr], [Grant.Args]; they describe a single grant. Group field
 // [Grant.Grants] holds children. The two types are mutually exclusive.
 // [Grant.Platform] can be set on either a leaf (scoping that single grant)
 // or a group (scoping all children). Invalid combinations are rejected.
 type Grant struct {
 
-	// Selects the subsystem targeted by the grant.
+	// Selects the subsystem domain targeted by the grant.
 	//
-	// Domain grants use a dot-prefixed syntax in YAML (e.g. ".seccomp openat")
-	// and are decoded with the subsystem extracted from the prefix. References
-	// use bare names ("fd/dup") and are decoded with [SubRef]; they are
-	// resolved recursively by AffordanceBuilder before reaching any runtime
-	// dispatcher. Must be empty on group nodes.
-	Subsystem Subsystem `codec:"-"`
+	// Domain grants use a dot-prefixed syntax (e.g. ".seccomp openat") and
+	// are decoded with the subsystem corresponding to the domain extracted
+	// from the prefix. References use bare names ("fd/dup") and are decoded
+	// with [DomainRef]; they are resolved recursively by AffordanceBuilder
+	// before reaching any runtime dispatcher. Must be empty on group nodes.
+	Subsystem Domain `codec:"-"`
 
 	// The expression payload passed to the subsystem handler.
 	//
 	// For domain grants, this is the text after the dot-prefixed subsystem
-	// selector (e.g. "openat" from ".seccomp openat"). For references, this
-	// is the Crucible reference (e.g. "fd/dup"). Must be empty on group nodes.
+	// domain selector (e.g. "openat" from ".seccomp openat"). For references,
+	// this is the Crucible reference. Must be empty on group nodes.
 	Expr string `codec:"-"`
 
 	// Structured arguments from the map form of a grant.
@@ -68,7 +66,7 @@ func (g *Grant) Validate() error {
 	hasGrants := len(g.Grants) > 0
 
 	if hasLeaf && hasGrants {
-		return crex.Wrapf(ErrInvalidAffordance, "grant cannot have both subsystem and children")
+		return crex.Wrapf(ErrInvalidAffordance, "grant cannot have both subsystem domain and children")
 	}
 
 	if hasGrants {
@@ -84,39 +82,12 @@ func (g *Grant) Validate() error {
 	}
 
 	if !hasLeaf {
-		return crex.Wrapf(ErrInvalidAffordance, "grant missing subsystem")
+		return crex.Wrapf(ErrInvalidAffordance, "grant missing subsystem domain")
 	}
-	if g.Subsystem == SubRef && g.Expr == "" {
+	if g.Subsystem == DomainRef && g.Expr == "" {
 		return crex.Wrapf(ErrInvalidAffordance, "ref grant missing target")
 	}
 	return nil
-}
-
-// Returns a mapstructure decode hook that converts a raw []any of YAML
-// elements into a typed []Grant slice.
-//
-// Platform groups are preserved as nested group nodes with a single level
-// of children. A decode hook is necessary because grants use a compact YAML
-// syntax that cannot be expressed with struct tags alone. Each element may
-// be a string (".seccomp openat", "std/net"), a domain map ({".seccomp":
-// ["arg"]}), or a platform group ({platform: "linux/amd64", grants: [...]}).
-// The hook intercepts the raw slice before mapstructure sees it, classifies
-// each element, and constructs the typed Grant with the correct Subsystem,
-// Expr, and Args fields (none of which correspond to named YAML keys). The
-// result is a fully typed Grant slice that mapstructure can assign to the
-// manifest struct.
-func GrantDecodeHookFunc() mapstructure.DecodeHookFuncType {
-	sliceType := reflect.TypeOf([]Grant{})
-	return func(from, to reflect.Type, data any) (any, error) {
-		if to != sliceType {
-			return data, nil
-		}
-		raw, ok := data.([]any)
-		if !ok {
-			return data, nil
-		}
-		return decodeGrantSlice(raw)
-	}
 }
 
 // Decodes a list of raw YAML elements into a []Grant.
@@ -153,9 +124,9 @@ func decodeGrantString(s string) Grant {
 	if strings.HasPrefix(s, ".") {
 		trimmed := s[1:]
 		subsystem, expr, _ := strings.Cut(trimmed, " ")
-		return Grant{Subsystem: Subsystem(subsystem), Expr: expr}
+		return Grant{Subsystem: Domain(subsystem), Expr: expr}
 	}
-	return Grant{Subsystem: SubRef, Expr: s}
+	return Grant{Subsystem: DomainRef, Expr: s}
 }
 
 // Decodes a map element as either a platform group or a domain grant
@@ -178,9 +149,9 @@ func decodeGrantMap(m map[string]any) ([]Grant, error) {
 		if strings.HasPrefix(key, ".") {
 			trimmed := key[1:]
 			subsystem, expr, _ := strings.Cut(trimmed, " ")
-			return []Grant{{Subsystem: Subsystem(subsystem), Expr: expr, Args: args}}, nil
+			return []Grant{{Subsystem: Domain(subsystem), Expr: expr, Args: args}}, nil
 		}
-		return []Grant{{Subsystem: SubRef, Expr: key, Args: args}}, nil
+		return []Grant{{Subsystem: DomainRef, Expr: key, Args: args}}, nil
 	}
 	return nil, crex.Wrapf(ErrInvalidAffordance, "empty map grant")
 }
