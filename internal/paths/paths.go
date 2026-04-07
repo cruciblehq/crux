@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/crux/internal/manifest"
 )
 
 const (
