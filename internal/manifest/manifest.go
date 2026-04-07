@@ -94,9 +94,18 @@ func (m *Manifest) Encode() (any, error) {
 		return nil, crex.Wrap(ErrEncodeFailed, err)
 	}
 
-	cfg, err := codec.ToMap(m.Config)
-	if err != nil {
-		return nil, crex.Wrap(ErrEncodeFailed, err)
+	var cfg map[string]any
+	if enc, ok := m.Config.(codec.Encodable); ok {
+		raw, err := enc.Encode()
+		if err != nil {
+			return nil, crex.Wrap(ErrEncodeFailed, err)
+		}
+		cfg = raw.(map[string]any)
+	} else {
+		cfg, err = codec.ToMap(m.Config)
+		if err != nil {
+			return nil, crex.Wrap(ErrEncodeFailed, err)
+		}
 	}
 
 	for k, v := range cfg {
