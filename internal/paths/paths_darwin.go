@@ -29,23 +29,13 @@ func LimaConfig() string {
 	return filepath.Join(VMDir(), "lima.yaml")
 }
 
-// Path to the cruxd Unix socket for an instance.
+// Path to the containerd Unix socket for an instance.
 //
-// On Darwin, cruxd binds a guest-local socket inside the Lima VM. Lima's
-// portForwards tunnels the guest socket to this host path over SSH, so the
-// host dials this path transparently.
+// On Darwin, containerd runs inside a Lima VM. Lima's portForwards tunnels
+// the guest socket to this host path over SSH, so the host dials this path
+// transparently.
 //
-//	~/Library/Caches/cruxd/instances/<name>/cruxd.sock
-func CruxdSocket(name string) string {
-	return filepath.Join(xdg.CacheHome, "cruxd", "instances", name, "cruxd.sock")
-}
-
-// Path to the cruxd PID file for an instance.
-//
-// Returns a path alongside the socket on the shared virtiofs mount so the
-// host can read the guest PID directly.
-//
-//	~/Library/Caches/cruxd/instances/<name>/cruxd.pid
-func CruxdPIDFile(name string) string {
-	return filepath.Join(xdg.CacheHome, "cruxd", "instances", name, "cruxd.pid")
+//	~/Library/Caches/crux/instances/<name>/containerd.sock
+func ContainerdSocket(name string) string {
+	return filepath.Join(xdg.CacheHome, "crux", "instances", name, "containerd.sock")
 }
