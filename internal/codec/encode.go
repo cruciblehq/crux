@@ -54,6 +54,7 @@ func ToMap(v any) (map[string]any, error) {
 		TagName: tag,
 		Result:  &m,
 		Squash:  true,
+		Deep:    true,
 	})
 	if err != nil {
 		return nil, err
