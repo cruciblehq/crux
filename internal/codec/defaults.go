@@ -13,14 +13,14 @@ import (
 // is applied only when the field's key is absent from the source map src.
 // Fields that were explicitly provided in the input (even as zero) are never
 // overwritten.
-func applyDefaults(v reflect.Value, src map[string]any, tag string) error {
+func applyDefaults(v reflect.Value, src map[string]any) error {
 	v = deref(v)
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
-		if err := applyFieldDefault(v.Field(i), t.Field(i), src, tag); err != nil {
+		if err := applyFieldDefault(v.Field(i), t.Field(i), src); err != nil {
 			return err
 		}
 	}
@@ -32,12 +32,12 @@ func applyDefaults(v reflect.Value, src map[string]any, tag string) error {
 // If the field is a struct or pointer-to-struct it recurses via [applyDefaults]
 // with a nested map. Otherwise the default is applied only when the field's key
 // is absent from src. Values provided explicitly are never overwritten.
-func applyFieldDefault(field reflect.Value, sf reflect.StructField, src map[string]any, tag string) error {
+func applyFieldDefault(field reflect.Value, sf reflect.StructField, src map[string]any) error {
 	rawTag := sf.Tag.Get(tag)
 	name, _, _ := strings.Cut(rawTag, ",")
 
 	if recurseInto(field) {
-		return applyDefaults(field, nestedSource(src, name), tag)
+		return applyDefaults(field, nestedSource(src, name))
 	}
 
 	if src != nil {

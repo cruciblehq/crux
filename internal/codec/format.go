@@ -3,6 +3,9 @@ package codec
 // Serialization format supported by the codec.
 type Format int
 
+// The struct tag key used by all codec operations.
+const tag = "codec"
+
 const (
 	JSON Format = iota // JSON serialization format.
 	YAML               // YAML serialization format.

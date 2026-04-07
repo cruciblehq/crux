@@ -1,7 +1,5 @@
 package codec
 
-const testTag = "codec"
-
 type sample struct {
 	Name    string `codec:"name"`
 	Version int    `codec:"version"`

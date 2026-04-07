@@ -7,7 +7,7 @@ import (
 
 func TestEncode_JSON(t *testing.T) {
 	s := sample{Name: "foo", Version: 1}
-	data, err := Encode(s, JSON, testTag)
+	data, err := Encode(s, JSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestEncode_JSON(t *testing.T) {
 
 func TestEncode_YAML(t *testing.T) {
 	s := sample{Name: "foo", Version: 1}
-	data, err := Encode(s, YAML, testTag)
+	data, err := Encode(s, YAML)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestEncode_YAML(t *testing.T) {
 }
 
 func TestEncode_UnsupportedFormat(t *testing.T) {
-	_, err := Encode(sample{}, Format(99), testTag)
+	_, err := Encode(sample{}, Format(99))
 	if !errors.Is(err, ErrUnsupportedFormat) {
 		t.Errorf("Encode(Format(99)) error = %v, want ErrUnsupportedFormat", err)
 	}
@@ -39,7 +39,7 @@ func TestEncode_UnsupportedFormat(t *testing.T) {
 
 func TestEncode_CustomEncodable(t *testing.T) {
 	c := &custom{Value: "hello"}
-	data, err := Encode(c, JSON, testTag)
+	data, err := Encode(c, JSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestEncode_CustomEncodable(t *testing.T) {
 
 func TestToMap(t *testing.T) {
 	s := sample{Name: "x", Version: 5}
-	m, err := ToMap(s, testTag)
+	m, err := ToMap(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestToMap(t *testing.T) {
 
 func TestToMap_Nested(t *testing.T) {
 	n := nested{Inner: sample{Name: "n", Version: 1}}
-	m, err := ToMap(n, testTag)
+	m, err := ToMap(n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestToMap_Nested(t *testing.T) {
 
 func TestToMap_Squash(t *testing.T) {
 	s := squashed{sample: sample{Name: "sq", Version: 7}, Extra: "e"}
-	m, err := ToMap(s, testTag)
+	m, err := ToMap(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,12 +90,12 @@ func TestToMap_Squash(t *testing.T) {
 
 func TestRoundtrip_JSON(t *testing.T) {
 	orig := sample{Name: "rt", Version: 42}
-	data, err := Encode(orig, JSON, testTag)
+	data, err := Encode(orig, JSON)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got sample
-	if err := Unmarshal(data, &got, JSON, testTag); err != nil {
+	if err := Unmarshal(data, &got, JSON); err != nil {
 		t.Fatal(err)
 	}
 	if got != orig {
@@ -105,12 +105,12 @@ func TestRoundtrip_JSON(t *testing.T) {
 
 func TestRoundtrip_YAML(t *testing.T) {
 	orig := sample{Name: "rt", Version: 42}
-	data, err := Encode(orig, YAML, testTag)
+	data, err := Encode(orig, YAML)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got sample
-	if err := Unmarshal(data, &got, YAML, testTag); err != nil {
+	if err := Unmarshal(data, &got, YAML); err != nil {
 		t.Fatal(err)
 	}
 	if got != orig {
