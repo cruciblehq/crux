@@ -1,0 +1,30 @@
+package codec
+
+const testTag = "codec"
+
+type sample struct {
+	Name    string `codec:"name"`
+	Version int    `codec:"version"`
+}
+
+type nested struct {
+	Inner sample `codec:"inner"`
+}
+
+type squashed struct {
+	sample `codec:",squash"`
+	Extra  string `codec:"extra"`
+}
+
+type custom struct {
+	Value string
+}
+
+func (c *custom) Encode() (any, error) {
+	return map[string]any{"custom": c.Value}, nil
+}
+
+func (c *custom) Decode(raw map[string]any) error {
+	c.Value, _ = raw["custom"].(string)
+	return nil
+}
