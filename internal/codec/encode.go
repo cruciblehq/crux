@@ -30,13 +30,13 @@ type Encodable interface {
 // If v implements [Encodable], its Encode method provides the serializable
 // representation. Otherwise v is converted via [ToMap]. The resulting value
 // is then serialized to the requested format.
-func Encode(v any, f Format, tag string) ([]byte, error) {
+func Encode(v any, f Format) ([]byte, error) {
 	var raw any
 	var err error
 	if enc, ok := v.(Encodable); ok {
 		raw, err = enc.Encode()
 	} else {
-		raw, err = ToMap(v, tag)
+		raw, err = ToMap(v)
 	}
 	if err != nil {
 		return nil, err
@@ -46,9 +46,9 @@ func Encode(v any, f Format, tag string) ([]byte, error) {
 
 // Converts a struct to a map[string]any.
 //
-// Field names are determined by the given struct tag. Embedded structs with
+// Field names are determined by the codec struct tag. Embedded structs with
 // tag:",squash" are flattened into the parent map.
-func ToMap(v any, tag string) (map[string]any, error) {
+func ToMap(v any) (map[string]any, error) {
 	var m map[string]any
 	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		TagName: tag,

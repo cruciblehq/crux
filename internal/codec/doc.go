@@ -10,14 +10,14 @@
 // converts the struct to a map using struct tags. The result is then marshaled
 // to the requested format.
 //
-//	data, err := codec.Encode(v, codec.YAML, "codec")
+//	data, err := codec.Encode(v, codec.YAML)
 //
 // [Unmarshal] parses bytes (JSON or YAML) into a map, then delegates to
 // [Decode] to populate a Go struct. [Decode] walks the type tree, applying
 // weak type coercion (e.g. string-to-int) and tag-declared defaults for
 // absent fields.
 //
-//	err := codec.Unmarshal(data, &v, codec.YAML, "codec")
+//	err := codec.Unmarshal(data, &v, codec.YAML)
 //
 // Types that need custom decoding logic implement [Decodable]. When [Decode]
 // encounters such a type at any depth, it calls Decode with the raw
@@ -26,8 +26,8 @@
 // and defaults, and call [Decode] on nested structs of different types.
 //
 //	func (m *MyType) Decode(raw map[string]any) error {
-//	    codec.Field(raw, m, "Name", "codec")
-//	    codec.Field(raw, m, "Version", "codec")
+//	    codec.Field(raw, m, "Name")
+//	    codec.Field(raw, m, "Version")
 //	    // custom dispatch or iteration for remaining fields
 //	    return nil
 //	}
