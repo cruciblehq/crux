@@ -120,11 +120,15 @@ func (m *Manifest) Encode() (any, error) {
 // Implements [codec.Decodable]. The common fields are decoded first to
 // determine [Resource.Type]. The raw map is then decoded into the concrete
 // configuration type for that resource.
-func (m *Manifest) Decode(raw map[string]any) error {
-	if err := codec.Field(raw, m, "Version"); err != nil {
+func (m *Manifest) Decode(raw any) error {
+	src, ok := raw.(map[string]any)
+	if !ok {
+		return crex.Wrapf(ErrDecodeFailed, "expected map, got %T", raw)
+	}
+	if err := codec.Field(src, m, "Version"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
-	if err := codec.Field(raw, m, "Resource"); err != nil {
+	if err := codec.Field(src, m, "Resource"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 
@@ -142,7 +146,7 @@ func (m *Manifest) Decode(raw map[string]any) error {
 		return crex.Wrap(ErrDecodeFailed, ErrInvalidResourceType)
 	}
 
-	if err := codec.Decode(raw, target); err != nil {
+	if err := codec.Decode(src, target); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 

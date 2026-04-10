@@ -20,14 +20,16 @@
 //	err := codec.Unmarshal(data, &v, codec.YAML)
 //
 // Types that need custom decoding logic implement [Decodable]. When [Decode]
-// encounters such a type at any depth, it calls Decode with the raw
-// map[string]any instead of mapping fields automatically. Implementations
+// encounters such a type at any depth, it calls Decode with the raw value
+// instead of mapping fields automatically. The raw value is typically a
+// map[string]any but may be a string or other scalar. Implementations
 // use [Field] to decode individual fields one at a time, retaining coercion
 // and defaults, and call [Decode] on nested structs of different types.
 //
-//	func (m *MyType) Decode(raw map[string]any) error {
-//	    codec.Field(raw, m, "Name")
-//	    codec.Field(raw, m, "Version")
+//	func (m *MyType) Decode(raw any) error {
+//	    src := raw.(map[string]any)
+//	    codec.Field(src, m, "Name")
+//	    codec.Field(src, m, "Version")
 //	    // custom dispatch or iteration for remaining fields
 //	    return nil
 //	}

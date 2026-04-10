@@ -14,15 +14,18 @@ import (
 //
 // When [Decode] encounters a target type that implements this interface
 // (at any depth in the struct tree), it delegates to Decode with the raw
-// parsed map instead of using the default field-by-field mapping.
+// value instead of using the default field-by-field mapping. The raw value
+// is typically a map[string]any but may be a string or other scalar when
+// the source value is not a map.
 type Decodable interface {
 
-	// Decodes a raw parsed map into the receiver.
+	// Decodes a raw value into the receiver.
 	//
+	// The raw value is the parsed representation from the source format.
 	// Implementations use [Field] to decode individual fields and [Decode]
 	// for nested structs, retaining defaults, coercion, and hook dispatch.
 	// Returning an error aborts the outer [Unmarshal] or [Decode] call.
-	Decode(raw map[string]any) error
+	Decode(raw any) error
 }
 
 // Populates dst from a map.
@@ -115,16 +118,12 @@ func Field(src map[string]any, v any, fieldName string) error {
 func decoderHook() mapstructure.DecodeHookFuncType {
 	iface := reflect.TypeOf((*Decodable)(nil)).Elem()
 	return func(from, to reflect.Type, data any) (any, error) {
-		m, ok := data.(map[string]any)
-		if !ok {
-			return data, nil
-		}
 		ptr := reflect.PointerTo(to)
 		if !ptr.Implements(iface) {
 			return data, nil
 		}
 		result := reflect.New(to)
-		if err := result.Interface().(Decodable).Decode(m); err != nil {
+		if err := result.Interface().(Decodable).Decode(data); err != nil {
 			return nil, err
 		}
 		return result.Elem().Interface(), nil
