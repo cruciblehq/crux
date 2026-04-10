@@ -8,7 +8,7 @@ import (
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/crux/internal/manifest"
 )
 
 // Represents the 'crux pull' command.
@@ -44,27 +44,23 @@ func (c *PullCmd) Run(ctx context.Context) error {
 		"registry", registry,
 	)
 
-	result, _, err := source.Pull(ctx, resType, raw)
+	ref, err := source.Parse(resType, raw)
 	if err != nil {
 		return err
 	}
 
-	if result.Cached {
-		slog.Info("resource already cached",
-			"namespace", result.Namespace,
-			"resource", result.Resource,
-			"version", result.Version,
-			"digest", result.Digest,
-		)
-	} else {
-		slog.Info("resource pulled successfully",
-			"namespace", result.Namespace,
-			"resource", result.Resource,
-			"version", result.Version,
-			"digest", result.Digest,
-			"size", result.Size,
-		)
+	result, err := source.Pull(ctx, ref)
+	if err != nil {
+		return err
 	}
+
+	slog.Info("resource pulled",
+		"namespace", result.Namespace,
+		"resource", result.Resource,
+		"version", result.Version,
+		"digest", result.Digest,
+		"size", result.Size,
+	)
 
 	return nil
 }

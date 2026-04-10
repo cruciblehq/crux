@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
-	"github.com/cruciblehq/spec/archive"
 )
 
 const (
@@ -174,7 +174,7 @@ func limaRun(ctx context.Context, args ...string) error {
 // Runs a command inside the shared VM via limactl shell.
 //
 // Unlike [limaExec], this function discards output and is intended for
-// fire-and-forget operations like starting or stopping cruxd instances.
+// fire-and-forget operations.
 func limaShell(ctx context.Context, command string, args ...string) error {
 	shellArgs := []string{"shell", "--workdir", "/", limaInstanceName, "--"}
 	shellArgs = append(shellArgs, command)

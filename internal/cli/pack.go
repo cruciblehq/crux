@@ -23,7 +23,10 @@ func (c *PackCmd) Run(ctx context.Context) error {
 	slog.Info("packaging resource...", "output", paths.Package(RootCmd.Context))
 
 	manifestPath := paths.Manifest(RootCmd.Context)
-	opts := resource.NewOptions(nil, internal.DefaultRegistryURL, internal.DefaultNamespace)
+	opts, err := resource.NewOptions(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
 	_, b, err := resource.ResolveBuilder(ctx, manifestPath, opts)
 	if err != nil {
 		return err

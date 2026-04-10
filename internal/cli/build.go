@@ -2,13 +2,11 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/internal/compute"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/crux/internal/watch"
@@ -35,12 +33,6 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	// Build first (don't wait for changes)
 	result, err := c.build(ctx, registry)
 	if err != nil {
-		if errors.Is(err, compute.ErrConnectionRefused) {
-			return crex.SystemError("daemon connection refused", err.Error()).
-				Fallback("Wait a few seconds and try again. If the problem persists, try 'crux runtime restart' or 'crux runtime reset'.").
-				Cause(err).
-				Err()
-		}
 		return err
 	}
 
@@ -92,18 +84,12 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 // Resolves the builder, creates the output directory, and builds the resource.
 func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildResult, error) {
-	backend, err := compute.BackendFor(compute.Local)
-	if err != nil {
-		return nil, err
-	}
-	client, err := backend.Client(ctx, internal.DefaultInstanceName)
+	opts, err := resource.NewOptions(registry, internal.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), resource.NewOptions(
-		client, registry, internal.DefaultNamespace,
-	))
+	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), opts)
 	if err != nil {
 		return nil, err
 	}

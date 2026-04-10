@@ -5,6 +5,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // The local compute backend.
@@ -18,12 +19,12 @@ func NewBackend() provider.Backend {
 	return &backend{}
 }
 
-// Provisions and starts a cruxd host instance.
+// Provisions a compute host instance.
 func (b *backend) Provision(ctx context.Context, name string, source resource.Source) error {
 	return provision(ctx, name, source)
 }
 
-// Tears down the cruxd instance and removes all state.
+// Tears down the instance and removes all state.
 func (b *backend) Deprovision(ctx context.Context, name string) error {
 	return deprovision(ctx, name)
 }
@@ -48,7 +49,7 @@ func (b *backend) Exec(ctx context.Context, name string, command string, args ..
 	return execute(ctx, name, command, args...)
 }
 
-// Returns a [provider.Client] connected to the given instance.
-func (b *backend) Client(_ context.Context, name string) (provider.Client, error) {
-	return newClient(name)
+// Returns a [runtime.Runtime] connected to the instance's containerd.
+func (b *backend) Runtime(_ context.Context, name string) (*runtime.Runtime, error) {
+	return newRuntime(name)
 }

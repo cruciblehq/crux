@@ -11,7 +11,6 @@ import (
 
 	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/paths"
-	specpaths "github.com/cruciblehq/spec/paths"
 )
 
 const (
@@ -20,6 +19,9 @@ const (
 	defaultLimaCPUs      = 2  // Default number of virtual CPUs allocated to the VM.
 	defaultLimaMemoryGiB = 2  // Default memory in GiB allocated to the VM.
 	defaultLimaDiskGiB   = 10 // Default disk size in GiB allocated to the VM.
+
+	// containerd socket path inside the Lima VM (guest).
+	guestContainerdSocket = "/run/containerd/containerd.sock"
 )
 
 //go:embed templates/lima.yaml.tmpl
@@ -40,17 +42,17 @@ type limaConfig struct {
 	Home        string // Host home directory for the virtiofs mount.
 	User        string // Host username (Lima creates a matching guest user).
 	ImagePath   string // Local path to the cached machine disk image.
-	GuestSocket string // cruxd socket path inside the VM (guest-local, under /run).
-	HostSocket  string // cruxd socket path on the host (Lima forwards guest → host).
+	GuestSocket string // containerd socket path inside the VM (guest-local, under /run).
+	HostSocket  string // containerd socket path on the host (Lima forwards guest → host).
 }
 
 // Generates the Lima YAML configuration for the shared crux VM.
 //
 // The configuration targets the host's native architecture and uses sensible
 // defaults for CPU, memory, and disk allocation. The VM boots from the
-// provided machine disk image. All required services (cruxd, containerd) are
-// pre-installed in the image; only Lima-specific host setup (user group
-// membership, socket directory permissions) is performed during provisioning.
+// provided machine disk image. containerd runs as a system service inside the
+// VM; Lima's portForwards section tunnels the guest containerd socket to the
+// host so crux can dial it transparently.
 func generateLimaConfig(name string, imagePath string) (string, error) {
 	u, err := user.Current()
 	if err != nil {
@@ -65,8 +67,8 @@ func generateLimaConfig(name string, imagePath string) (string, error) {
 		Home:        u.HomeDir,
 		User:        u.Username,
 		ImagePath:   imagePath,
-		GuestSocket: specpaths.Socket(name),
-		HostSocket:  paths.CruxdSocket(name),
+		GuestSocket: guestContainerdSocket,
+		HostSocket:  paths.ContainerdSocket(name),
 	}
 
 	if err := os.MkdirAll(paths.VMDir(), paths.DefaultDirMode); err != nil {

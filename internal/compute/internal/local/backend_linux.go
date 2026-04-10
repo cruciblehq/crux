@@ -4,7 +4,7 @@ package local
 
 import (
 	"context"
-	"os"
+	"net"
 	"os/exec"
 
 	"github.com/cruciblehq/crex"
@@ -13,66 +13,47 @@ import (
 	"github.com/cruciblehq/crux/internal/resource"
 )
 
-// Provisions a cruxd instance.
-func provision(ctx context.Context, name string, _ resource.Source) error {
-	if err := ensureCruxd(ctx); err != nil {
-		return err
-	}
-	if err := startCruxd(name); err != nil {
-		return err
+// Provisions a compute instance.
+//
+// On Linux containerd runs as a system service. Provisioning verifies
+// the socket is reachable.
+func provision(_ context.Context, name string, _ resource.Source) error {
+	if !isContainerdRunning(name) {
+		return ErrHostNotRunning
 	}
 	return nil
 }
 
-// Starts the cruxd process.
+// Starts the compute instance.
+//
+// containerd is managed by the system init, so this only verifies reachability.
 func start(_ context.Context, name string) error {
-	if err := startCruxd(name); err != nil {
-		return err
+	if !isContainerdRunning(name) {
+		return ErrHostNotRunning
 	}
 	return nil
 }
 
-// Signals the cruxd process to stop and waits for exit.
-func stop(_ context.Context, name string) error {
-	pid, err := stopCruxd(name)
-	if err != nil {
-		return err
-	}
-	waitForProcessExit(pid)
+// Stops the compute instance. No-op on Linux — containerd is a system service.
+func stop(_ context.Context, _ string) error {
 	return nil
 }
 
-// Tears down the cruxd process and removes all instance state.
-func deprovision(_ context.Context, name string) error {
-	if isCruxdRunning(name) {
-		pid, err := stopCruxd(name)
-		if err != nil {
-			return err
-		}
-		waitForProcessExit(pid)
-	}
-
-	os.RemoveAll(paths.CruxdInstanceDir(name))
+// Tears down the compute instance. No-op on Linux — containerd is a system service.
+func deprovision(_ context.Context, _ string) error {
 	return nil
 }
 
-// Queries the current state of the cruxd process.
+// Queries the current state of the compute instance.
 func status(_ context.Context, name string) (provider.State, error) {
-	if isCruxdRunning(name) {
+	if isContainerdRunning(name) {
 		return provider.StateRunning, nil
 	}
-	if _, err := os.Stat(paths.CruxdInstanceDir(name)); err == nil {
-		return provider.StateStopped, nil
-	}
-	return provider.StateNotProvisioned, nil
+	return provider.StateStopped, nil
 }
 
 // Runs a command on the host and captures its output.
-func execute(ctx context.Context, name string, command string, args ...string) (*provider.ExecResult, error) {
-	if !isCruxdRunning(name) {
-		return nil, ErrHostNotRunning
-	}
-
+func execute(ctx context.Context, _ string, command string, args ...string) (*provider.ExecResult, error) {
 	cmd := exec.CommandContext(ctx, command, args...)
 	stdout, err := cmd.Output()
 
@@ -88,4 +69,14 @@ func execute(ctx context.Context, name string, command string, args ...string) (
 	}
 
 	return provider.NewExecResult(string(stdout), stderr, exitCode), nil
+}
+
+// Checks whether the containerd socket is reachable.
+func isContainerdRunning(name string) bool {
+	conn, err := net.Dial("unix", paths.ContainerdSocket(name))
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
 }

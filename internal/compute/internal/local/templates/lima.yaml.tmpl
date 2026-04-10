@@ -6,8 +6,8 @@ disk: {{ .Disk }}
 images:
   - location: {{ .ImagePath }}
     arch: {{ .Arch }}
-# The machine image must include containerd, cruxd, and all required
-# services pre-configured.
+# The machine image must include containerd and all required services
+# pre-configured.
 containerd:
   system: false
   user: false
@@ -38,10 +38,10 @@ probes:
       #!/bin/sh
       test -S /run/containerd/containerd.sock
     hint: containerd is not running
-# Forward the cruxd Unix socket from the guest to the host. Unix domain sockets
-# on virtiofs are visible on both sides but the kernel socket state does not
-# cross the boundary. Lima tunnels the connection over SSH so the host can dial
-# its local path transparently.
+# Forward the containerd Unix socket from the guest to the host. Unix domain
+# sockets on virtiofs are visible on both sides but the kernel socket state
+# does not cross the boundary. Lima tunnels the connection over SSH so the
+# host can dial its local path transparently.
 portForwards:
   - guestSocket: "{{ .GuestSocket }}"
     hostSocket: "{{ .HostSocket }}"
