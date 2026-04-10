@@ -95,10 +95,8 @@ func (bb *BlueprintBuilder) compile(ctx context.Context, cfg *manifest.Blueprint
 
 	p.Gateway = cfg.Gateway
 
-	aff := NewAffordanceBuilder(bb.source)
-
 	for _, svc := range cfg.Services {
-		ref, afford, err := bb.resolveService(ctx, aff, svc)
+		ref, err := bb.resolveService(ctx, svc)
 		if err != nil {
 			return nil, err
 		}
@@ -112,9 +110,7 @@ func (bb *BlueprintBuilder) compile(ctx context.Context, cfg *manifest.Blueprint
 			Service: svc.ID,
 			Compute: "default",
 		}
-		if len(afford) > 0 {
-			ctr.Grants = afford
-		}
+		// TODO: resolve service affordance grants.
 		if bb.environment != "" {
 			ctr.Environment = bb.environment
 		}
@@ -133,47 +129,22 @@ func (bb *BlueprintBuilder) compile(ctx context.Context, cfg *manifest.Blueprint
 	return p, nil
 }
 
-// Pulls a service manifest and resolves its runtime affordances.
+// Pulls a service manifest and returns the fully qualified reference string.
 //
-// Returns the fully qualified reference string and the resolved grants.
-// Services with no stages or no runtime affordances return nil.
-func (bb *BlueprintBuilder) resolveService(ctx context.Context, aff *AffordanceBuilder, svc manifest.Ref) (string, []manifest.Grant, error) {
+// Services with no stages or no runtime affordances return the ref only.
+// TODO: resolve service affordance grants independently of AffordanceBuilder.
+func (bb *BlueprintBuilder) resolveService(ctx context.Context, svc manifest.Ref) (string, error) {
 	ref, err := bb.source.Parse(manifest.TypeService, svc.Target)
 	if err != nil {
-		return "", nil, crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
+		return "", crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
 	}
 
-	result, err := bb.source.Pull(ctx, ref)
+	_, err = bb.source.Pull(ctx, ref)
 	if err != nil {
-		return "", nil, crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
+		return "", crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
 	}
 
-	m, err := ReadManifestIn(result.Dir)
-	if err != nil {
-		return "", nil, crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
-	}
-
-	cfg, err := manifestConfig[*manifest.Service](m)
-	if err != nil {
-		return "", nil, crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
-	}
-
-	stages := cfg.Stages
-	if len(stages) == 0 {
-		return ref.String(), nil, nil
-	}
-
-	last := stages[len(stages)-1]
-	if len(last.Affordances) == 0 {
-		return ref.String(), nil, nil
-	}
-
-	afford, err := aff.resolveRefs(ctx, last.Affordances)
-	if err != nil {
-		return "", nil, crex.Wrapf(ErrBlueprintBuild, "service %s: %w", svc.ID, err)
-	}
-
-	return ref.String(), afford, nil
+	return ref.String(), nil
 }
 
 // Writes a plan to the given directory as plan.yaml.

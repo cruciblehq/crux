@@ -61,10 +61,12 @@ var (
 
 	// Param.
 
-	ErrInvalidParam       = errors.New("invalid param")
-	ErrMissingParamName   = errors.New("missing param name")
-	ErrDuplicateParamName = errors.New("duplicate param name")
-	ErrDefaultNotInSchema = errors.New("default param not in schema")
+	ErrInvalidParam        = errors.New("invalid param")
+	ErrMissingParamName    = errors.New("missing param name")
+	ErrInvalidParamName    = errors.New("invalid param name")
+	ErrInvalidParamDefault = errors.New("invalid param default")
+	ErrDuplicateParamName  = errors.New("duplicate param name")
+	ErrDefaultNotInSchema  = errors.New("default param not in schema")
 
 	// Blueprint.
 
