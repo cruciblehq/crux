@@ -1,4 +1,4 @@
-// Package compute provisions cruxd host instances for Crucible.
+// Package compute provisions compute host instances for Crucible.
 //
 // The package maintains a registry of compute backends, initialised lazily.
 // Callers select a backend via [BackendFor] with a [Provider] constant,
@@ -23,8 +23,8 @@
 //	err = b.Start(ctx, "local")
 //	err = b.Deprovision(ctx, "local")
 //
-// On macOS the local backend provisions a lightweight VM on first use and runs
-// cruxd inside it. On Linux no VM is needed because cruxd runs natively.
+// On macOS the local backend provisions a lightweight VM on first use that
+// runs containerd. On Linux containerd runs natively as a system service.
 //
 // The backend's Status method returns the current [State]:
 // [StateNotProvisioned], [StateStopped], or [StateRunning].

@@ -11,10 +11,7 @@ const (
 // Interface for compute backend implementations.
 type Backend = provider.Backend
 
-// Interface for communicating with a cruxd instance.
-type Client = provider.Client
-
-// Lifecycle state of a cruxd instance.
+// Lifecycle state of a compute instance.
 type State = provider.State
 
 // Output captured from a command executed on the instance's host.

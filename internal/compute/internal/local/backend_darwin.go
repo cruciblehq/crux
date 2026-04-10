@@ -4,78 +4,78 @@ package local
 
 import (
 	"context"
-	"log/slog"
+	"io"
 	"net"
+	"time"
 
+	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
 )
 
-// Provisions a cruxd instance.
+// Provisions a compute instance.
 //
 // The shared VM is created and started if it does not already exist. The
 // machine image is resolved through the [resource.Source] passed by the
-// caller. A cruxd process is then started inside the VM for the given
-// instance. The call blocks until cruxd signals readiness via the
-// ready-fd protocol.
+// caller. containerd runs as a system service inside the VM and is started
+// automatically during boot.
 func provision(ctx context.Context, name string, source resource.Source) error {
-	if err := ensureHostRunning(ctx, name, source); err != nil {
-		return err
-	}
-
-	if err := startCruxd(ctx, name); err != nil {
-		return err
-	}
-
-	return nil
+	return ensureHostRunning(ctx, name, source)
 }
 
-// Starts a cruxd instance inside an already-running VM.
+// Starts the VM for a previously provisioned instance.
 //
-// The VM must have been provisioned and be running. A cruxd process is
-// started inside the VM. The call blocks until cruxd signals readiness
-// via the ready-fd protocol.
+// The VM must have been provisioned already. containerd starts automatically
+// when the VM boots.
 func start(ctx context.Context, name string) error {
 	state, err := hostStatus(ctx)
 	if err != nil {
 		return err
 	}
-	if state != provider.StateRunning {
-		slog.Debug("start failed, VM is not running", "name", name, "state", state)
-		return ErrHostNotRunning
+	if state == provider.StateRunning {
+		return nil
+	}
+	if state == provider.StateNotProvisioned {
+		return ErrHostNotCreated
 	}
 
-	if err := startCruxd(ctx, name); err != nil {
-		slog.Debug("start failed, cruxd did not start", "name", name, "error", err)
-		return err
+	if err := limaRun(ctx, "start", "--tty=false", limaInstanceName); err != nil {
+		return crex.Wrap(ErrHostStart, err)
 	}
-
 	return nil
 }
 
-// Stops a cruxd instance. The VM continues running.
+// Stops the VM.
 func stop(ctx context.Context, name string) error {
-	return stopCruxd(ctx, name)
+	state, err := hostStatus(ctx)
+	if err != nil {
+		return err
+	}
+	if state != provider.StateRunning {
+		return ErrHostNotRunning
+	}
+
+	if err := limaRun(ctx, "stop", limaInstanceName); err != nil {
+		return crex.Wrap(ErrHostStop, err)
+	}
+	return nil
 }
 
-// Tears down a cruxd instance and destroys the VM.
+// Tears down the instance and destroys the VM.
 func deprovision(ctx context.Context, name string) error {
-	// Best-effort: stop the cruxd instance if running.
-	stopCruxd(ctx, name)
-
 	return destroyHost(ctx)
 }
 
-// Queries the current state of a cruxd instance.
+// Queries the current state of a compute instance.
 //
-// State is determined by probing two layers: the Lima VM and the cruxd
-// process inside it. The returned state is the least-healthy of the two:
+// State is determined by probing two layers: the Lima VM and the containerd
+// socket inside it. The returned state is the least-healthy of the two:
 //
 //   - [provider.StateNotProvisioned] — the VM does not exist.
 //   - [provider.StateStopped] — the VM exists but is not running, or the
-//     VM is running but the cruxd socket for this instance is not reachable.
-//   - [provider.StateRunning] — both the VM and the cruxd socket are up.
+//     VM is running but the containerd socket is not reachable.
+//   - [provider.StateRunning] — both the VM and containerd are up.
 func status(ctx context.Context, name string) (provider.State, error) {
 	rtState, err := hostStatus(ctx)
 	if err != nil {
@@ -90,11 +90,22 @@ func status(ctx context.Context, name string) (provider.State, error) {
 	}
 
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "unix", paths.CruxdSocket(name))
+	conn, err := d.DialContext(ctx, "unix", paths.ContainerdSocket(name))
 	if err != nil {
 		return provider.StateStopped, nil
 	}
+
+	// Lima's port forwarding accepts connections to the host socket even
+	// when the guest socket has no listener, returning EOF immediately.
+	// Probe the connection to distinguish a live containerd from a
+	// forwarding stub: containerd will send gRPC data (timeout), while a
+	// dead-end connection returns EOF.
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	_, err = conn.Read(make([]byte, 1))
 	conn.Close()
+	if err == io.EOF {
+		return provider.StateStopped, nil
+	}
 	return provider.StateRunning, nil
 }
 

@@ -32,6 +32,7 @@ var RootCmd struct {
 	Status  StatusCmd  `cmd:"" help:"Show the state of a resource."`
 	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
 	Pull    PullCmd    `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
+	Import  ImportCmd  `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
 	Host    HostCmd    `cmd:"" help:"Manage the Crucible host environment."`
 	Version VersionCmd `cmd:"" help:"Show version information."`

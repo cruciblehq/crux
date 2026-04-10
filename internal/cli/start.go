@@ -2,16 +2,14 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/compute"
+	"github.com/cruciblehq/crux/internal/manifest"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/protocol"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Represents the 'crux start' command.
@@ -35,18 +33,13 @@ func (c *StartCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client, err := b.Client(ctx, internal.DefaultInstanceName)
+	rt, err := b.Runtime(ctx, internal.DefaultInstanceName)
 	if err != nil {
 		return err
 	}
+	defer rt.Close()
 
-	if err := containerStart(ctx, client, *man, paths.ImageTar(RootCmd.Context)); err != nil {
-		if errors.Is(err, compute.ErrConnectionRefused) {
-			return crex.SystemError("daemon connection refused", err.Error()).
-				Fallback("Wait a few seconds and try again. If the problem persists, try 'crux runtime restart' or 'crux runtime reset'.").
-				Cause(err).
-				Err()
-		}
+	if err := containerStart(ctx, rt, *man, paths.ImageTar(RootCmd.Context)); err != nil {
 		return err
 	}
 
@@ -56,42 +49,22 @@ func (c *StartCmd) Run(ctx context.Context) error {
 
 // Ensures a container is running for the given resource.
 //
-// The operation is idempotent: if the container is already running it is
-// left untouched; if it is stopped a new process is started on the
-// existing snapshot; if it does not exist the image is imported and a
-// fresh container is created.
-func containerStart(ctx context.Context, client compute.Client, m manifest.Manifest, path string) error {
+// The image is imported if not already present, then [Runtime.StartFromTag]
+// handles the container lifecycle idempotently: if the container is already
+// running it is left untouched; if it is stopped a new task is started on
+// the existing snapshot; if it does not exist a fresh container is created.
+func containerStart(ctx context.Context, rt *runtime.Runtime, m manifest.Manifest, path string) error {
 	cfg := m.Config.(*manifest.Service)
 
-	result, err := client.ContainerStatus(ctx, &protocol.ContainerStatusRequest{ID: m.Resource.Name})
-	if err != nil {
+	tag := runtime.ImageTag(m.Resource.Name, m.Resource.Version)
+	name := runtime.ContainerID(m.Resource.Name)
+
+	if err := rt.ImportImage(ctx, path, tag); err != nil {
 		return err
 	}
 
 	outputStage := cfg.Stages[len(cfg.Stages)-1]
 
-	startReq := &protocol.ImageStartRequest{
-		Ref:         m.Resource.Name,
-		Version:     m.Resource.Version,
-		Affordances: outputStage.Affordances,
-	}
-
-	switch result.Status {
-	case protocol.ContainerRunning:
-		return nil
-
-	case protocol.ContainerStopped:
-		return client.ImageStart(ctx, startReq)
-
-	default:
-		if err := client.ImageImport(ctx, &protocol.ImageImportRequest{
-			Ref:     m.Resource.Name,
-			Version: m.Resource.Version,
-			Path:    path,
-		}); err != nil {
-			return err
-		}
-
-		return client.ImageStart(ctx, startReq)
-	}
+	_, err := rt.StartFromTag(ctx, tag, name, outputStage.Affordances)
+	return err
 }

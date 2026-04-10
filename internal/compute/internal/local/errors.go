@@ -16,8 +16,7 @@ var (
 	ErrHostExec            = errors.New("failed to execute command in host")
 	ErrHostConfig          = errors.New("failed to generate host configuration")
 
-	// Lima and cruxd installation errors.
+	// Lima installation errors.
 
 	ErrLimaDownload = errors.New("failed to download lima")
-	ErrCruxdInstall = errors.New("failed to install cruxd")
 )

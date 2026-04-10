@@ -2,16 +2,14 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/compute"
+	"github.com/cruciblehq/crux/internal/manifest"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/protocol"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Represents the 'crux status' command.
@@ -32,24 +30,18 @@ func (c *StatusCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client, err := b.Client(ctx, internal.DefaultInstanceName)
+	rt, err := b.Runtime(ctx, internal.DefaultInstanceName)
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+
+	name := runtime.ContainerID(man.Resource.Name)
+	state, err := rt.Container(name).Status(ctx)
 	if err != nil {
 		return err
 	}
 
-	result, err := client.ContainerStatus(ctx, &protocol.ContainerStatusRequest{
-		ID: man.Resource.Name,
-	})
-	if err != nil {
-		if errors.Is(err, compute.ErrConnectionRefused) {
-			return crex.SystemError("daemon connection refused", err.Error()).
-				Fallback("Wait a few seconds and try again. If the problem persists, try 'crux runtime restart' or 'crux runtime reset'.").
-				Cause(err).
-				Err()
-		}
-		return err
-	}
-
-	fmt.Println(result.Status)
+	fmt.Println(state)
 	return nil
 }

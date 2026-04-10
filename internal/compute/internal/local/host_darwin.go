@@ -4,22 +4,21 @@ package local
 
 import (
 	"context"
-	"path/filepath"
-	"runtime"
+	"errors"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/spec/manifest"
 )
+
+var errMachineProvisioning = errors.New("VM provisioning from derived images is not yet implemented")
 
 // Ensures the host VM is running, creating it if necessary.
 //
-// If the VM does not exist, the machine image is resolved through the given
-// [resource.Source], a Lima YAML configuration is generated, and the VM is
-// created and started. If the VM exists but is stopped, it is resumed. If
-// already running, this is a no-op. Blocks until the VM is ready.
+// If the VM exists but is stopped, it is resumed. If already running, this
+// is a no-op. Provisioning a new VM is not yet supported—VM images will be
+// derived from blueprint resolution rather than pulled as a standalone
+// machine resource.
 func ensureHostRunning(ctx context.Context, name string, source resource.Source) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
@@ -41,21 +40,10 @@ func ensureHostRunning(ctx context.Context, name string, source resource.Source)
 		return nil
 
 	case provider.StateNotProvisioned:
-		dir, _, err := source.Resolve(ctx, manifest.TypeMachine, internal.DefaultMachineImage)
-		if err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-
-		imagePath := filepath.Join(dir, machineImageForArch())
-
-		configPath, err := generateLimaConfig(name, imagePath)
-		if err != nil {
-			return err
-		}
-		if err := limaRun(ctx, "start", "--tty=false", "--name="+limaInstanceName, configPath); err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-		return nil
+		// TODO: VM images are now derived from blueprint resolution rather
+		// than pulled as a standalone machine resource. This path needs to
+		// accept a resolved VM image path from the plan layer.
+		return crex.Wrap(ErrHostStart, errMachineProvisioning)
 
 	default:
 		return crex.Wrapf(ErrHostStart, "unexpected VM state: %s", status)
@@ -96,15 +84,5 @@ func hostStatus(ctx context.Context) (provider.State, error) {
 		return provider.StateStopped, nil
 	default:
 		return provider.StateNotProvisioned, nil
-	}
-}
-
-// Returns the machine qcow2 image filename for the host architecture.
-func machineImageForArch() string {
-	switch runtime.GOARCH {
-	case goarchARM64:
-		return manifest.MachineImageAarch64
-	default:
-		return manifest.MachineImageX86_64
 	}
 }

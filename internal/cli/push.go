@@ -23,9 +23,12 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	slog.Info("pushing package...", "registry", registry)
 
-	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), resource.NewOptions(
-		nil, registry, internal.DefaultNamespace,
-	))
+	opts, err := resource.NewOptions(registry, internal.DefaultNamespace)
+	if err != nil {
+		return err
+	}
+
+	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), opts)
 	if err != nil {
 		return err
 	}

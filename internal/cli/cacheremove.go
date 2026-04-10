@@ -9,8 +9,8 @@ import (
 	"github.com/cruciblehq/crux/internal"
 	"github.com/cruciblehq/crux/internal/cache"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/internal/reference"
 )
 
 // Represents the 'crux cache remove' command.
