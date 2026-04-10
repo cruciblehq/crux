@@ -21,23 +21,16 @@ type Reference struct {
 //
 // The context type is required, and used to set the type when the reference
 // string does not include one, or to validate the type when it does. When
-// the reference string includes a type, it must match the context type.
-//
-// The expected string format is:
-//
-//	[<type>] [[[registry/]namespace/]name] (<version-constraint> | <channel>) [<digest>]
-//
-// The type is optional and must be lowercase alphabetic. When omitted, the
-// context type is used. When present, it must match the context type exactly.
-//
-// The resource location is a single token with up to three slash-separated
-// segments (registry/namespace/name). When segments are omitted, the
-// corresponding fields are empty. Callers apply defaults where needed.
-//
-// Either a version constraint or a channel is required, but not both. Version
-// constraints may span multiple tokens (e.g., ">=1.0.0 <2.0.0"). Channels are
-// prefixed with a colon (e.g., ":stable").
-//
+// the reference string includes a type, it must match the context type. The
+// expected string format is [<type>] [[[registry/]namespace/]name]
+// (<version-constraint> | <channel>) [<digest>]. The type is optional and
+// must be lowercase alphabetic. When omitted, the context type is used. When
+// present, it must match the context type exactly. The location is a single
+// token with up to three slash-separated segments (registry/namespace/name).
+// When segments are omitted, the corresponding fields are empty. Callers
+// apply defaults where needed. Either a version constraint or a channel is
+// required, but not both. Version constraints may span multiple tokens (e.g.,
+// ">=1.0.0 <2.0.0"). Channels are prefixed with a colon (e.g., ":stable").
 // The digest is optional and follows the format algorithm:hash (e.g.,
 // "sha256:abcd1234"). When present, it freezes the reference to a specific
 // content version.
