@@ -22,7 +22,8 @@ func (c *custom) Encode() (any, error) {
 	return map[string]any{"custom": c.Value}, nil
 }
 
-func (c *custom) Decode(raw map[string]any) error {
-	c.Value, _ = raw["custom"].(string)
+func (c *custom) Decode(raw any) error {
+	m, _ := raw.(map[string]any)
+	c.Value, _ = m["custom"].(string)
 	return nil
 }
