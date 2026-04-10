@@ -78,14 +78,14 @@ func (s *ResourceSummary) Validate() error {
 // details. Includes scoping information to identify the resource's location. The
 // media type is [MediaTypeResource].
 type Resource struct {
-	Namespace string            `codec:"namespace"` // Namespace this resource belongs to.
-	Name      string            `codec:"name"`      // Resource name.
-	Type      string            `codec:"type"`      // Resource type (e.g., "widget", "service").
-	Description string          `codec:"description"` // Description.
-	Versions  []VersionSummary  `codec:"versions"`  // List of versions (summary form).
-	Channels  []ChannelSummary  `codec:"channels"`  // List of channels (summary form).
-	CreatedAt int64             `codec:"createdAt"` // When the resource was created.
-	UpdatedAt int64             `codec:"updatedAt"` // When the resource was last updated.
+	Namespace   string           `codec:"namespace"`   // Namespace this resource belongs to.
+	Name        string           `codec:"name"`        // Resource name.
+	Type        string           `codec:"type"`        // Resource type (e.g., "widget", "service").
+	Description string           `codec:"description"` // Description.
+	Versions    []VersionSummary `codec:"versions"`    // List of versions (summary form).
+	Channels    []ChannelSummary `codec:"channels"`    // List of channels (summary form).
+	CreatedAt   int64            `codec:"createdAt"`   // When the resource was created.
+	UpdatedAt   int64            `codec:"updatedAt"`   // When the resource was last updated.
 }
 
 // Validates the resource.

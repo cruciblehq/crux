@@ -25,7 +25,7 @@ func ReadManifest(manifestPath string) (*manifest.Manifest, error) {
 		return nil, crex.Wrap(ErrReadManifest, err)
 	}
 	var m manifest.Manifest
-	if err := codec.Decode(data, &m, codec.YAML); err != nil {
+	if err := codec.Unmarshal(data, &m, codec.YAML); err != nil {
 		return nil, crex.Wrap(ErrReadManifest, err)
 	}
 	return &m, nil

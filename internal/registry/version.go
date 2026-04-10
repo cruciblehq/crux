@@ -9,9 +9,7 @@ import "github.com/cruciblehq/crex"
 // update context. Contains only user-modifiable fields. The media type is
 // [MediaTypeVersionInfo].
 type VersionInfo struct {
-
-	// Version string (e.g., "1.0.0").
-	String string `codec:"string"`
+	String string `codec:"string"` // Version string (e.g., "1.0.0").
 }
 
 // Validates the version info.

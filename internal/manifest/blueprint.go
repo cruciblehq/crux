@@ -12,7 +12,7 @@ type Blueprint struct {
 	// Services to deploy.
 	//
 	// Each entry names a service from the registry. Services carry only
-	// an ID and a reference — affordances and configuration come from the
+	// an ID and a reference; affordances and configuration come from the
 	// service manifest fetched during the build.
 	Services []Ref `codec:"services"`
 
