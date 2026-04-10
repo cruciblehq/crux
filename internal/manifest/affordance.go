@@ -7,12 +7,10 @@ import (
 
 // Holds configuration specific to affordance resources.
 //
-// An affordance declares a set of grants that confer subsystem settings or
-// reference other affordances. Domain grants use a dot-prefixed expression
-// to select the subsystem (e.g. ".seccomp openat"). References name another
-// affordance resource and are resolved recursively by AffordanceBuilder.
-// Platform groups scope grants to a target platform and are preserved as
-// nested [Grant] nodes with a single level of children.
+// An affordance declares grants that confer subsystem settings or reference
+// other affordances. Domain grants use a dot-prefixed expression to select
+// the subsystem (e.g. ".seccomp openat"). References name another affordance
+// resource and are resolved recursively by AffordanceBuilder.
 type Affordance struct {
 
 	// Parameter schema for this affordance.
@@ -22,54 +20,139 @@ type Affordance struct {
 	// instead of requiring an explicit key. Zero value means no parameters.
 	Schema Schema `codec:"schema,omitempty"`
 
-	// Sandbox grants that compose this affordance.
+	// Grant scopes.
 	//
-	// Each grant targets a subsystem with an expression. Domain grants
-	// use dot-prefixed syntax (e.g. ".seccomp openat") and are decoded
-	// with the subsystem domain extracted from the prefix. References
-	// use bare Crucible references and are decoded with the [DomainRef]
-	// subsystem; they are resolved recursively by AffordanceBuilder.
-	// Platform groups in the YAML are preserved as nested [Grant] nodes,
-	// each group carrying a [Grant.Platform] selector and a [Grant.Grants]
-	// list of children.
-	Grants []Grant `codec:"grants,omitempty"`
-}
-
-// Decodes a raw parsed map into the affordance.
-//
-// Implements [codec.Decodable]. The grants field uses compact YAML syntax
-// (strings and maps) that requires manual iteration.
-func (a *Affordance) Decode(raw map[string]any) error {
-	if err := codec.Field(raw, a, "Schema"); err != nil {
-		return crex.Wrap(ErrInvalidAffordance, err)
-	}
-
-	if v, ok := raw["grants"]; ok {
-		list, ok := v.([]any)
-		if !ok {
-			return crex.Wrapf(ErrInvalidAffordance, "grants must be a list")
-		}
-		grants, err := decodeGrantSlice(list)
-		if err != nil {
-			return err
-		}
-		a.Grants = grants
-	}
-
-	return nil
+	// Internally groups grants by platform. Universal grants (no platform)
+	// live in a scope with an empty Platform. Custom Encode flattens
+	// universal grants into the top-level list; platform-scoped grants
+	// are written as platform group entries.
+	Scopes []GrantScope `codec:"-"`
 }
 
 // Validates the affordance configuration.
+//
+// Schema and all grant scopes must be valid.
 func (a *Affordance) Validate() error {
 	if err := a.Schema.Validate(); err != nil {
 		return crex.Wrap(ErrInvalidAffordance, err)
 	}
 
-	for i := range a.Grants {
-		if err := a.Grants[i].Validate(); err != nil {
+	for i := range a.Scopes {
+		if err := a.Scopes[i].Validate(); err != nil {
 			return crex.Wrapf(ErrInvalidAffordance, "grant %d: %w", i+1, err)
 		}
 	}
 
 	return nil
+}
+
+// Encodes the affordance to a format-independent value.
+//
+// Implements [codec.Encodable]. Universal grants (scopes with empty Platform)
+// are flattened into the top-level grants list. Platform-scoped grants are
+// written as platform group entries with their own inner grants list.
+func (a *Affordance) Encode() (any, error) {
+	m := make(map[string]any)
+
+	sm, err := codec.ToMap(a.Schema)
+	if err != nil {
+		return nil, err
+	}
+	if len(sm) > 0 {
+		m["schema"] = sm
+	}
+
+	list, err := encodeScopes(a.Scopes)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) > 0 {
+		m["grants"] = list
+	}
+
+	return m, nil
+}
+
+// Encodes grant scopes into a flat list suitable for serialization.
+//
+// Universal grants (empty Platform) are inlined directly. Platform-scoped
+// grants are written as platform group entries.
+func encodeScopes(scopes []GrantScope) ([]any, error) {
+	var list []any
+	for _, scope := range scopes {
+		encoded, err := scope.Encode()
+		if err != nil {
+			return nil, err
+		}
+		if entries, ok := encoded.([]any); ok {
+			list = append(list, entries...)
+		} else {
+			list = append(list, encoded)
+		}
+	}
+	return list, nil
+}
+
+// Decodes a raw parsed map into the affordance.
+//
+// Implements [codec.Decodable]. Each grant element in the list is decoded by
+// [decodeGrant], which handles both source format (compact syntax strings and
+// dot-prefixed domain maps) and resolved format (maps with subsystem/expr/args
+// keys). Platform groups are decoded recursively.
+func (a *Affordance) Decode(raw any) error {
+	src, ok := raw.(map[string]any)
+	if !ok {
+		return crex.Wrapf(ErrInvalidAffordance, "expected map, got %T", raw)
+	}
+
+	if err := codec.Field(src, a, "Schema"); err != nil {
+		return crex.Wrap(ErrInvalidAffordance, err)
+	}
+
+	list, _ := src["grants"].([]any)
+	if len(list) == 0 {
+		return nil
+	}
+
+	scopes, err := decodeScopes(list)
+	if err != nil {
+		return crex.Wrap(ErrInvalidAffordance, err)
+	}
+	a.Scopes = scopes
+	return nil
+}
+
+// Decodes a grant list into scopes, handling platform groups.
+//
+// Strings and maps without a "platform" key are accumulated into the universal
+// scope (empty Platform). Maps with a "platform" key are decoded as platform
+// groups via [GrantScope.Decode].
+func decodeScopes(list []any) ([]GrantScope, error) {
+	var universal []Grant
+	var scopes []GrantScope
+
+	for _, elem := range list {
+		m, isMap := elem.(map[string]any)
+		if isMap {
+			if _, ok := m["platform"]; ok {
+				var scope GrantScope
+				if err := scope.Decode(m); err != nil {
+					return nil, err
+				}
+				scopes = append(scopes, scope)
+				continue
+			}
+		}
+
+		g, err := decodeGrant(elem)
+		if err != nil {
+			return nil, err
+		}
+		universal = append(universal, g)
+	}
+
+	if len(universal) > 0 {
+		scopes = append([]GrantScope{{Grants: universal}}, scopes...)
+	}
+	return scopes, nil
 }

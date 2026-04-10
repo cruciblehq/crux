@@ -4,206 +4,162 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/subsystem"
 )
 
-// Domain selector prefix.
+// Prefix that marks a grant string or map key as a domain grant.
 //
-// This is used as a prefix to distinguish domain grants from references in the
-// compact YAML syntax. A grant string or map key starting with this prefix is
-// a domain grant; anything else is a reference.
+// In the compact syntax, domain grants start with a dot followed by the
+// subsystem name (e.g. ".seccomp openat"). Strings and map keys without
+// this prefix are treated as affordance references.
 const domainPrefix = "."
 
-// An element in an affordance's grant list.
+// A single permission granted by an affordance.
 //
-// A leaf grant carries a subsystem-specific configuration in [Grant.Config].
-// The Config type depends on the [Grant.Subsystem] domain. A group grant
-// scopes children to a platform via [Grant.Platform] and [Grant.Grants]. The
-// two forms are mutually exclusive. Invalid combinations are rejected.
+// Each grant targets one subsystem domain and carries an expression with
+// optional arguments. The compact syntax form (e.g. ".seccomp openat") is
+// parsed into Subsystem + Expr by [decodeGrant]. Grants with an empty
+// Subsystem are references to other affordances. Grants with a non-empty
+// Subsystem are domain grants that the builder resolves into built grants
+// with subsystem-specific expressions and arguments. The builder ensures
+// that all grants it produces are valid before including them in the build
+// output manifest.
 type Grant struct {
 
 	// Selects the subsystem domain targeted by the grant.
 	//
-	// Determines how [Grant.Config] is interpreted. For domain grants, this
-	// is extracted from the dot-prefixed syntax (e.g. ".seccomp openat" for
-	// DomainSeccomp). For references, this is [DomainRef] and Config holds
-	// the reference target string. Ref grants are transient: they are
-	// resolved during build and never appear in the build output. Must be
-	// empty on group nodes.
-	Subsystem Domain `codec:"subsystem,omitempty"`
+	// Determines how Expr and Args are interpreted. Each subsystem defines
+	// its own domain syntax and the builder routes grants to the subsystem
+	// based on this field. Empty for references. Non-empty for domain grants.
+	Subsystem string `codec:"subsystem,omitempty"`
 
-	// Subsystem-specific configuration for this grant.
+	// The grant expression.
 	//
-	// The concrete type depends on [Grant.Subsystem]. For [DomainSeccomp],
-	// this holds a [subsystem.SeccompRule]. For [DomainRef], this holds the
-	// reference target string, which is resolved and flattened during build.
-	Config any `codec:"config,omitempty"`
+	// Contains the expression for the grant. For domain grants, this is the
+	// subsystem-specific expression (e.g. "openat" for seccomp, "effective
+	// NET_RAW" for cap). For references, this is the affordance reference.
+	Expr string `codec:"expr,omitempty"`
 
-	// Restricts this grant or group to a specific platform.
+	// Optional arguments that qualify the expression.
 	//
-	// When set on a leaf grant, restricts it to the given platform. When set
-	// with [Grant.Grants], creates a platform-scoped group; all children in
-	// the group inherit the scope. The format is "os/arch" (e.g.
-	// "linux/amd64"). Can be set on both leaf and group nodes.
-	Platform string `codec:"platform,omitempty"`
-
-	// Child grants scoped to the platform specified by [Grant.Platform].
-	//
-	// When set, leaf fields (Subsystem, Config) must be empty. Only one
-	// level of nesting is permitted: children must be leafs and cannot
-	// themselves contain children. Children follow the same rules as
-	// top-level grants.
-	Grants []Grant `codec:"grants,omitempty"`
+	// Subsystem-specific argument strings. For seccomp, these are argument
+	// filters (e.g. "0 eq 1"). For cgroup, these are sub-knob values. Nil
+	// when no arguments are needed.
+	Args []string `codec:"args,omitempty"`
 }
 
 // Validates the grant's structural integrity.
 //
-// Leaf fields (Subsystem, Config) and group field (Grants) are mutually
-// exclusive. Platform can be set on either. Children of a group must be
-// leaf grants, nested groups are not allowed.
+// A grant must have a non-empty Subsystem and Expr. Any additional validation
+// is the responsibility of the subsystem that produced the grant. The builder
+// must ensure that all grants produced by a subsystem are valid.
 func (g *Grant) Validate() error {
-	hasLeaf := g.Subsystem != ""
-	hasGrants := len(g.Grants) > 0
-
-	if hasLeaf && hasGrants {
-		return crex.Wrapf(ErrInvalidAffordance, "grant cannot have both subsystem domain and children")
+	if g.Subsystem == "" {
+		return crex.Wrapf(ErrInvalidAffordance, "built grant must have a subsystem")
 	}
-
-	if hasGrants {
-		return g.validateChildren()
-	}
-
-	if !hasLeaf {
-		return crex.Wrapf(ErrInvalidAffordance, "grant missing subsystem domain")
-	}
-	if g.Subsystem == DomainRef {
-		if _, ok := g.Config.(string); !ok || g.Config.(string) == "" {
-			return crex.Wrapf(ErrInvalidAffordance, "ref grant missing target")
-		}
+	if g.Expr == "" {
+		return crex.Wrapf(ErrInvalidAffordance, "grant must have an expr")
 	}
 	return nil
 }
 
-// Validates all children of a group grant.
+// Decodes a map into the grant.
 //
-// Children must be leaf grants, nested groups are not allowed.
-func (g *Grant) validateChildren() error {
-	for i := range g.Grants {
-		if len(g.Grants[i].Grants) > 0 {
-			return crex.Wrap(ErrInvalidAffordance, ErrNestedPlatformGroup)
+// Implements [codec.Decodable]. A map with a "subsystem" key is a resolved
+// grant. A map with a dot-prefixed key is a source domain grant whose value
+// is an optional args list. A map with a bare key is a reference.
+func (g *Grant) Decode(raw any) error {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return crex.Wrapf(ErrInvalidAffordance, "expected map, got %T", raw)
+	}
+	if sub, _ := m["subsystem"].(string); sub != "" {
+		g.Subsystem = sub
+		g.Expr, _ = m["expr"].(string)
+		if rawArgs, ok := m["args"].([]any); ok {
+			g.Args = make([]string, len(rawArgs))
+			for i, a := range rawArgs {
+				g.Args[i], _ = a.(string)
+			}
 		}
-		if err := g.Grants[i].Validate(); err != nil {
+		return nil
+	}
+	for key, val := range m {
+		if !strings.HasPrefix(key, domainPrefix) {
+			g.Expr = key
+			return nil
+		}
+		trimmed := key[len(domainPrefix):]
+		domain, expr, _ := strings.Cut(trimmed, " ")
+		if domain == "" {
+			return crex.Wrapf(ErrInvalidAffordance, "empty domain in key %q", key)
+		}
+		args, err := decodeArgs(val)
+		if err != nil {
 			return err
 		}
+		g.Subsystem = domain
+		g.Expr = expr
+		g.Args = args
+		return nil
 	}
-	return nil
+	return crex.Wrapf(ErrInvalidAffordance, "empty map grant")
 }
 
-// Decodes a list of raw YAML elements into a []Grant.
-func decodeGrantSlice(raw []any) ([]Grant, error) {
-	var grants []Grant
-	for _, elem := range raw {
-		decoded, err := decodeGrant(elem)
-		if err != nil {
-			return nil, err
-		}
-		grants = append(grants, decoded...)
-	}
-	return grants, nil
-}
-
-// Classifies and decodes a single raw YAML element into one or more Grants.
+// Decodes a raw grant element into a typed Grant.
 //
-// A string produces a single leaf grant. A map with a "platform" key is a
-// platform group whose children are preserved as nested grants.
-// Any other single-key map is a domain grant with structured args.
-func decodeGrant(elem any) ([]Grant, error) {
+// Handles both source and resolved formats. Source strings use the compact
+// syntax: ".domain expr" for domain grants, bare names for references.
+// Maps are delegated to [Grant.Decode].
+func decodeGrant(elem any) (Grant, error) {
 	switch v := elem.(type) {
 	case string:
 		return decodeGrantString(v)
 	case map[string]any:
-		return decodeGrantMap(v)
+		var g Grant
+		if err := g.Decode(v); err != nil {
+			return Grant{}, err
+		}
+		return g, nil
 	default:
-		return nil, crex.Wrapf(ErrInvalidAffordance, "unsupported grant type %T", elem)
+		return Grant{}, crex.Wrapf(ErrInvalidAffordance, "unsupported grant type %T", elem)
 	}
 }
 
-// Decodes a string element into one or more Grants.
+// Parses a compact syntax string into a Grant.
 //
-// Strings starting with [domainPrefix] are domain grants. All others
-// are Crucible references.
-func decodeGrantString(s string) ([]Grant, error) {
-	if strings.HasPrefix(s, domainPrefix) {
-		trimmed := s[len(domainPrefix):]
-		domain, expr, _ := strings.Cut(trimmed, " ")
-		return resolveGrants(Domain(domain), expr, nil)
+// Dot-prefixed strings are domain grants (e.g. ".seccomp openat" becomes
+// Grant{Subsystem: "seccomp", Expr: "openat"}). Bare names are references
+// (e.g. "my-affordance" becomes Grant{Expr: "my-affordance"}).
+func decodeGrantString(s string) (Grant, error) {
+	if !strings.HasPrefix(s, domainPrefix) {
+		return Grant{Expr: s}, nil
 	}
-	return []Grant{{Subsystem: DomainRef, Config: s}}, nil
+	trimmed := s[len(domainPrefix):]
+	domain, expr, _ := strings.Cut(trimmed, " ")
+	if domain == "" {
+		return Grant{}, crex.Wrapf(ErrInvalidAffordance, "empty domain in %q", s)
+	}
+	return Grant{Subsystem: domain, Expr: expr}, nil
 }
 
-// Decodes a map element as either a platform group or a domain grant
-// with structured args.
-func decodeGrantMap(m map[string]any) ([]Grant, error) {
-	if p, ok := m["platform"]; ok {
-		ps, _ := p.(string)
-		raw, _ := m["grants"].([]any)
-		children, err := decodeGrantSlice(raw)
-		if err != nil {
-			return nil, err
-		}
-		return []Grant{{Platform: ps, Grants: children}}, nil
-	}
-	for key, val := range m {
-		args, err := decodeArgs(val)
-		if err != nil {
-			return nil, err
-		}
-		if strings.HasPrefix(key, domainPrefix) {
-			trimmed := key[len(domainPrefix):]
-			domain, expr, _ := strings.Cut(trimmed, " ")
-			return resolveGrants(Domain(domain), expr, args)
-		}
-		return resolveGrants(DomainRef, key, args)
-	}
-	return nil, crex.Wrapf(ErrInvalidAffordance, "empty map grant")
-}
-
-// Resolves a compact grant expression into one or more leaf Grants.
+// Decodes args from a raw YAML value.
 //
-// Dispatches to the appropriate subsystem resolver based on domain. A single
-// expression may expand into multiple grants.
-func resolveGrants(domain Domain, expr string, args []string) ([]Grant, error) {
-	switch domain {
-	case DomainSeccomp:
-		rules, err := subsystem.ResolveSeccomp(expr, args)
-		if err != nil {
-			return nil, crex.Wrap(ErrInvalidAffordance, err)
-		}
-		grants := make([]Grant, len(rules))
-		for i := range rules {
-			grants[i] = Grant{Subsystem: domain, Config: rules[i]}
-		}
-		return grants, nil
-	case DomainRef:
-		return []Grant{{Subsystem: DomainRef, Config: expr}}, nil
-	default:
-		return nil, crex.Wrapf(ErrInvalidAffordance, "unsupported domain %q", domain)
-	}
-}
-
-// Converts a map value to a string slice of args.
+// Nil means no args. A []any of strings is converted to []string.
 func decodeArgs(val any) ([]string, error) {
-	list, ok := val.([]any)
-	if !ok {
+	if val == nil {
 		return nil, nil
 	}
-	args := make([]string, 0, len(list))
-	for _, a := range list {
+	list, ok := val.([]any)
+	if !ok {
+		return nil, crex.Wrapf(ErrInvalidAffordance, "args must be a list, got %T", val)
+	}
+	args := make([]string, len(list))
+	for i, a := range list {
 		s, ok := a.(string)
 		if !ok {
-			return nil, crex.Wrapf(ErrInvalidAffordance, "arg must be a string, not %T", a)
+			return nil, crex.Wrapf(ErrInvalidAffordance, "arg %d must be a string, got %T", i+1, a)
 		}
-		args = append(args, s)
+		args[i] = s
 	}
 	return args, nil
 }
