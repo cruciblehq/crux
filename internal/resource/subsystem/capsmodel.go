@@ -97,10 +97,17 @@ func (c *caps) GrantBound(cap string) {
 }
 
 // Merges another capability set into this one.
-func (c *caps) merge(other caps) {
-	mergeSlice(&c.Effective, other.Effective)
-	mergeSlice(&c.Permitted, other.Permitted)
-	mergeSlice(&c.Inheritable, other.Inheritable)
-	mergeSlice(&c.Bounding, other.Bounding)
-	mergeSlice(&c.Ambient, other.Ambient)
+//
+// Returns true if any capability was added. Capabilities are purely additive,
+// so no conflicts are possible.
+func (c *caps) merge(other caps) bool {
+	changed := false
+
+	changed = changed || mergeSlice(&c.Effective, other.Effective)
+	changed = changed || mergeSlice(&c.Permitted, other.Permitted)
+	changed = changed || mergeSlice(&c.Inheritable, other.Inheritable)
+	changed = changed || mergeSlice(&c.Bounding, other.Bounding)
+	changed = changed || mergeSlice(&c.Ambient, other.Ambient)
+
+	return changed
 }

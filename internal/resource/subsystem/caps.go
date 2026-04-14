@@ -10,7 +10,7 @@ import (
 // Implements [Subsystem] for [manifest.DomainCap].
 //
 // Accumulates capability grants into an internal [caps] model. Capabilities
-// are purely additive. Granting the same capability twice is harmless.
+// are purely additive. Granting the same capability twice is idempotent.
 type CapsSubsystem struct {
 	model caps
 }
@@ -18,7 +18,8 @@ type CapsSubsystem struct {
 // Feeds a caps grant into the subsystem.
 //
 // Validates the expression "[verb] <name>" and merges it into the internal
-// model. Returns a single grant with the validated expression.
+// model. Returns the grant if it had an effect, or nil if the capability
+// was already present in all targeted sets.
 func (s *CapsSubsystem) Build(_ context.Context, domain Domain, input manifest.Grant) ([]manifest.Grant, error) {
 	crex.Assertf(domain == DomainCap, "unexpected cap domain %q", domain)
 
@@ -27,7 +28,9 @@ func (s *CapsSubsystem) Build(_ context.Context, domain Domain, input manifest.G
 		return nil, err
 	}
 
-	s.model.merge(caps)
+	if !s.model.merge(caps) {
+		return nil, nil
+	}
 
 	return []manifest.Grant{{Subsystem: string(domain), Expr: input.Expr}}, nil
 }

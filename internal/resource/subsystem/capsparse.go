@@ -11,6 +11,11 @@ import (
 var validCapName = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
 // Parses a caps expression "<verb> <name>" into a [caps] config.
+//
+// The verb determines which kernel capability sets are populated. Each verb
+// expands to a predefined combination of sets via the corresponding Grant
+// method on [caps]. The capability name must be an uppercase identifier
+// matching the kernel ABI (e.g., NET_RAW, SYS_PTRACE).
 func parseCaps(expr string) (caps, error) {
 	fields := strings.Fields(expr)
 	if len(fields) != 2 {
