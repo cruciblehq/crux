@@ -1,7 +1,5 @@
 package subsystem
 
-import "github.com/cruciblehq/crex"
-
 // Controls which privileged kernel operations are allowed to the container.
 //
 // Linux capabilities divide root privilege into individual units (e.g., CHOWN,
@@ -17,33 +15,11 @@ type caps struct {
 	Ambient     []string `codec:"ambient,omitempty"`     // Ambient capability set.
 }
 
-// Cap permission verb.
-type capVerb string
-
-const (
-	capVerbGrant       capVerb = "grant"       // All five sets (effective immediately, survives exec, auto-inherits). Broadest grant.
-	capVerbEffective   capVerb = "effective"   // Effective + permitted + bounding (effective immediately, survives exec, does not auto-inherit).
-	capVerbInheritable capVerb = "inheritable" // Permitted + inheritable + ambient + bounding (auto-inherits across exec via ambient).
-	capVerbPermitted   capVerb = "permitted"   // Permitted + bounding (raisable on demand, not effective by default).
-	capVerbBound       capVerb = "bound"       // Bounding only (exec ceiling for child processes).
-)
-
-// Converts a string to a capVerb, returning an error for unknown values.
-func parseCapVerb(s string) (capVerb, error) {
-	v := capVerb(s)
-	switch v {
-	case capVerbGrant, capVerbEffective, capVerbInheritable, capVerbPermitted, capVerbBound:
-		return v, nil
-	default:
-		return "", crex.Wrapf(ErrGrantExpression, "unknown verb %q", s)
-	}
-}
-
 // Grants a capability to all five sets.
 //
 // The capability is effective immediately, survives exec, and auto-inherits
 // to child processes. This is the broadest grant.
-func (c *caps) Grant(cap string) {
+func (c *caps) grantAll(cap string) {
 	appendUnique(&c.Effective, cap)
 	appendUnique(&c.Permitted, cap)
 	appendUnique(&c.Inheritable, cap)
@@ -56,7 +32,7 @@ func (c *caps) Grant(cap string) {
 // The capability is effective immediately and survives exec (via bounding),
 // but does not auto-inherit to child processes. Useful for capabilities the
 // service itself needs.
-func (c *caps) GrantEffective(cap string) {
+func (c *caps) grantEffective(cap string) {
 	appendUnique(&c.Effective, cap)
 	appendUnique(&c.Permitted, cap)
 	appendUnique(&c.Bounding, cap)
@@ -68,7 +44,7 @@ func (c *caps) GrantEffective(cap string) {
 // the ambient set automatically raises it into the child's effective and
 // permitted sets. Useful for capabilities a service's children need but the
 // parent doesn't use directly.
-func (c *caps) GrantInheritable(cap string) {
+func (c *caps) grantInheritable(cap string) {
 	appendUnique(&c.Permitted, cap)
 	appendUnique(&c.Inheritable, cap)
 	appendUnique(&c.Ambient, cap)
@@ -81,7 +57,7 @@ func (c *caps) GrantInheritable(cap string) {
 // set allows it to persist across exec. Not effective by default, and does
 // not auto-inherit. Useful for capabilities that are only needed for specific
 // operations.
-func (c *caps) GrantPermitted(cap string) {
+func (c *caps) grantPermitted(cap string) {
 	appendUnique(&c.Permitted, cap)
 	appendUnique(&c.Bounding, cap)
 }
@@ -91,7 +67,7 @@ func (c *caps) GrantPermitted(cap string) {
 // This acts as an exec ceiling: child processes may receive this capability
 // (via file caps or ambient), but the current process cannot use it. Useful
 // for capabilities that are only needed by child processes.
-func (c *caps) GrantBound(cap string) {
+func (c *caps) grantBound(cap string) {
 	appendUnique(&c.Bounding, cap)
 }
 
@@ -106,4 +82,20 @@ func (c *caps) merge(other caps) bool {
 	changed = mergeSlice(&c.Bounding, other.Bounding) || changed
 	changed = mergeSlice(&c.Ambient, other.Ambient) || changed
 	return changed
+}
+
+// Applies a capability verb to this model for a single capability name.
+func (c *caps) grant(verb capVerb, name string) {
+	switch verb {
+	case capVerbGrant:
+		c.grantAll(name)
+	case capVerbEffective:
+		c.grantEffective(name)
+	case capVerbInheritable:
+		c.grantInheritable(name)
+	case capVerbPermitted:
+		c.grantPermitted(name)
+	case capVerbBound:
+		c.grantBound(name)
+	}
 }

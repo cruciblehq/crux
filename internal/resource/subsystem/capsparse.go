@@ -1,14 +1,10 @@
 package subsystem
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/cruciblehq/crex"
 )
-
-// Matches a valid capability name (uppercase letters, digits, and underscores).
-var validCapName = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
 // Parses a caps expression "<verb> <name>" into a [caps] config.
 //
@@ -26,22 +22,11 @@ func parseCaps(expr string) (caps, error) {
 		return caps{}, err
 	}
 	name := fields[1]
-	if !validCapName.MatchString(name) {
-		return caps{}, crex.Wrapf(ErrGrantExpression, "invalid capability name %q", name)
+	if err := validateCapName(name); err != nil {
+		return caps{}, err
 	}
 
 	var c caps
-	switch verb {
-	case capVerbGrant:
-		c.Grant(name)
-	case capVerbEffective:
-		c.GrantEffective(name)
-	case capVerbInheritable:
-		c.GrantInheritable(name)
-	case capVerbPermitted:
-		c.GrantPermitted(name)
-	case capVerbBound:
-		c.GrantBound(name)
-	}
+	c.grant(verb, name)
 	return c, nil
 }
