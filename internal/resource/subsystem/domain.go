@@ -24,5 +24,6 @@ const (
 	DomainFcap    Domain = "fcap"     // File capabilities.
 	DomainRlimit  Domain = "rlimit"   // POSIX resource limits.
 	DomainCgroup  Domain = "cgroup"   // Cgroup v2 controllers.
+	DomainDevice  Domain = "device"   // Device node provisioning.
 	DomainExpose  Domain = "expose"   // Virtual filesystem unmask.
 )

@@ -26,3 +26,22 @@ func validateContainerPath(p string) (string, error) {
 	}
 	return p, nil
 }
+
+// Matches a valid device name (lowercase letters, digits, and underscores).
+var validDeviceName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// Validates a device name against the expected format.
+func validateDeviceName(name string) error {
+	if !validDeviceName.MatchString(name) {
+		return crex.Wrapf(ErrGrantExpression, "invalid device name %q", name)
+	}
+	return nil
+}
+
+// Validates that a file mode fits within the 12-bit Unix permission range (07777).
+func validateFileMode(mode uint16) error {
+	if mode > 0o7777 {
+		return crex.Wrapf(ErrGrantExpression, "%d is not a valid file mode", mode)
+	}
+	return nil
+}
