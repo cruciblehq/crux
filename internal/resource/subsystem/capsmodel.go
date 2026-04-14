@@ -42,8 +42,7 @@ func parseCapVerb(s string) (capVerb, error) {
 // Grants a capability to all five sets.
 //
 // The capability is effective immediately, survives exec, and auto-inherits
-// to child processes. This is the default when no verb is specified in the
-// expression. This is the broadest grant.
+// to child processes. This is the broadest grant.
 func (c *caps) Grant(cap string) {
 	appendUnique(&c.Effective, cap)
 	appendUnique(&c.Permitted, cap)
@@ -101,13 +100,10 @@ func (c *caps) GrantBound(cap string) {
 // Returns true if any capability was added. Capabilities are purely additive,
 // so no conflicts are possible.
 func (c *caps) merge(other caps) bool {
-	changed := false
-
-	changed = changed || mergeSlice(&c.Effective, other.Effective)
-	changed = changed || mergeSlice(&c.Permitted, other.Permitted)
-	changed = changed || mergeSlice(&c.Inheritable, other.Inheritable)
-	changed = changed || mergeSlice(&c.Bounding, other.Bounding)
-	changed = changed || mergeSlice(&c.Ambient, other.Ambient)
-
+	changed := mergeSlice(&c.Effective, other.Effective)
+	changed = mergeSlice(&c.Permitted, other.Permitted) || changed
+	changed = mergeSlice(&c.Inheritable, other.Inheritable) || changed
+	changed = mergeSlice(&c.Bounding, other.Bounding) || changed
+	changed = mergeSlice(&c.Ambient, other.Ambient) || changed
 	return changed
 }

@@ -17,7 +17,7 @@ type CapsSubsystem struct {
 
 // Feeds a caps grant into the subsystem.
 //
-// Validates the expression "[verb] <name>" and merges it into the internal
+// Validates the expression "<verb> <name>" and merges it into the internal
 // model. Returns the grant if it had an effect, or nil if the capability
 // was already present in all targeted sets.
 func (s *CapsSubsystem) Build(_ context.Context, domain Domain, input manifest.Grant) ([]manifest.Grant, error) {
