@@ -21,13 +21,13 @@ func parseFcap(expr string) (fcap, error) {
 	if err != nil {
 		return fcap{}, err
 	}
-	path, err := validateContainerPath(fields[1])
+	path, err := validateFcapsContainerPath(fields[1])
 	if err != nil {
 		return fcap{}, err
 	}
 	names := fields[2:]
 	for _, name := range names {
-		if err := validateCapName(name); err != nil {
+		if err := validateFcapsName(name); err != nil {
 			return fcap{}, err
 		}
 	}

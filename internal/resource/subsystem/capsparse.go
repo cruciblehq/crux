@@ -22,7 +22,7 @@ func parseCaps(expr string) (caps, error) {
 		return caps{}, err
 	}
 	name := fields[1]
-	if err := validateCapName(name); err != nil {
+	if err := validateCapsName(name); err != nil {
 		return caps{}, err
 	}
 

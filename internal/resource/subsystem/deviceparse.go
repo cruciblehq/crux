@@ -62,7 +62,7 @@ func parseDeviceExpr(expr string, args []string) (device, error) {
 func setDeviceField(d *device, key deviceArg, val string) error {
 	switch key {
 	case deviceArgPath:
-		p, err := validateContainerPath(val)
+		p, err := validateDeviceContainerPath(val)
 		if err != nil {
 			return err
 		}
