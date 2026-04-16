@@ -20,6 +20,7 @@ const (
 	DomainPtrace  Domain = "ptrace"   // LSM ptrace mediation.
 	DomainIOUring Domain = "io_uring" // LSM io_uring access.
 	DomainUserns  Domain = "userns"   // LSM user namespace creation.
+	DomainMqueue  Domain = "mqueue"   // LSM message queue mediation.
 	DomainCap     Domain = "cap"      // Linux capabilities.
 	DomainFcap    Domain = "fcap"     // File capabilities.
 	DomainRlimit  Domain = "rlimit"   // POSIX resource limits.
