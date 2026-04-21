@@ -2,6 +2,8 @@ package cap
 
 import (
 	"slices"
+
+	"github.com/cruciblehq/crex"
 )
 
 // Accumulated capability state across all five kernel sets.
@@ -64,7 +66,7 @@ func (s *State) Apply(r *Grant) (bool, error) {
 	case ModeBound:
 		return s.grantBound(r.Name), nil
 	default:
-		return s.grantFull(r.Name), nil
+		return false, crex.Wrapf(ErrInvalidRule, "unknown capability mode %q", r.Mode)
 	}
 }
 
@@ -129,6 +131,9 @@ func (s *State) grantBound(name string) bool {
 // Each capability is added to the appropriate sets based on which sets it is
 // present in the other state. Repeated capabilities are silently ignored.
 func (s *State) Merge(other *State) {
+	if other == nil {
+		return
+	}
 	for _, name := range other.Effective {
 		appendUnique(&s.Effective, name)
 	}

@@ -1,6 +1,9 @@
 package cap
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestCloneStateReturnsNilForNilOrEmpty(t *testing.T) {
 	if cloneState(nil) != nil {
@@ -85,20 +88,21 @@ func TestStateApplyByMode(t *testing.T) {
 	}
 }
 
-func TestStateApplyUnknownModeFallsBackToFull(t *testing.T) {
+func TestStateApplyUnknownModeReturnsError(t *testing.T) {
 	state := NewState()
 	changed, err := state.Apply(&Grant{Mode: Mode("bogus"), Name: "net_admin"})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error")
 	}
-	if !changed {
-		t.Fatal("changed = false")
+	if !errors.Is(err, ErrInvalidRule) {
+		t.Fatalf("error = %v, want ErrInvalidRule", err)
 	}
-	assertSlice(t, "effective", state.Effective, []string{"net_admin"})
-	assertSlice(t, "permitted", state.Permitted, []string{"net_admin"})
-	assertSlice(t, "inheritable", state.Inheritable, []string{"net_admin"})
-	assertSlice(t, "bounding", state.Bounding, []string{"net_admin"})
-	assertSlice(t, "ambient", state.Ambient, []string{"net_admin"})
+	if changed {
+		t.Fatal("changed = true")
+	}
+	if cloneState(state) != nil {
+		t.Fatal("state changed on invalid mode")
+	}
 }
 
 func TestStateMergeDeduplicatesBySet(t *testing.T) {

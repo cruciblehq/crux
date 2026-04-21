@@ -36,11 +36,18 @@ func (b *Builder) Build(rule string) error {
 }
 
 // Returns a copy of the accumulated capability state.
+//
+// The returned state is a deep copy of the accumulated state. If the state is
+// nil or empty, returns nil. Otherwise, the returned state is non-nil with at
+// least one non-empty capability set.
 func (b *Builder) State() *State {
 	return cloneState(b.state)
 }
 
 // Merges another capability state into the accumulated state.
+//
+// If the input state is nil or empty, does nothing. Otherwise, incorporates
+// all capability names from each set.
 func (b *Builder) Merge(other *State) error {
 	if other == nil {
 		return nil
