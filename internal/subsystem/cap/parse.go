@@ -18,6 +18,9 @@ func Parse(rule string) (*Grant, error) {
 	if len(fields) == 0 {
 		return nil, crex.Wrapf(ErrInvalidRule, "capability rule is empty")
 	}
+	if len(fields) > 2 {
+		return nil, crex.Wrapf(ErrInvalidRule, "unexpected token %q", fields[2])
+	}
 
 	mode := ModeFull
 	name := fields[0]
