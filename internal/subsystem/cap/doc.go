@@ -6,5 +6,5 @@
 // functions to build grants from capability rules. The rules are strings
 // that specify the capability name without the CAP_ prefix. The package also
 // defines the subsystem-specific rule expression for capability grants and
-// functions to parse and compile these rules into capability state.
+// functions to parse and compile these rules into a capability model.
 package cap

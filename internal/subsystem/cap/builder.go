@@ -2,60 +2,64 @@ package cap
 
 // Compiles capability grants from rule strings.
 //
-// Owns the accumulated capability state and deduplicates grants across
-// multiple calls within a single compilation session.
+// Owns the accumulated capability model and deduplicates grants across
+// multiple calls within a compilation session.
 type Builder struct {
-	state *State
+	model *Model // Accumulated capability model.
 }
 
-// Returns a new Builder with no accumulated state.
+// Returns a new Builder with no accumulated model.
+//
+// The returned Builder owns its own accumulated model. The Builder may be
+// reused across multiple Build calls within a single compilation session,
+// accumulating grants into the model across calls.
 func NewBuilder() *Builder {
 	return &Builder{}
 }
 
-// Returns a new Builder initialized with existing state.
-func NewBuilderWithState(state *State) *Builder {
-	return &Builder{state: cloneState(state)}
+// Returns a new Builder initialized with existing model.
+//
+// The input model is deep-copied to ensure the Builder owns its own copy of
+// the accumulated model. The input model is not modified by the Builder and
+// may be safely reused across multiple Builder instances.
+func NewBuilderWithModel(model *Model) *Builder {
+	return &Builder{model: cloneModel(model)}
 }
 
-// Parses a capability rule and merges it into the accumulated state.
+// Parses a capability rule and merges it into the accumulated model.
 //
 // Rules begin with an optional mode keyword followed by a capability name
 // (e.g. "effective net_admin"). The mode selects which of the five kernel
 // capability sets to populate. The mode defaults to ModeFull.
 func (b *Builder) Build(rule string) error {
-	g, err := Parse(rule)
+	delta, err := Parse(rule)
 	if err != nil {
 		return err
 	}
-	if b.state == nil {
-		b.state = NewState()
-	}
-	_, err = b.state.Apply(g)
-	return err
+	return b.Merge(delta)
 }
 
-// Returns a copy of the accumulated capability state.
+// Returns a copy of the accumulated capability model.
 //
-// The returned state is a deep copy of the accumulated state. If the state is
-// nil or empty, returns nil. Otherwise, the returned state is non-nil with at
-// least one non-empty capability set.
-func (b *Builder) State() *State {
-	return cloneState(b.state)
+// The returned model is a deep copy of the accumulated model. If the model
+// is nil or empty, returns nil. Otherwise, the returned model is non-nil
+// with at least one non-empty capability set.
+func (b *Builder) Model() *Model {
+	return cloneModel(b.model)
 }
 
-// Merges another capability state into the accumulated state.
+// Merges another capability model into the accumulated model.
 //
-// If the input state is nil or empty, does nothing. Otherwise, incorporates
+// If the input model is nil or empty, does nothing. Otherwise, incorporates
 // all capability names from each set.
-func (b *Builder) Merge(other *State) error {
+func (b *Builder) Merge(other *Model) error {
 	if other == nil {
 		return nil
 	}
-	if b.state == nil {
-		b.state = cloneState(other)
+	if b.model == nil {
+		b.model = cloneModel(other)
 		return nil
 	}
-	b.state.Merge(other)
+	b.model.Merge(other)
 	return nil
 }
