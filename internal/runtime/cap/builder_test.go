@@ -1,10 +1,13 @@
 package cap
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/cruciblehq/crux/internal/manifest/grant"
 )
 
 func TestComposeNilBuilderIsNoOp(t *testing.T) {
@@ -94,5 +97,174 @@ func TestMergeUnionsSets(t *testing.T) {
 	}
 	if !slices.Equal(b.caps.Effective, []string{"CAP_KILL"}) {
 		t.Fatalf("Effective = %v", b.caps.Effective)
+	}
+}
+
+func TestBuildRejectsWhere(t *testing.T) {
+	b := NewBuilder()
+	g := &grant.Grant{
+		Subsystem: "cap",
+		Args:      []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}},
+		Where:     &grant.CompareExpr{},
+	}
+	if err := b.Build(g); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsKwargs(t *testing.T) {
+	b := NewBuilder()
+	g := &grant.Grant{
+		Subsystem: "cap",
+		Args:      []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}},
+		Kwargs:    []grant.Kwarg{{Key: "k", Value: grant.Arg{Type: grant.ArgName, Value: "v"}}},
+	}
+	if err := b.Build(g); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsMissingArgs(t *testing.T) {
+	if err := NewBuilder().Build(&grant.Grant{Subsystem: "cap"}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsTooManyArgs(t *testing.T) {
+	b := NewBuilder()
+	g := &grant.Grant{Subsystem: "cap", Args: []grant.Arg{
+		{Type: grant.ArgName, Value: "net_admin"},
+		{Type: grant.ArgName, Value: "full"},
+		{Type: grant.ArgName, Value: "extra"},
+	}}
+	if err := b.Build(g); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsNonNameCapArg(t *testing.T) {
+	if err := NewBuilder().Build(&grant.Grant{
+		Subsystem: "cap",
+		Args:      []grant.Arg{{Type: grant.ArgInt, Value: "1"}},
+	}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsUnknownCap(t *testing.T) {
+	if err := NewBuilder().Build(&grant.Grant{
+		Subsystem: "cap",
+		Args:      []grant.Arg{{Type: grant.ArgName, Value: "not_a_cap"}},
+	}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsNonNameModeArg(t *testing.T) {
+	if err := NewBuilder().Build(&grant.Grant{
+		Subsystem: "cap",
+		Args: []grant.Arg{
+			{Type: grant.ArgName, Value: "net_admin"},
+			{Type: grant.ArgInt, Value: "1"},
+		},
+	}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildRejectsUnknownMode(t *testing.T) {
+	if err := NewBuilder().Build(&grant.Grant{
+		Subsystem: "cap",
+		Args: []grant.Arg{
+			{Type: grant.ArgName, Value: "net_admin"},
+			{Type: grant.ArgName, Value: "bogus"},
+		},
+	}); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("err = %v, want ErrInvalidGrant", err)
+	}
+}
+
+func TestBuildEffectiveMode(t *testing.T) {
+	b := NewBuilder()
+	if err := b.Build(&grant.Grant{
+		Subsystem: "cap",
+		Args: []grant.Arg{
+			{Type: grant.ArgName, Value: "chown"},
+			{Type: grant.ArgName, Value: "effective"},
+		},
+	}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	s := b.Spec()
+	if len(s.Effective) == 0 || len(s.Permitted) == 0 || len(s.Bounding) == 0 {
+		t.Fatalf("effective/permitted/bounding should be set: %+v", s)
+	}
+	if len(s.Inheritable) != 0 || len(s.Ambient) != 0 {
+		t.Fatalf("inheritable/ambient should be empty: %+v", s)
+	}
+}
+
+func TestBuildInheritableMode(t *testing.T) {
+	b := NewBuilder()
+	if err := b.Build(&grant.Grant{
+		Subsystem: "cap",
+		Args: []grant.Arg{
+			{Type: grant.ArgName, Value: "chown"},
+			{Type: grant.ArgName, Value: "inheritable"},
+		},
+	}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	s := b.Spec()
+	if len(s.Permitted) == 0 || len(s.Inheritable) == 0 || len(s.Ambient) == 0 || len(s.Bounding) == 0 {
+		t.Fatalf("permitted/inheritable/ambient/bounding should be set: %+v", s)
+	}
+	if len(s.Effective) != 0 {
+		t.Fatalf("effective should be empty: %+v", s)
+	}
+}
+
+func TestBuildPermittedMode(t *testing.T) {
+	b := NewBuilder()
+	if err := b.Build(&grant.Grant{
+		Subsystem: "cap",
+		Args: []grant.Arg{
+			{Type: grant.ArgName, Value: "chown"},
+			{Type: grant.ArgName, Value: "permitted"},
+		},
+	}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	s := b.Spec()
+	if len(s.Permitted) == 0 || len(s.Bounding) == 0 {
+		t.Fatalf("permitted/bounding should be set: %+v", s)
+	}
+	if len(s.Effective) != 0 || len(s.Inheritable) != 0 || len(s.Ambient) != 0 {
+		t.Fatalf("effective/inheritable/ambient should be empty: %+v", s)
+	}
+}
+
+func TestBuildIdempotent(t *testing.T) {
+	b := NewBuilder()
+	g := &grant.Grant{Subsystem: "cap", Args: []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}}}
+	if err := b.Build(g); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if err := b.Build(g); err != nil {
+		t.Fatalf("Build re: %v", err)
+	}
+	if s := b.Spec(); len(s.Effective) != 1 {
+		t.Fatalf("Effective len = %d, want 1 after idempotent builds", len(s.Effective))
+	}
+}
+
+func TestMergeNilIsNoOp(t *testing.T) {
+	b := NewBuilder()
+	b.apply("net_admin", ModeFull)
+	if err := b.Merge(nil); err != nil {
+		t.Fatalf("Merge(nil): %v", err)
+	}
+	if len(b.caps.Effective) != 1 {
+		t.Fatal("Merge(nil) mutated the builder")
 	}
 }
