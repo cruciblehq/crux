@@ -73,7 +73,7 @@ func parse(g *grant.Grant) (*macspec.Allow, error) {
 	if hookArg.Type != grant.ArgName {
 		return nil, crex.Wrapf(ErrCompile, "expected name as hook in mac expression, got %s", hookArg)
 	}
-	hook := macspec.Catalog().LookupHook(hookArg.Value)
+	hook := catalog().LookupHook(hookArg.Value)
 	if hook == nil {
 		return nil, crex.Wrapf(ErrCompile, "unknown hook %q in mac expression", hookArg.Value)
 	}
@@ -265,7 +265,7 @@ func checkTypeCompat(left, right grant.Operand, hook *macspec.Hook) error {
 		return nil
 	}
 	if *lt != *rt {
-		return crex.Wrapf(ErrCompile, "type mismatch: left is %s, right is %s", *lt, *rt)
+		return crex.Wrapf(ErrCompile, "type mismatch between left (%s) and right (%s)", *lt, *rt)
 	}
 	return nil
 }
