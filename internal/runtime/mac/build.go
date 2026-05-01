@@ -5,7 +5,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/manifest/grant"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
-	macspec "github.com/cruciblehq/crux/internal/runtime/shared/mac"
+	"github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 )
 
 // Implementation for MAC (LSM) grants.
@@ -71,7 +71,7 @@ func check(g *grant.Grant) error {
 func parse(g *grant.Grant) (*macspec.Allow, error) {
 	hookArg := g.Args[0]
 	if hookArg.Type != grant.ArgName {
-		return nil, crex.Wrapf(ErrCompile, "expected name as hook in mac expression, got %s", hookArg)
+		return nil, crex.Wrapf(ErrCompile, "expected name as hook in mac expression")
 	}
 	hook := catalog().LookupHook(hookArg.Value)
 	if hook == nil {

@@ -3,7 +3,7 @@ package mac
 import (
 	"sync"
 
-	macspec "github.com/cruciblehq/crux/internal/runtime/shared/mac"
+	"github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 )
 
 var (

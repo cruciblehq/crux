@@ -1,6 +1,6 @@
 package mac
 
-import macspec "github.com/cruciblehq/crux/internal/runtime/shared/mac"
+import "github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 
 // Field constants used by hook registrations in catalog.go.
 //

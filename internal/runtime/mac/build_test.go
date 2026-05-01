@@ -6,7 +6,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/manifest/grant"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
-	macspec "github.com/cruciblehq/crux/internal/runtime/shared/mac"
+	"github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 )
 
 func newSub() (*Subsystem, *macspec.Spec) {

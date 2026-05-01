@@ -213,7 +213,7 @@ func check(g *grant.Grant) error {
 func parseGrant(g *grant.Grant) (string, string, error) {
 	knobArg := g.Args[0]
 	if knobArg.Type != grant.ArgName {
-		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as knob in cgroup expression, got %s", knobArg)
+		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as knob in cgroup expression")
 	}
 	return knobArg.Value, buildValue(g.Args[1:], g.Kwargs), nil
 }

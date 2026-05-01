@@ -7,7 +7,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/manifest/grant"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
-	fcapspec "github.com/cruciblehq/crux/internal/runtime/shared/fcap"
+	"github.com/cruciblehq/crux/internal/runtime/shared/fcapspec"
 )
 
 // Helper to create a name-typed argument for testing.

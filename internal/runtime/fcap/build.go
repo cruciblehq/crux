@@ -8,7 +8,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/manifest/grant"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
-	fcapspec "github.com/cruciblehq/crux/internal/runtime/shared/fcap"
+	"github.com/cruciblehq/crux/internal/runtime/shared/fcapspec"
 )
 
 // Implementation of the file capabilities subsystem.
@@ -75,7 +75,7 @@ func check(g *grant.Grant) error {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in fcap expression")
 	}
 	if len(g.Args) != 3 {
-		return crex.Wrapf(ErrInvalidGrant, "wrong number of arguments in fcap expression: got %d, want cap mode path", len(g.Args))
+		return crex.Wrapf(ErrInvalidGrant, "wrong number of arguments in fcap expression")
 	}
 	return nil
 }
@@ -90,14 +90,14 @@ func check(g *grant.Grant) error {
 func parse(g *grant.Grant) (string, fcapspec.Mode, string, error) {
 	capArg := g.Args[0]
 	if capArg.Type != grant.ArgName {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in fcap expression, got %s", capArg)
+		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in fcap expression")
 	}
 	if _, err := shared.ParseCap(capArg.Value); err != nil {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "unknown capability %q in fcap expression", capArg.Value)
 	}
 	modeArg := g.Args[1]
 	if modeArg.Type != grant.ArgName {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in fcap expression, got %s", modeArg)
+		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in fcap expression")
 	}
 	mode := fcapspec.Mode(modeArg.Value)
 	if !mode.IsValid() {
@@ -107,7 +107,7 @@ func parse(g *grant.Grant) (string, fcapspec.Mode, string, error) {
 	switch pathArg.Type {
 	case grant.ArgStrASCII, grant.ArgStrUnicode, grant.ArgName:
 	default:
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected string as path in fcap expression, got %s", pathArg)
+		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected string as path in fcap expression")
 	}
 	path, err := normalizePath(pathArg.Value)
 	if err != nil {

@@ -14,22 +14,22 @@ import (
 // the threshold for the configured window length.
 type psiTrigger struct {
 	Type      psiType `knob:"type" json:"type,omitempty"`           // Stall type for the trigger (some or full).
-	Threshold uint64  `knob:"threshold" json:"threshold,omitempty"` // Stall percentage threshold for the trigger (0-100).
-	Window    uint64  `knob:"window" json:"window,omitempty"`       // Time window in microseconds for calculating the stall percentage.
+	Threshold uint64  `knob:"threshold" json:"threshold,omitempty"` // Cumulative stall time in microseconds within Window that arms the trigger.
+	Window    uint64  `knob:"window" json:"window,omitempty"`       // Tracking window in microseconds over which Threshold is accumulated.
 }
 
 // Matches a PSI trigger as "type threshold window". Type is any non
 // whitespace token (validated separately). Threshold and window are
-// unsigned integers. For example, "some 80 1000" would trigger when
-// some tasks are stalled on CPU for at least 80% of the time over a
-// 1000ms window.
+// unsigned integers in microseconds. For example, "some 150000 1000000"
+// fires when at least one task is stalled on CPU for a cumulative 150ms
+// within any 1s window.
 var rePSITrigger = regexp.MustCompile(`^(\S+)\s+(\d+)\s+(\d+)$`)
 
-// Parses a PSI pressure trigger from the textual form "kind threshold window".
+// Parses a PSI pressure trigger from the textual form "type threshold window".
 func parsePSITrigger(value string) (psiTrigger, error) {
 	m := rePSITrigger.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return psiTrigger{}, crex.Wrapf(ErrInvalidGrant, "psi: expected kind threshold window")
+		return psiTrigger{}, crex.Wrapf(ErrInvalidGrant, "expected psi trigger as type threshold window")
 	}
 	threshold, err := strconv.ParseUint(m[2], 10, 64)
 	if err != nil {

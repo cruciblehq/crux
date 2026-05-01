@@ -35,7 +35,7 @@ var reIOWeightDevice = regexp.MustCompile(`^(\d+):(\d+)(?:\s+(\S+))?$`)
 func parseIOWeightDevice(value string) (ioWeightDevice, error) {
 	m := reIOWeightDevice.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "io.weight: expected major:minor weight")
+		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "expected major:minor weight for io.weight device entry")
 	}
 	maj, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
@@ -46,7 +46,7 @@ func parseIOWeightDevice(value string) (ioWeightDevice, error) {
 		return ioWeightDevice{}, crex.Wrap(ErrInvalidGrant, err)
 	}
 	if m[3] == "" || m[3] == "default" {
-		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "io.weight: removal form %q not allowed; grants only add overrides", value)
+		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "restrictive form %q not allowed", value)
 	}
 	wd := ioWeightDevice{Major: uint32(maj), Minor: uint32(min)}
 	if err := parseUint16(&wd.Weight, m[3]); err != nil {
