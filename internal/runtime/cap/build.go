@@ -3,7 +3,7 @@ package cap
 import (
 	"slices"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/cruciblehq/crux/internal/manifest/grant"
@@ -81,7 +81,7 @@ func check(g *grant.Grant) error {
 }
 
 // Extracts and validates the grant's capability name and optional mode.
-func parse(g *grant.Grant) (shared.Cap, Mode, error) {
+func parse(g *grant.Grant) (shared.Cap, mode, error) {
 	nameArg := g.Args[0]
 	if nameArg.Type != grant.ArgName {
 		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in cap expression, found %s instead", nameArg)
@@ -90,13 +90,13 @@ func parse(g *grant.Grant) (shared.Cap, Mode, error) {
 	if err != nil {
 		return "", "", crex.Wrapf(ErrInvalidGrant, "unknown capability %q in cap expression", nameArg.Value)
 	}
-	mode := ModeFull
+	mode := modeFull
 	if len(g.Args) == 2 {
 		modeArg := g.Args[1]
 		if modeArg.Type != grant.ArgName {
 			return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in cap expression, found %s instead", modeArg)
 		}
-		m, err := ParseMode(modeArg.Value)
+		m, err := parseMode(modeArg.Value)
 		if err != nil {
 			return "", "", err
 		}
@@ -106,28 +106,28 @@ func parse(g *grant.Grant) (shared.Cap, Mode, error) {
 }
 
 // Applies a parsed capability and mode to the wired-in section.
-func apply(caps *specs.LinuxCapabilities, c shared.Cap, mode Mode) error {
+func apply(caps *specs.LinuxCapabilities, c shared.Cap, mode mode) error {
 	normalized := shared.NormalizeCap(c)
 	switch mode {
-	case ModeFull:
+	case modeFull:
 		addCap(&caps.Effective, normalized)
 		addCap(&caps.Permitted, normalized)
 		addCap(&caps.Inheritable, normalized)
 		addCap(&caps.Bounding, normalized)
 		addCap(&caps.Ambient, normalized)
-	case ModeEffective:
+	case modeEffective:
 		addCap(&caps.Effective, normalized)
 		addCap(&caps.Permitted, normalized)
 		addCap(&caps.Bounding, normalized)
-	case ModeInheritable:
+	case modeInheritable:
 		addCap(&caps.Permitted, normalized)
 		addCap(&caps.Inheritable, normalized)
 		addCap(&caps.Ambient, normalized)
 		addCap(&caps.Bounding, normalized)
-	case ModePermitted:
+	case modePermitted:
 		addCap(&caps.Permitted, normalized)
 		addCap(&caps.Bounding, normalized)
-	case ModeBound:
+	case modeBound:
 		addCap(&caps.Bounding, normalized)
 	}
 	return nil

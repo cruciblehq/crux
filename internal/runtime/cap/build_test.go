@@ -24,7 +24,7 @@ func wrap(c *specs.LinuxCapabilities) shared.Spec {
 
 func TestApplyFullMode(t *testing.T) {
 	caps := &specs.LinuxCapabilities{}
-	if err := apply(caps, "net_admin", ModeFull); err != nil {
+	if err := apply(caps, "net_admin", modeFull); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	want := []string{"CAP_NET_ADMIN"}
@@ -43,7 +43,7 @@ func TestApplyFullMode(t *testing.T) {
 
 func TestMergeUnionsSets(t *testing.T) {
 	sub, dst := newSub()
-	if err := apply(dst, "chown", ModeBound); err != nil {
+	if err := apply(dst, "chown", modeBound); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	src := &specs.LinuxCapabilities{
@@ -63,7 +63,7 @@ func TestMergeUnionsSets(t *testing.T) {
 
 func TestMergeNilCapIsNoOp(t *testing.T) {
 	sub, dst := newSub()
-	if err := apply(dst, "net_admin", ModeFull); err != nil {
+	if err := apply(dst, "net_admin", modeFull); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	if err := sub.Merge(shared.Spec{}); err != nil {
@@ -182,7 +182,7 @@ func TestNameReturnsCap(t *testing.T) {
 
 func TestApplyInheritableMode(t *testing.T) {
 	caps := &specs.LinuxCapabilities{}
-	if err := apply(caps, "net_admin", ModeInheritable); err != nil {
+	if err := apply(caps, "net_admin", modeInheritable); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	want := []string{"CAP_NET_ADMIN"}
@@ -203,7 +203,7 @@ func TestApplyInheritableMode(t *testing.T) {
 
 func TestApplyPermittedMode(t *testing.T) {
 	caps := &specs.LinuxCapabilities{}
-	if err := apply(caps, "net_admin", ModePermitted); err != nil {
+	if err := apply(caps, "net_admin", modePermitted); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	want := []string{"CAP_NET_ADMIN"}
@@ -220,7 +220,7 @@ func TestApplyPermittedMode(t *testing.T) {
 
 func TestApplyBoundMode(t *testing.T) {
 	caps := &specs.LinuxCapabilities{}
-	if err := apply(caps, "net_admin", ModeBound); err != nil {
+	if err := apply(caps, "net_admin", modeBound); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	want := []string{"CAP_NET_ADMIN"}
