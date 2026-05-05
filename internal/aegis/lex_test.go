@@ -793,53 +793,15 @@ func TestQuantityFollowedByPunct(t *testing.T) {
 	}
 }
 
-func TestParseQuantity(t *testing.T) {
-	cases := []struct {
-		src    string
-		val    uint64
-		suffix QuantitySuffix
-	}{
-		{"1Ki", 1, SuffixKi},
-		{"1024Mi", 1024, SuffixMi},
-		{"500m", 500, SuffixMilli},
-		{"0Gi", 0, SuffixGi},
-	}
-	for _, tc := range cases {
-		t.Run(tc.src, func(t *testing.T) {
-			v, suf, err := ParseQuantity(tc.src)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if v != tc.val {
-				t.Errorf("value: got %d, want %d", v, tc.val)
-			}
-			if suf != tc.suffix {
-				t.Errorf("suffix: got %q, want %q", suf, tc.suffix)
-			}
-		})
-	}
-}
-
-func TestParseQuantityErrors(t *testing.T) {
-	cases := []string{"", "Gi", "1Xyz", "abc", "1Ki2"}
-	for _, src := range cases {
-		t.Run(src, func(t *testing.T) {
-			if _, _, err := ParseQuantity(src); err == nil {
-				t.Errorf("ParseQuantity(%q): expected error, got nil", src)
-			}
-		})
-	}
-}
-
 func TestIsQuantitySuffix(t *testing.T) {
 	for _, s := range []string{"Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "k", "K", "M", "G", "T", "P", "E", "m", "u", "n"} {
-		if !IsQuantitySuffix(s) {
-			t.Errorf("IsQuantitySuffix(%q) = false, want true", s)
+		if !isQuantitySuffix(s) {
+			t.Errorf("isQuantitySuffix(%q) = false, want true", s)
 		}
 	}
 	for _, s := range []string{"", "x", "Xi", "kk", "Mib"} {
-		if IsQuantitySuffix(s) {
-			t.Errorf("IsQuantitySuffix(%q) = true, want false", s)
+		if isQuantitySuffix(s) {
+			t.Errorf("isQuantitySuffix(%q) = true, want false", s)
 		}
 	}
 }

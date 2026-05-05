@@ -357,7 +357,7 @@ func (l *lexer) matchQuantitySuffix() int {
 	if cand == "" {
 		return 0
 	}
-	if _, ok := quantitySuffixes[QuantitySuffix(cand)]; !ok {
+	if !isQuantitySuffix(cand) {
 		return 0
 	}
 	next, _ := utf8.DecodeRuneInString(l.src[end:])
