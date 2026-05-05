@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 	"github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 )
@@ -18,11 +18,11 @@ func wrap(s *macspec.Spec) shared.Spec { return shared.Spec{MAC: s} }
 
 func buildSrc(t *testing.T, sub *Subsystem, src string) error {
 	t.Helper()
-	g, err := grant.Parse(src)
+	g, err := aegis.Parse(src)
 	if err != nil {
 		t.Fatalf("Parse(%q): %v", src, err)
 	}
-	return sub.Build(*g)
+	return sub.Build(g)
 }
 
 func TestBuildSimpleHook(t *testing.T) {
@@ -106,18 +106,18 @@ func TestSpecEmptyWhenNoGrants(t *testing.T) {
 
 func TestBuildRejectsNoArgs(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "mac"}); !errors.Is(err, ErrCompile) {
+	if err := sub.Build(&aegis.Model{Subsystem: "mac"}); !errors.Is(err, ErrCompile) {
 		t.Fatalf("err = %v, want ErrCompile", err)
 	}
 }
 
 func TestBuildRejectsTwoArgs(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{
+	if err := sub.Build(&aegis.Model{
 		Subsystem: "mac",
-		Args: []grant.Arg{
-			{Type: grant.ArgName, Value: "file_open"},
-			{Type: grant.ArgName, Value: "extra"},
+		Args: []aegis.Arg{
+			{Type: aegis.ArgName, Value: "file_open"},
+			{Type: aegis.ArgName, Value: "extra"},
 		},
 	}); err == nil {
 		t.Fatal("expected error for two args")

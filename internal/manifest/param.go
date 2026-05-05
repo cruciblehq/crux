@@ -3,7 +3,7 @@ package manifest
 import (
 	"regexp"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Matches a valid param name.
@@ -23,14 +23,14 @@ type Param struct {
 	//
 	// Used as the key in the argument map passed by callers. Must be
 	// non-empty and unique within the parent [Schema].
-	Name string `codec:"name"`
+	Name string `json:"name"`
 
 	// Fallback value used when the caller does not supply this argument.
 	//
 	// When nil, the parameter is required and omitting it is a validation
 	// error. When non-nil, the parameter is optional and the default value
 	// is substituted.
-	Default any `codec:"default,omitempty"`
+	Default any `json:"default,omitempty"`
 }
 
 // Validates the param.
@@ -49,7 +49,7 @@ func (p *Param) Validate() error {
 		case string, int, float64, bool:
 			// valid scalar types
 		default:
-			return crex.Wrapf(ErrInvalidParam, "param %q: %w (got %T)", p.Name, ErrInvalidParamDefault, p.Default)
+			return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, ErrInvalidParamDefault)
 		}
 	}
 	return nil

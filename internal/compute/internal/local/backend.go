@@ -5,7 +5,6 @@ import (
 
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // The local compute backend.
@@ -47,9 +46,4 @@ func (b *backend) Status(ctx context.Context, name string) (provider.State, erro
 // Runs a command on the given instance and returns its output.
 func (b *backend) Exec(ctx context.Context, name string, command string, args ...string) (*provider.ExecResult, error) {
 	return execute(ctx, name, command, args...)
-}
-
-// Returns a [runtime.Runtime] connected to the instance's containerd.
-func (b *backend) Runtime(_ context.Context, name string) (*runtime.Runtime, error) {
-	return newRuntime(name)
 }

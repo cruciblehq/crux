@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
 	"github.com/cruciblehq/crux/internal/reference"
 	"github.com/cruciblehq/crux/internal/registry"

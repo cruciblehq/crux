@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Mutable properties of a resource for creation or update.
 //
@@ -9,9 +9,9 @@ import "github.com/cruciblehq/crex"
 // context. Contains only user-modifiable fields. The media type is
 // [MediaTypeResourceInfo].
 type ResourceInfo struct {
-	Name        string `codec:"name"`        // Resource name.
-	Type        string `codec:"type"`        // Resource type (e.g., "widget", "service").
-	Description string `codec:"description"` // Description.
+	Name        string `json:"name"`        // Resource name.
+	Type        string `json:"type"`        // Resource type (e.g., "widget", "service").
+	Description string `json:"description"` // Description.
 }
 
 // Validates the resource info.
@@ -35,14 +35,14 @@ func (info *ResourceInfo) Validate() error {
 // read-only fields like timestamps, statistics, and latest version information
 // to help with navigation decisions.
 type ResourceSummary struct {
-	Name          string  `codec:"name"`          // Resource name.
-	Type          string  `codec:"type"`          // Resource type (e.g., "widget", "service").
-	Description   string  `codec:"description"`   // Description.
-	LatestVersion *string `codec:"latestVersion"` // Most recent version string (null if no versions).
-	VersionCount  int     `codec:"versionCount"`  // Number of versions for this resource.
-	ChannelCount  int     `codec:"channelCount"`  // Number of channels for this resource.
-	CreatedAt     int64   `codec:"createdAt"`     // When the resource was created.
-	UpdatedAt     int64   `codec:"updatedAt"`     // When the resource was last updated.
+	Name          string  `json:"name"`          // Resource name.
+	Type          string  `json:"type"`          // Resource type (e.g., "widget", "service").
+	Description   string  `json:"description"`   // Description.
+	LatestVersion *string `json:"latestVersion"` // Most recent version string (null if no versions).
+	VersionCount  int     `json:"versionCount"`  // Number of versions for this resource.
+	ChannelCount  int     `json:"channelCount"`  // Number of channels for this resource.
+	CreatedAt     int64   `json:"createdAt"`     // When the resource was created.
+	UpdatedAt     int64   `json:"updatedAt"`     // When the resource was last updated.
 }
 
 // Validates the resource summary.
@@ -78,14 +78,14 @@ func (s *ResourceSummary) Validate() error {
 // details. Includes scoping information to identify the resource's location. The
 // media type is [MediaTypeResource].
 type Resource struct {
-	Namespace   string           `codec:"namespace"`   // Namespace this resource belongs to.
-	Name        string           `codec:"name"`        // Resource name.
-	Type        string           `codec:"type"`        // Resource type (e.g., "widget", "service").
-	Description string           `codec:"description"` // Description.
-	Versions    []VersionSummary `codec:"versions"`    // List of versions (summary form).
-	Channels    []ChannelSummary `codec:"channels"`    // List of channels (summary form).
-	CreatedAt   int64            `codec:"createdAt"`   // When the resource was created.
-	UpdatedAt   int64            `codec:"updatedAt"`   // When the resource was last updated.
+	Namespace   string           `json:"namespace"`   // Namespace this resource belongs to.
+	Name        string           `json:"name"`        // Resource name.
+	Type        string           `json:"type"`        // Resource type (e.g., "widget", "service").
+	Description string           `json:"description"` // Description.
+	Versions    []VersionSummary `json:"versions"`    // List of versions (summary form).
+	Channels    []ChannelSummary `json:"channels"`    // List of channels (summary form).
+	CreatedAt   int64            `json:"createdAt"`   // When the resource was created.
+	UpdatedAt   int64            `json:"updatedAt"`   // When the resource was last updated.
 }
 
 // Validates the resource.
@@ -121,7 +121,7 @@ func (r *Resource) Validate() error {
 type ResourceList struct {
 
 	// List of resources.
-	Resources []ResourceSummary `codec:"resources"`
+	Resources []ResourceSummary `json:"resources"`
 }
 
 // Validates the resource list.

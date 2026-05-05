@@ -3,7 +3,7 @@ package runtime
 import (
 	"github.com/cruciblehq/crux/internal/crex"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/cap"
 	"github.com/cruciblehq/crux/internal/runtime/cgroup"
 	"github.com/cruciblehq/crux/internal/runtime/fcap"
@@ -56,16 +56,16 @@ func NewBuilder() *Builder {
 	return &Builder{spec: s, subs: subs, index: idx}
 }
 
-// Builds a grant into the accumulated state.
+// Builds a parsed grant into the accumulated state.
 //
-// [Grant.Subsystem] selects the appropriate subsystem. Unknown names produce
-// ErrUnknownSubsystem. Errors from the subsystem are returned unwrapped.
-func (b *Builder) Build(g *grant.Grant) error {
-	sub, ok := b.index[shared.Name(g.Subsystem)]
+// [aegis.Model.Subsystem] selects the appropriate subsystem. Unknown names
+// produce ErrUnknownSubsystem. Errors from the subsystem are returned unwrapped.
+func (b *Builder) Build(p *aegis.Model) error {
+	sub, ok := b.index[shared.Name(p.Subsystem)]
 	if !ok {
-		return crex.Wrapf(ErrUnknownSubsystem, "unknown subsystem %q", g.Subsystem)
+		return crex.Wrapf(ErrUnknownSubsystem, "unknown subsystem %q", p.Subsystem)
 	}
-	return sub.Build(*g)
+	return sub.Build(p)
 }
 
 // Folds another [shared.Spec] into the accumulated state.

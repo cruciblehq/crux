@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/registry"
 )
 

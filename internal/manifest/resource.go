@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Holds common metadata about the resource.
 //
@@ -13,25 +13,25 @@ type Resource struct {
 	//
 	// Determines how the rest of the manifest is interpreted and how
 	// Crucible manages the resource.
-	Type ResourceType `codec:"type"`
+	Type ResourceType `json:"type"`
 
 	// The qualified resource name.
 	//
 	// Identifies the resource, including its namespace, using the format
 	// "namespace/name" (e.g. "cruciblehq/my-api"). The registry is not
 	// part of the name; it is resolved from configuration.
-	Name string `codec:"name"`
+	Name string `json:"name"`
 
 	// Description of the resource.
 	//
 	// Documents what the resource does or provides. Optional.
-	Description string `codec:"description,omitempty"`
+	Description string `json:"description,omitempty"`
 
 	// The version of the resource.
 	//
 	// This is a semantic version string that indicates the version of the
 	// resource being defined. This field is required.
-	Version string `codec:"version"`
+	Version string `json:"version"`
 }
 
 // Validates the resource metadata.

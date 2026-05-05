@@ -9,10 +9,10 @@ import "fmt"
 type Error struct {
 
 	// Error code (see [ErrorCode]).
-	Code ErrorCode `codec:"code"`
+	Code ErrorCode `json:"code"`
 
 	// Error description.
-	Message string `codec:"message"`
+	Message string `json:"message"`
 }
 
 // Implements the error interface.

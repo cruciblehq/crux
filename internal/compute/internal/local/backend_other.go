@@ -7,7 +7,6 @@ import (
 
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 func provision(_ context.Context, _ string, _ resource.Source) error {
@@ -31,9 +30,5 @@ func status(_ context.Context, _ string) (provider.State, error) {
 }
 
 func execute(_ context.Context, _ string, _ string, _ ...string) (*provider.ExecResult, error) {
-	return nil, ErrUnsupportedPlatform
-}
-
-func newRuntime(_ string) (*runtime.Runtime, error) {
 	return nil, ErrUnsupportedPlatform
 }

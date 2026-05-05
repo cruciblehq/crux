@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // A build step in a recipe stage.
 //
@@ -18,7 +18,7 @@ type Step struct {
 	//
 	// The command string is passed to the default shell or to the shell
 	// specified by [Step.Shell]. It runs in the current working directory.
-	Run string `codec:"run,omitempty"`
+	Run string `json:"run,omitempty"`
 
 	// Copies a file or directory from the host into the image.
 	//
@@ -26,14 +26,14 @@ type Step struct {
 	// manifest file and dest is a path inside the image. A relative dest
 	// resolves against the current working directory. Directories are
 	// copied recursively.
-	Copy string `codec:"copy,omitempty"`
+	Copy string `json:"copy,omitempty"`
 
 	// Selects the shell used to execute [Step.Run] commands.
 	//
 	// When paired with [Step.Run], overrides the default shell for that
 	// single command. When set alone or with other modifiers, changes the
 	// default shell for all subsequent run operations. Defaults to /bin/sh.
-	Shell string `codec:"shell,omitempty"`
+	Shell string `json:"shell,omitempty"`
 
 	// Sets environment variables in the build container.
 	//
@@ -41,7 +41,7 @@ type Step struct {
 	// command and not persisted. When set alone, the variables persist in the
 	// image and are inherited by subsequent steps and any service that uses
 	// this runtime as its base.
-	Env map[string]string `codec:"env,omitempty"`
+	Env map[string]string `json:"env,omitempty"`
 
 	// Sets the working directory inside the build container.
 	//
@@ -49,7 +49,7 @@ type Step struct {
 	// single step without changing the default. When set alone, changes the
 	// default working directory for all subsequent steps and persists it in
 	// the image configuration.
-	Workdir string `codec:"workdir,omitempty"`
+	Workdir string `json:"workdir,omitempty"`
 
 	// Sets the user identity for commands in the build container.
 	//
@@ -58,7 +58,7 @@ type Step struct {
 	// default user for all subsequent steps. The format is "uid:gid"
 	// (e.g. "1000:1000"). The UIDs must exist in the container's user
 	// namespace mapping.
-	User string `codec:"user,omitempty"`
+	User string `json:"user,omitempty"`
 
 	// Restricts this step or group to a specific platform.
 	//
@@ -66,14 +66,14 @@ type Step struct {
 	// platform. When set with [Step.Steps], creates a platform-scoped
 	// group; other modifiers on the same step apply to all children in
 	// the group. The format is "os/arch" (e.g. "linux/amd64").
-	Platform string `codec:"platform,omitempty"`
+	Platform string `json:"platform,omitempty"`
 
 	// Child steps scoped to the platform specified by [Step.Platform].
 	//
 	// When set, [Step.Platform] must also be set. Children inherit any
 	// modifiers set at the group level and follow the same rules as
 	// top-level steps.
-	Steps []Step `codec:"steps,omitempty"`
+	Steps []Step `json:"steps,omitempty"`
 }
 
 // Validates the step.

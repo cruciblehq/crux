@@ -5,7 +5,7 @@ package manifest
 // Maps URL path patterns to service IDs. Not every service needs a route;
 // services without routes still run but receive no external traffic.
 type Gateway struct {
-	Routes []Route `codec:"routes,omitempty"` // URL path patterns mapped to services.
+	Routes []Route `json:"routes,omitempty"` // URL path patterns mapped to services.
 }
 
 // Validates gateway routes.

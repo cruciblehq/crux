@@ -3,7 +3,7 @@ package codec
 import "testing"
 
 type validatable struct {
-	Name string `codec:"name"`
+	Name string `json:"name"`
 }
 
 func (v *validatable) Validate() error {

@@ -1,8 +1,8 @@
 package manifest
 
 import (
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/codec"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // The canonical filename for Crucible resource manifests.
@@ -19,19 +19,19 @@ type Manifest struct {
 	//
 	// Determines how the rest of the manifest is interpreted. Currently
 	// the only supported version is 0.
-	Version int `codec:"version"`
+	Version int `json:"version"`
 
 	// Common metadata shared across all resource types.
 	//
 	// Includes the resource type, qualified name, and version. This is
 	// required and must be valid for the manifest to be considered valid.
-	Resource Resource `codec:"resource"`
+	Resource Resource `json:"resource"`
 
 	// Type-specific configuration.
 	//
 	// The concrete type depends on [Resource.Type]: [Runtime] from runtimes,
 	// [Service] for services, [Widget] for widgets, etc.
-	Config any `codec:"-"`
+	Config any `json:"-"`
 }
 
 // Validates the manifest.

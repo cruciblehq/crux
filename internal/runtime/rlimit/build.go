@@ -7,7 +7,7 @@ import (
 	"github.com/cruciblehq/crux/internal/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -15,8 +15,8 @@ const rlimitNamePrefix = "RLIMIT_"
 
 // All known POSIX resource short names accepted in .rlimit grants.
 //
-// The kernel exposes these via the RLIMIT_<UPPER> constants. The grant language
-// uses the lowercase short form (e.g. "nofile" rather than "RLIMIT_NOFILE").
+// The kernel exposes these via the RLIMIT_<UPPER> constants. Aegis grants
+// use the lowercase short form (e.g. "nofile" rather than "RLIMIT_NOFILE").
 var knownResources = map[string]struct{}{
 	"as": {}, "core": {}, "cpu": {}, "data": {}, "fsize": {},
 	"locks": {}, "memlock": {}, "msgqueue": {}, "nice": {},
@@ -48,11 +48,11 @@ func (s *Subsystem) Name() shared.Name {
 //
 // The grant has the form ".rlimit NAME SOFT [HARD]". When HARD is omitted
 // it defaults to SOFT.
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	e, err := parse(&g)
+	e, err := parse(g)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 }
 
 // Validates the grant's structural shape against what the rlimit subsystem accepts.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if g.Where != nil {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in rlimit expression")
 	}
@@ -93,9 +93,9 @@ func check(g *grant.Grant) error {
 //
 // Validates that the resource name is known, that the soft and hard limits are
 // valid integers, and that the soft limit does not exceed the hard limit.
-func parse(g *grant.Grant) (specs.POSIXRlimit, error) {
+func parse(g *aegis.Model) (specs.POSIXRlimit, error) {
 	nameArg := g.Args[0]
-	if nameArg.Type != grant.ArgName {
+	if nameArg.Type != aegis.ArgName {
 		return specs.POSIXRlimit{}, crex.Wrapf(ErrInvalidGrant, "expected name as resource in rlimit expression")
 	}
 	if _, ok := knownResources[nameArg.Value]; !ok {
@@ -144,8 +144,8 @@ func apply(rlimits *[]specs.POSIXRlimit, e specs.POSIXRlimit) error {
 }
 
 // Parses an integer-typed argument into an unsigned 64-bit limit.
-func parseLimit(a grant.Arg, label string) (uint64, error) {
-	if a.Type != grant.ArgInt {
+func parseLimit(a aegis.Arg, label string) (uint64, error) {
+	if a.Type != aegis.ArgInt {
 		return 0, crex.Wrapf(ErrInvalidGrant, "expected integer as %s limit in rlimit expression", label)
 	}
 	v, err := strconv.ParseUint(a.Value, 0, 64)

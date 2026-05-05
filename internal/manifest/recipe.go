@@ -3,7 +3,7 @@ package manifest
 import (
 	"fmt"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // The OCI image artifact produced by recipe-based builds (runtimes and services).
@@ -23,7 +23,7 @@ type Recipe struct {
 	// steps. Stages run in declaration order. Artifacts produced by a stage can
 	// be referenced from subsequent stages via the stage name in a copy source
 	// (e.g. "builder:/app/bin"). The last stage is the output stage.
-	Stages []Stage `codec:"stages,omitempty"`
+	Stages []Stage `json:"stages,omitempty"`
 }
 
 // Validates the recipe.
@@ -54,6 +54,17 @@ func (r *Recipe) Validate() error {
 	}
 
 	return nil
+}
+
+// Returns the output stage.
+//
+// The output stage is the last stage in the recipe. Its image is exported
+// as the final build artifact. Returns nil when the recipe has no stages.
+func (r *Recipe) OutputStage() *Stage {
+	if len(r.Stages) == 0 {
+		return nil
+	}
+	return &r.Stages[len(r.Stages)-1]
 }
 
 // Returns a label for a stage, preferring the name when available and

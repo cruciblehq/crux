@@ -6,12 +6,12 @@ import (
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
-func nameArg(v string) grant.Arg { return grant.Arg{Type: grant.ArgName, Value: v} }
-func intArg(v string) grant.Arg  { return grant.Arg{Type: grant.ArgInt, Value: v} }
+func nameArg(v string) aegis.Arg { return aegis.Arg{Type: aegis.ArgName, Value: v} }
+func intArg(v string) aegis.Arg  { return aegis.Arg{Type: aegis.ArgInt, Value: v} }
 
 // Returns a Subsystem with an empty rlimits slice.
 func newSub() (*Subsystem, *[]specs.POSIXRlimit) {
@@ -26,8 +26,8 @@ func wrap(rl *[]specs.POSIXRlimit) shared.Spec {
 
 func TestBuildAppliesGrant(t *testing.T) {
 	sub, rl := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args: []grant.Arg{nameArg("nofile"), intArg("1024"), intArg("4096")},
+	if err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args: []aegis.Arg{nameArg("nofile"), intArg("1024"), intArg("4096")},
 	}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -41,8 +41,8 @@ func TestBuildAppliesGrant(t *testing.T) {
 
 func TestBuildHardDefaultsToSoft(t *testing.T) {
 	sub, rl := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args: []grant.Arg{nameArg("core"), intArg("0")},
+	if err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args: []aegis.Arg{nameArg("core"), intArg("0")},
 	}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -53,11 +53,11 @@ func TestBuildHardDefaultsToSoft(t *testing.T) {
 
 func TestBuildIdempotent(t *testing.T) {
 	sub, rl := newSub()
-	g := grant.Grant{Subsystem: "rlimit", Args: []grant.Arg{nameArg("nofile"), intArg("1024")}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "rlimit", Args: []aegis.Arg{nameArg("nofile"), intArg("1024")}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
-	if err := sub.Build(g); err != nil {
+	if err := sub.Build(&g); err != nil {
 		t.Fatalf("second Build: %v", err)
 	}
 	if len(*rl) != 1 {
@@ -67,10 +67,10 @@ func TestBuildIdempotent(t *testing.T) {
 
 func TestBuildConflictRejected(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "rlimit", Args: []grant.Arg{nameArg("nofile"), intArg("1024")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "rlimit", Args: []aegis.Arg{nameArg("nofile"), intArg("1024")}}); err != nil {
 		t.Fatal(err)
 	}
-	err := sub.Build(grant.Grant{Subsystem: "rlimit", Args: []grant.Arg{nameArg("nofile"), intArg("2048")}})
+	err := sub.Build(&aegis.Model{Subsystem: "rlimit", Args: []aegis.Arg{nameArg("nofile"), intArg("2048")}})
 	if !errors.Is(err, ErrConflict) {
 		t.Fatalf("err = %v, want ErrConflict", err)
 	}
@@ -78,8 +78,8 @@ func TestBuildConflictRejected(t *testing.T) {
 
 func TestBuildSoftExceedsHard(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args: []grant.Arg{nameArg("nofile"), intArg("4096"), intArg("1024")},
+	err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args: []aegis.Arg{nameArg("nofile"), intArg("4096"), intArg("1024")},
 	})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
@@ -88,9 +88,9 @@ func TestBuildSoftExceedsHard(t *testing.T) {
 
 func TestBuildRejectsWhere(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args:  []grant.Arg{nameArg("nofile"), intArg("1024")},
-		Where: &grant.CompareExpr{},
+	err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args:  []aegis.Arg{nameArg("nofile"), intArg("1024")},
+		Where: &aegis.CompareExpr{},
 	})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
@@ -99,9 +99,9 @@ func TestBuildRejectsWhere(t *testing.T) {
 
 func TestBuildRejectsKwargs(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args:   []grant.Arg{nameArg("nofile"), intArg("1024")},
-		Kwargs: []grant.Kwarg{{Key: "k", Value: nameArg("v")}},
+	err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args:   []aegis.Arg{nameArg("nofile"), intArg("1024")},
+		Kwargs: []aegis.Kwarg{{Key: "k", Value: nameArg("v")}},
 	})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
@@ -110,8 +110,8 @@ func TestBuildRejectsKwargs(t *testing.T) {
 
 func TestBuildRejectsUnknownResource(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "rlimit",
-		Args: []grant.Arg{nameArg("bogus"), intArg("1")},
+	err := sub.Build(&aegis.Model{Subsystem: "rlimit",
+		Args: []aegis.Arg{nameArg("bogus"), intArg("1")},
 	})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)

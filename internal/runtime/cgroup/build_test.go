@@ -6,7 +6,7 @@ import (
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -19,11 +19,11 @@ func newSub() (*Subsystem, *specs.LinuxResources) {
 // Parses src as a grant and feeds it into sub.Build.
 func buildSrc(t *testing.T, sub *Subsystem, src string) error {
 	t.Helper()
-	g, err := grant.Parse(src)
+	g, err := aegis.Parse(src)
 	if err != nil {
 		t.Fatalf("Parse(%q): %v", src, err)
 	}
-	return sub.Build(*g)
+	return sub.Build(g)
 }
 
 // Asserts that lr.Unified[knob] equals want.
@@ -98,21 +98,23 @@ func TestBuildMissingValue(t *testing.T) {
 
 func TestBuildMissingKnob(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "cgroup"}
-	err := sub.Build(g)
+	g := aegis.Model{Subsystem: "cgroup"}
+	err := sub.Build(&g)
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildNonNameKnobArg(t *testing.T) {
-	g, err := grant.Parse(".cgroup cpu.weight 100")
-	if err != nil {
-		t.Fatal(err)
+	g := aegis.Model{
+		Subsystem: "cgroup",
+		Args: []aegis.Arg{
+			{Type: aegis.ArgInt, Value: "42"},
+			{Type: aegis.ArgInt, Value: "100"},
+		},
 	}
-	g.Args[0] = grant.Arg{Type: grant.ArgInt, Value: "42"}
 	sub, _ := newSub()
-	if err := sub.Build(*g); !errors.Is(err, ErrInvalidGrant) {
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
@@ -195,8 +197,8 @@ func TestMergeConflict(t *testing.T) {
 }
 
 func TestBuildValueJoinsArgsAndKwargs(t *testing.T) {
-	args := []grant.Arg{{Type: grant.ArgInt, Value: "8"}, {Type: grant.ArgInt, Value: "0"}}
-	kwargs := []grant.Kwarg{{Key: "rbps", Value: grant.Arg{Type: grant.ArgInt, Value: "1024"}}}
+	args := []aegis.Arg{{Type: aegis.ArgInt, Value: "8"}, {Type: aegis.ArgInt, Value: "0"}}
+	kwargs := []aegis.Kwarg{{Key: "rbps", Value: aegis.Arg{Type: aegis.ArgInt, Value: "1024"}}}
 	if got, want := buildValue(args, kwargs), "8 0 rbps=1024"; got != want {
 		t.Fatalf("buildValue = %q, want %q", got, want)
 	}

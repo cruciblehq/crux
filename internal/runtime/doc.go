@@ -5,7 +5,7 @@
 // [shared.Spec] model. The aggregate [Builder] owns one [shared.Spec] per
 // session and one subsystem implementation per slice, and routes incoming
 // grants to the correct subsystem based on the subsystem name carried by
-// each grant. After all grants have been ingested, [Builder.Spec] returns
+// each aegis. After all grants have been ingested, [Builder.Spec] returns
 // the aggregated model.
 //
 // Building an aggregate spec from a sequence of grants:

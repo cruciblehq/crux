@@ -4,7 +4,7 @@ import (
 	"github.com/cruciblehq/crux/internal/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -31,11 +31,11 @@ func (s *Subsystem) Name() shared.Name {
 // Applies a parsed grant to the wired-in section.
 //
 // The grant has the form ".seccomp SYSCALL [SUBFILTER]".
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	entries, err := parse(&g)
+	entries, err := parse(g)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 }
 
 // Validates the grant's structural shape against what the seccomp subsystem accepts.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if g.Where != nil {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in seccomp expression")
 	}
@@ -84,10 +84,10 @@ func check(g *grant.Grant) error {
 // Sub-filter qualifiers are only accepted for a curated set of syscalls, and
 // must be one of a curated set of values. Unknown syscalls or qualifiers are
 // errors.
-func parse(g *grant.Grant) ([]specs.LinuxSyscall, error) {
+func parse(g *aegis.Model) ([]specs.LinuxSyscall, error) {
 	knob := make([]string, 0, len(g.Args))
 	for _, a := range g.Args {
-		if a.Type != grant.ArgName {
+		if a.Type != aegis.ArgName {
 			return nil, crex.Wrapf(ErrInvalidGrant, "expected name as argument in seccomp expression")
 		}
 		knob = append(knob, a.Value)

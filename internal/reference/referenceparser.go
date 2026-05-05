@@ -3,6 +3,8 @@ package reference
 import (
 	"regexp"
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 var (
@@ -26,7 +28,7 @@ func (p *referenceParser) parse(contextType string) (*Reference, error) {
 	// Find where the identifier ends and version/channel begins
 	idEnd := p.findIdentifierEnd()
 	if idEnd == 0 {
-		return nil, wrap(ErrInvalidReference, ErrEmptyReference)
+		return nil, crex.Wrap(ErrInvalidReference, ErrEmptyReference)
 	}
 
 	// Parse the identifier portion
@@ -55,7 +57,7 @@ func (p *referenceParser) parse(contextType string) (*Reference, error) {
 	}
 
 	if _, ok := p.peek(); ok {
-		return nil, wrap(ErrInvalidReference, ErrUnexpectedToken)
+		return nil, crex.Wrap(ErrInvalidReference, ErrUnexpectedToken)
 	}
 
 	return ref, nil
@@ -105,7 +107,7 @@ func (p *referenceParser) remaining() int {
 func (p *referenceParser) parseVersionOrChannel(ref *Reference) error {
 	tok, ok := p.peek()
 	if !ok {
-		return wrap(ErrInvalidReference, ErrMissingVersionChannel)
+		return crex.Wrap(ErrInvalidReference, ErrMissingVersionChannel)
 	}
 
 	// Check for channel
@@ -128,7 +130,7 @@ func (p *referenceParser) parseVersionOrChannel(ref *Reference) error {
 	}
 
 	if len(versionTokens) == 0 {
-		return wrap(ErrInvalidReference, ErrMissingVersionChannel)
+		return crex.Wrap(ErrInvalidReference, ErrMissingVersionChannel)
 	}
 
 	versionStr := strings.Join(versionTokens, " ")

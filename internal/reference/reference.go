@@ -2,6 +2,8 @@ package reference
 
 import (
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Resource reference.
@@ -11,10 +13,10 @@ import (
 // information. References are immutable once created. Use [Parse] to
 // construct valid references.
 type Reference struct {
-	Identifier
-	version *VersionConstraint
-	channel *string
-	digest  *Digest
+	Identifier                    // Resource identifier (registry, namespace, name).
+	version    *VersionConstraint // Semantic version constraint.
+	channel    *string            // The release track.
+	digest     *Digest            // Content digest for pinning to an exact version.
 }
 
 // Parses a reference string.
@@ -60,7 +62,7 @@ func MustParse(s string, contextType string) *Reference {
 // the reference becomes frozen, pointing to an exact immutable resource version.
 func New(id *Identifier, versionOrChannel string, digest *Digest) (*Reference, error) {
 	if id == nil {
-		return nil, wrap(ErrInvalidReference, ErrEmptyReference)
+		return nil, crex.Wrap(ErrInvalidReference, ErrEmptyReference)
 	}
 
 	ref := &Reference{
@@ -76,7 +78,7 @@ func New(id *Identifier, versionOrChannel string, digest *Digest) (*Reference, e
 		// Parse as version constraint
 		vc, err := ParseVersionConstraint(versionOrChannel)
 		if err != nil {
-			return nil, wrap(ErrInvalidReference, err)
+			return nil, crex.Wrap(ErrInvalidReference, err)
 		}
 		ref.version = vc
 	}

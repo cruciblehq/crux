@@ -9,7 +9,7 @@ import (
 	"os/user"
 	"text/template"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/paths"
 )
 

@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Current state format version.
 const StateVersion = 0
@@ -10,9 +10,9 @@ const StateVersion = 0
 // Records what resources have been deployed and their runtime identifiers.
 // Used for incremental deployments and resource lifecycle management.
 type State struct {
-	Version    int        `codec:"version"`    // Version of the state format.
-	Deployment Deployment `codec:"deployment"` // Metadata about the most recent deployment.
-	Services   []Ref      `codec:"services"`   // Services that were deployed.
+	Version    int        `json:"version"`    // Version of the state format.
+	Deployment Deployment `json:"deployment"` // Metadata about the most recent deployment.
+	Services   []Ref      `json:"services"`   // Services that were deployed.
 }
 
 // Validates the state.

@@ -1,17 +1,17 @@
 package codec
 
 type sample struct {
-	Name    string `codec:"name"`
-	Version int    `codec:"version"`
+	Name    string `json:"name"`
+	Version int    `json:"version"`
 }
 
 type nested struct {
-	Inner sample `codec:"inner"`
+	Inner sample `json:"inner"`
 }
 
 type squashed struct {
-	sample `codec:",squash"`
-	Extra  string `codec:"extra"`
+	sample `json:",squash"`
+	Extra  string `json:"extra"`
 }
 
 type custom struct {

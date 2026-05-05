@@ -11,7 +11,7 @@ import "github.com/cruciblehq/crux/internal/crex"
 type mode string
 
 const (
-	modeFull        mode = "full"        // All five sets. Broadest grant.
+	modeFull        mode = "full"        // All five sets. Broadest aegis.
 	modeEffective   mode = "effective"   // Effective, permitted, and bounding (effective immediately, survives exec, does not auto-inherit).
 	modeInheritable mode = "inheritable" // Permitted, inheritable, ambient, and bounding (auto-inherits across exec via ambient).
 	modePermitted   mode = "permitted"   // Permitted and bounding (raisable on demand, not effective by default).

@@ -1,123 +1,72 @@
-// Package reference defines the structure and parsing logic for Crucible
-// resource references.
+// Package reference defines the structure and parsing logic for Crucible resource references.
 //
-// Resources are identified and located using resource references, which are
-// symbolic strings that encapsulate the necessary information to fetch and
-// verify the resource.
+// A resource reference is a symbolic string that encapsulates the information
+// needed to fetch and verify a resource. Its general shape is an optional
+// resource type, an optional [scheme://]registry, a hierarchical path, a
+// version constraint or a channel, and an optional digest, written for
+// example as "widget official/my-widget ^1.2.0 sha256:3a7bd3e2360a3d80c1...".
+// Scheme, registry, and path together form the resource location, and when
+// scheme or registry are omitted they default to the values configured in
+// [Options]. The path itself uses Crucible's namespace/name convention, where
+// the namespace groups related resources and the name identifies one within
+// that namespace; the namespace may be omitted only when the registry is also
+// omitted, in which case the configured default namespace applies. As a
+// result, the references "my-widget", "official/my-widget",
+// "registry.crucible.net/official/my-widget", and
+// "http://registry.crucible.net/official/my-widget" all denote the same
+// resource when the defaults match.
 //
-// A reference has the general format:
+// Versioning follows semantic versioning with a small number of deliberate
+// deviations. The version segment accepts the operators that semver libraries
+// usually support: coercion of partial versions, OR with || and implicit AND
+// by whitespace, the comparison operators =, !=, >, <, >=, and <=, hyphen
+// ranges, x-style wildcards, tilde patch ranges, and caret minor ranges.
+// Crucible diverges from semver by requiring every version range to have an
+// explicit upper bound, since future major versions introduce breaking changes
+// that cannot be anticipated; ">=2.0.0 <3.0.0" and ">1.5.0 <2.0.0" are valid,
+// while ">=2.0.0" and ">1.5.0" are not. Operators that imply an upper bound
+// such as ^1.2.3, ~1.2.3, 1.2.x, and 1.2.3 - 2.0.0 are allowed because the
+// bound is unambiguous. Crucible also rejects the bare asterisk wildcard
+// because it undermines the stability guarantees that versioning is meant to
+// provide.
 //
-//	[<type>] [[scheme://]registry/]<path> (<version-constraint> | <channel>) [<digest>]
+// Pre-releases receive special treatment. Standard semver compares pre-release
+// identifiers lexically in ASCII order, which makes "BETA" sort below "alpha"
+// and produces ordering that is unhelpful for Crucible's usage. More
+// importantly, pre-releases are inherently unstable and unsuitable for
+// Crucible's dynamic composition model, so they are prohibited in version
+// constraints except in narrow scenarios where authorised users opt in to
+// pre-release access. To cover the common need for tracking unstable streams
+// without pre-release identifiers, Crucible introduces channels: named release
+// tracks such as "stable", "beta", or "alpha" that act as mutable pointers to
+// the latest version on that track. Channels require explicit opt-in and
+// authorisation, are unavailable by default, and cannot appear in published
+// resources, which keeps them confined to development and testing.
 //
-// Scheme, registry (authority), and path together form the resource identifier
-// (or location), which specifies where to locate the resource. When omitted,
-// both default to the values configured in [Options].
+// A channel is specified in place of a version with a colon prefix, for
+// example "my-widget :stable" or "official/my-widget :beta", and when present
+// no other version constraint applies. When a resource is prepared for
+// deployment its dependencies are resolved to concrete versions and the
+// references are frozen by appending a digest. The original constraints are
+// preserved alongside the digest for auditing, but the digest is what
+// downstream tooling uses to fetch and verify content. A digest is a
+// cryptographic hash of the resource content, written for example as
+// "sha256:3a7bd3e2360a3d80c1...", and turns the reference into a content-
+// addressed pointer that always denotes the same bytes regardless of any
+// changes to the symbolic components.
 //
-// Crucible's registry uses a hierarchical path structure to organize resources,
-// consisting of namespace and name segments expressed as namespace/name. The
-// namespace groups related resources, while the name identifies a specific
-// resource within that namespace. The namespace can be omitted, in which case
-// it defaults to the configured default namespace, but only if the registry
-// is not specified. Other registries may use different conventions.
+// References also carry a resource type. The type is not represented in the
+// reference string itself; it is supplied contextually when a reference is
+// parsed in a position where a particular type is expected. When the expected
+// type is ambiguous, callers may supply it explicitly as the leading token,
+// for example "widget my-widget :stable sha256:3a7bd3e2360a3d80c1...".
 //
-// For example, the following references are equivalent:
+// Parsing a reference and inspecting its components:
 //
-//   - my-widget
-//   - official/my-widget
-//   - registry.crucible.net/official/my-widget
-//   - http://registry.crucible.net/official/my-widget
-//
-// In the Crucible ecosystem, versioning adheres strictly to semantic versioning
-// principles, with a few exceptions. The version segment allows most of the same
-// operators usually supported by semantic versioning libraries, specifically:
-//
-//   - Coercion (1.2 -> 1.2.0, v1.2.3 -> 1.2.3)
-//   - OR (1.2 || 1.3) and AND (space-separated) operators
-//   - Comparison operators (=, !=, >, <, >=, <=)
-//   - Hyphen ranges (1.2.3 - 2.0.0)
-//   - Wildcards (1.2.x, 1.x)
-//   - Patch-range comparisons (~1.2.3)
-//   - Caret-range comparisons (^1.2.3)
-//
-// The first exception involves unbounded ranges. Often software projects declare
-// support for versions using open-ended constraints (e.g., >=2.0.0 or >1.5.0).
-// However, this breaks compatibility guarantees, since future major versions
-// introduce breaking changes that cannot be anticipated. Therefore, Crucible
-// requires all version ranges to have explicit upper bounds. For example:
-//
-//   - >=2.0.0 <3.0.0 (valid)
-//   - >1.5.0 <2.0.0 (valid)
-//   - >=2.0.0 (invalid, no upper bound)
-//   - >1.5.0 (invalid, no upper bound)
-//
-// Operators that implicitly define upper bounds are allowed:
-//
-//   - ^1.2.3 (implies <2.0.0)
-//   - ~1.2.3 (implies <1.3.0)
-//   - 1.2.x (implies >=1.2.0 <1.3.0)
-//   - 1.2.3 - 2.0.0 (explicit range)
-//
-// Another exception involves wildcards. The asterisk (*) operator is often used
-// to denote "any version". In Crucible, this operator is not supported, since
-// it undermines the purpose of versioning, which is to provide stability and
-// compatibility guarantees. Instead, users should specify explicit version
-// constraints that reflect their compatibility requirements.
-//
-// Pre-releases are also handled differently. The semver specification dictates
-// that pre-release identifiers with letters or hyphens are case-sensitive and
-// compared lexically in ASCII sort order, entailing "BETA" representing a lower
-// version than "alpha". This is contrary to Crucible's intended usage.
-//
-// Furthermore, semver also specifies that pre-releases are unstable and may not
-// satisfy compatibility requirements, making them unsuitable for Crucible's
-// dynamic composition use cases. There are exceptions to this, such as when
-// preparing for an upcoming release, in which case Crucible enables specific
-// users to reference pre-release versions (e.g., those given explicit access).
-// However, in general, pre-releases are prohibited in version constraints.
-//
-// Crucible fixes this problem by introducing channels, which are named release
-// tracks (e.g., "stable", "beta", "alpha"). Channels represent mutable version
-// streams, allowing users to track different stability levels without dealing
-// with pre-release versioning complexities. Channels require explicit opt-in
-// and authorization and are not used by default. At the same time, a Crucible
-// resource cannot be published with channel dependencies and must use standard
-// versioning. Channels are only available for development and testing purposes.
-//
-// A channel can be specified in place of a version, using a colon prefix (e.g.,
-// :stable). When a channel is specified, the latest version in that channel is
-// used and no other version constraints apply. For example:
-//
-//   - my-widget :stable
-//   - official/my-widget :beta
-//   - registry.crucible.net/official/my-widget :alpha
-//   - http://registry.crucible.net/official/my-widget :stable
-//
-// When a resource is prepared for deployment its dependencies are resolved to
-// specific versions and all references are frozen by including a digest. The
-// original version constraints are preserved for auditing purposes, but the
-// content-addressed reference is used for fetching and verification.
-//
-// The digest segment provides a cryptographic hash (e.g., SHA-256) of the
-// resource content, ensuring immutability and integrity. When a digest is
-// included, the reference is considered "frozen" and always refers to the
-// exact same content, regardless of any changes to the symbolic components
-// of the reference. For example:
-//
-//   - my-widget >1.2.0 <3.0.0 sha256:3a7bd3e2360a3d80c1...
-//   - official/my-widget ^1.2.0 sha256:4b825dc642cb6eb9...
-//   - registry.crucible.net/official/my-widget ~1 sha256:5d41402abc4b2a76...
-//   - http://registry.crucible.net/official/my-widget =2.0.1 sha256:6f5902ac237024bdd0...
-//
-// References also include a resource type, although it is not represented
-// in the reference string, instead being provided contextually when parsing
-// references. For example, when parsing a reference where a widget is expected,
-// the resource type is implicitly "widget". In cases where the resource type
-// might be ambiguous, it will have to be provided explicitly:
-//
-//   - widget my-widget :stable sha256:3a7bd3e2360a3d80c1...
-//
-// References are parsed using [Parse], which validates the format and extract
-// the individual components. The [Reference] struct provides access to the
-// parsed components and a [String] method to obtain the canonical string
-// representation of the reference.
+//	ref, err := reference.Parse("official/my-widget ^1.2.0", opts)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(ref.Path, ref.Version)
+//	fmt.Println(ref.String())
 package reference

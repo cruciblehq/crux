@@ -72,7 +72,7 @@ func nestedSource(src map[string]any, name string) map[string]any {
 	return m
 }
 
-// Reports whether a field should be recursed into for defaults.
+// Whether a field should be recursed into for defaults.
 //
 // Returns true for struct values and for non-nil pointers to structs. All
 // other kinds return false.

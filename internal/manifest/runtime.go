@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Holds configuration specific to runtime resources.
 //
@@ -9,13 +9,13 @@ import "github.com/cruciblehq/crex"
 // packages, copying configuration files, setting environment variables, etc.)
 // to produce a base that service resources build on top of.
 type Runtime struct {
-	Recipe `codec:",squash"`
+	Recipe `json:",squash"`
 
 	// Declared parameters for this runtime.
 	//
 	// Lists build-time configuration values the runtime accepts. Values are
 	// bound through environment declarations.
-	Schema Schema `codec:"schema,omitempty"`
+	Schema Schema `json:"schema,omitempty"`
 }
 
 // Validates the runtime configuration.

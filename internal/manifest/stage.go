@@ -3,7 +3,7 @@ package manifest
 import (
 	"strconv"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // A build stage in a recipe.
@@ -24,29 +24,29 @@ type Stage struct {
 	// When set, must be unique across all stages in the recipe. Used as the
 	// prefix in copy source paths (e.g. "builder:/path"). Stages that do not
 	// need to be referenced by other stages can omit the name.
-	Name string `codec:"name,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	// Restricts this stage to a specific target platform.
 	//
 	// When set, the stage is only built when the target platform matches. The
 	// format is "os/arch" (e.g. "linux/arm64"). Steps within a platform-scoped
 	// stage cannot use [Step.Platform].
-	Platform string `codec:"platform,omitempty"`
+	Platform string `json:"platform,omitempty"`
 
 	// Base image for this stage.
 	//
 	// A Crucible resource reference (e.g. "crucible/runtime 0.1.0"). When nil,
 	// the stage starts from an empty filesystem (scratch).
-	From *Ref `codec:"from,omitempty"`
+	From *Ref `json:"from,omitempty"`
 
 	// Capabilities this stage requires from the platform.
 	//
 	// The platform resolves each affordance into effects that apply to the
 	// container for this stage.
-	Affordances []Ref `codec:"affordances,omitempty"`
+	Affordances []Ref `json:"affordances,omitempty"`
 
 	// Ordered build steps for this stage.
-	Steps []Step `codec:"steps,omitempty"`
+	Steps []Step `json:"steps,omitempty"`
 }
 
 // Validates the stage.
@@ -86,7 +86,7 @@ func (s *Stage) Validate() error {
 	return nil
 }
 
-// Reports whether a step or any of its children use the platform field.
+// Whether a step or any of its children use the platform field.
 func stepUsesPlatform(s *Step) bool {
 	if s.Platform != "" {
 		return true

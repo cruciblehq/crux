@@ -6,7 +6,7 @@ import (
 
 	"github.com/cruciblehq/crux/internal/crex"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 	"github.com/cruciblehq/crux/internal/runtime/shared/fcapspec"
 )
@@ -39,11 +39,11 @@ func (s *Subsystem) Name() shared.Name {
 // The grant has the form ".fcap CAP MODE PATH" where CAP is a capability
 // name without the CAP_ prefix, MODE is one of "effective" or "inheritable",
 // and PATH is an absolute, clean filesystem path.
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	cap, mode, path, err := parse(&g)
+	cap, mode, path, err := parse(g)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 // Rejects grants that carry a where clause, keyword arguments, or a
 // positional arity other than three. Per-argument typing and value
 // validation are deferred to parse.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if g.Where != nil {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in fcap expression")
 	}
@@ -87,16 +87,16 @@ func check(g *grant.Grant) error {
 // is a string or name carrying an absolute, NUL-free, already-clean path. The
 // path is normalized through pathpkg.Clean and returned in its canonical form.
 // All failures are wrapped as ErrInvalidGrant.
-func parse(g *grant.Grant) (string, fcapspec.Mode, string, error) {
+func parse(g *aegis.Model) (string, fcapspec.Mode, string, error) {
 	capArg := g.Args[0]
-	if capArg.Type != grant.ArgName {
+	if capArg.Type != aegis.ArgName {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in fcap expression")
 	}
 	if _, err := shared.ParseCap(capArg.Value); err != nil {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "unknown capability %q in fcap expression", capArg.Value)
 	}
 	modeArg := g.Args[1]
-	if modeArg.Type != grant.ArgName {
+	if modeArg.Type != aegis.ArgName {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in fcap expression")
 	}
 	mode := fcapspec.Mode(modeArg.Value)
@@ -105,7 +105,7 @@ func parse(g *grant.Grant) (string, fcapspec.Mode, string, error) {
 	}
 	pathArg := g.Args[2]
 	switch pathArg.Type {
-	case grant.ArgStrASCII, grant.ArgStrUnicode, grant.ArgName:
+	case aegis.ArgStrASCII, aegis.ArgStrUnicode, aegis.ArgName:
 	default:
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected string as path in fcap expression")
 	}

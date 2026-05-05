@@ -1,7 +1,7 @@
 package manifest
 
 import (
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Identifies a Crucible resource by its reference string.
@@ -16,18 +16,18 @@ type Ref struct {
 	//
 	// Set when the reference names a specific instance (e.g. a service in a
 	// blueprint). The ID persists from composition through plan into state.
-	ID string `codec:"id,omitempty"`
+	ID string `json:"id,omitempty"`
 
 	// Crucible reference string identifying the resource.
-	Target string `codec:"ref"`
+	Target string `json:"ref"`
 
 	// Scalar parameter for the referenced affordance. Mutually exclusive
 	// with [Ref.Args].
-	Value string `codec:"value,omitempty"`
+	Value string `json:"value,omitempty"`
 
 	// Argument map for the referenced affordance. Mutually exclusive with
 	// [Ref.Value].
-	Args map[string]string `codec:"args,omitempty"`
+	Args map[string]string `json:"args,omitempty"`
 }
 
 // Validates the ref.

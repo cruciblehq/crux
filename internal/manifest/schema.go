@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Declares the parameters a resource accepts.
 //
@@ -15,12 +15,12 @@ type Schema struct {
 	//
 	// When a caller passes a plain value instead of a named argument map,
 	// the value is assigned to this parameter. Empty means no default.
-	Default string `codec:"default,omitempty"`
+	Default string `json:"default,omitempty"`
 
 	// Named parameters accepted by the resource.
 	//
 	// Each param must have a unique name. Zero value means no parameters.
-	Params []Param `codec:"params,omitempty"`
+	Params []Param `json:"params,omitempty"`
 }
 
 // Validates the schema.

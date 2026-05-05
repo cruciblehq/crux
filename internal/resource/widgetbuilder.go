@@ -4,7 +4,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
 	"github.com/cruciblehq/crux/internal/reference"
 	es "github.com/evanw/esbuild/pkg/api"
@@ -73,29 +73,23 @@ func (wb *WidgetBuilder) Build(ctx context.Context, m manifest.Manifest, output 
 
 // Converts [manifest.Widget] options into esbuild's [es.BuildOptions].
 //
-// It maps the relevant fields and sets appropriate defaults for building
-// Crucible widgets. The defaults are chosen to optimize for typical Crucible
-// use cases, such as JSX support. Logging is disabled as we handle it ourselves.
-// The Crucible UI library is marked as external to avoid bundling it, and the
-// JSX factory and fragment are set to use Crucible's implementations.
-//
-// The project can include JavaScript (.js/.jsx) and/or TypeScript (.ts/.tsx)
-// files. esbuild performs no type checking, even when TypeScript is used. To
-// enforce type safety, run `tsc` separately before invoking esbuild.
-//
-// File syntax is inferred from extensions. If a tsconfig.json is present,
-// esbuild respects only a subset of its options: "extends" (for configuration
-// inheritance) and the "module" and "target" properties under "compilerOptions"
-// (to set the output module format and JavaScript version, respectively). JSX
-// options in tsconfig.json are not respected, as they are overridden to use
-// Crucible’s custom JSX factory and fragment.
-//
-// For output, although esbuild supports CommonJS, ESM, and IIFE/UMD formats,
-// Crucible supports only ESM output. Other formats are unlikely to be added.
-// The build emits ES2015-compatible code to maintain broad environment support.
-//
-// Currently, crux builds only for web platforms. If additional platforms are
-// introduced, the build process must run separately for each platform target.
+// Maps the relevant fields and sets appropriate defaults for building widgets.
+// The defaults are chosen to optimize for typical Crucible use cases, such as
+// JSX support. Logging is disabled as we handle it ourselves. The Crucible UI
+// library is marked as external to avoid bundling it, and the JSX factory and
+// fragment are set to use Crucible's implementations. The project can include
+// JavaScript (.js/.jsx) and/or TypeScript (.ts/.tsx) files. esbuild performs
+// no type checking, even when TypeScript is used. To enforce type safety, tsc
+// should be invoked separately. File syntax is inferred from extensions. If a
+// tsconfig.json is present, esbuild respects only a subset of its options:
+// "extends" (for configuration inheritance) and the "module" and "target"
+// properties under "compilerOptions" (to set the output module format and
+// JavaScript version, respectively). JSX options in tsconfig.json are not
+// respected, as they are overridden to use Crucible’s custom JSX factory and
+// fragment. For output, although esbuild supports CommonJS, ESM, and IIFE/UMD
+// formats, Crucible supports only ESM output. Other formats are unlikely to be
+// added in the future. The build emits ES2015-compatible code to maintain broad
+// environment support. Currently, crux builds only for web platforms.
 func esBuildOptionsFromManifest(options *manifest.Widget, dist string) (es.BuildOptions, error) {
 
 	// Determine project root

@@ -3,19 +3,19 @@ package codec
 import "testing"
 
 type withDefaults struct {
-	Name   string `codec:"name"`
-	Weight uint16 `codec:"weight,default=100"`
-	Mode   string `codec:"mode,default=auto"`
+	Name   string `json:"name"`
+	Weight uint16 `json:"weight,default=100"`
+	Mode   string `json:"mode,default=auto"`
 }
 
 type nestedDefaults struct {
-	Inner withDefaults `codec:"inner"`
+	Inner withDefaults `json:"inner"`
 }
 
 type allDefaults struct {
-	B bool    `codec:"b,default=true"`
-	I int64   `codec:"i,default=-42"`
-	F float64 `codec:"f,default=3.14"`
+	B bool    `json:"b,default=true"`
+	I int64   `json:"i,default=-42"`
+	F float64 `json:"f,default=3.14"`
 }
 
 func TestDecode_Defaults(t *testing.T) {
@@ -109,7 +109,7 @@ func TestDecode_DefaultFloat(t *testing.T) {
 
 func TestDecode_DefaultUnsupportedType(t *testing.T) {
 	type unsupported struct {
-		Sl []int `codec:"sl,default=nope"`
+		Sl []int `json:"sl,default=nope"`
 	}
 	var s unsupported
 	err := Decode(map[string]any{}, &s)

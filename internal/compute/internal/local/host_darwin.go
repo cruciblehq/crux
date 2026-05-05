@@ -6,8 +6,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/resource"
 )
 

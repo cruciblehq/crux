@@ -4,10 +4,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/codec"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/internal/paths"
 )
 
 // Reads and decodes the manifest inside the given directory.

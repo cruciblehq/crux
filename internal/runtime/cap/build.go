@@ -6,7 +6,7 @@ import (
 	"github.com/cruciblehq/crux/internal/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -34,11 +34,11 @@ func (s *Subsystem) Name() shared.Name {
 // without the CAP_ prefix and MODE optionally selects which kernel sets to
 // populate. When MODE is omitted, ModeFull is used. The grant accepts no
 // keyword arguments and no where clause.
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	name, mode, err := parse(&g)
+	name, mode, err := parse(g)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 }
 
 // Validates the grant's structural shape against what the cap subsystem accepts.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if g.Where != nil {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in cap expression")
 	}
@@ -81,9 +81,9 @@ func check(g *grant.Grant) error {
 }
 
 // Extracts and validates the grant's capability name and optional mode.
-func parse(g *grant.Grant) (shared.Cap, mode, error) {
+func parse(g *aegis.Model) (shared.Cap, mode, error) {
 	nameArg := g.Args[0]
-	if nameArg.Type != grant.ArgName {
+	if nameArg.Type != aegis.ArgName {
 		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in cap expression, found %s instead", nameArg)
 	}
 	c, err := shared.ParseCap(nameArg.Value)
@@ -93,7 +93,7 @@ func parse(g *grant.Grant) (shared.Cap, mode, error) {
 	mode := modeFull
 	if len(g.Args) == 2 {
 		modeArg := g.Args[1]
-		if modeArg.Type != grant.ArgName {
+		if modeArg.Type != aegis.ArgName {
 			return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in cap expression, found %s instead", modeArg)
 		}
 		m, err := parseMode(modeArg.Value)

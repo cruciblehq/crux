@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Mutable properties of a channel for creation or update.
 //
@@ -10,9 +10,9 @@ import "github.com/cruciblehq/crex"
 // changing this pointer updates where the channel points. Contains only user-
 // modifiable fields. The media type is [MediaTypeChannelInfo].
 type ChannelInfo struct {
-	Name        string `codec:"name"`        // Channel name.
-	Version     string `codec:"version"`     // Version this channel points to.
-	Description string `codec:"description"` // Description.
+	Name        string `json:"name"`        // Channel name.
+	Version     string `json:"version"`     // Version this channel points to.
+	Description string `json:"description"` // Description.
 }
 
 // Validates the channel info.
@@ -35,11 +35,11 @@ func (info *ChannelInfo) Validate() error {
 // listings and channel lists to keep payloads compact. Includes read-only
 // fields like timestamps.
 type ChannelSummary struct {
-	Name        string `codec:"name"`        // Channel name.
-	Version     string `codec:"version"`     // Version this channel points to.
-	Description string `codec:"description"` // Description.
-	CreatedAt   int64  `codec:"createdAt"`   // When the channel was created.
-	UpdatedAt   int64  `codec:"updatedAt"`   // When the channel was last updated.
+	Name        string `json:"name"`        // Channel name.
+	Version     string `json:"version"`     // Version this channel points to.
+	Description string `json:"description"` // Description.
+	CreatedAt   int64  `json:"createdAt"`   // When the channel was created.
+	UpdatedAt   int64  `json:"updatedAt"`   // When the channel was last updated.
 }
 
 // Validates the channel summary.
@@ -67,13 +67,13 @@ func (s *ChannelSummary) Validate() error {
 // information to identify the channel's location. The media type is
 // [MediaTypeChannel].
 type Channel struct {
-	Namespace   string  `codec:"namespace"`   // Namespace this channel belongs to.
-	Resource    string  `codec:"resource"`    // Resource this channel belongs to.
-	Name        string  `codec:"name"`        // Channel name.
-	Version     Version `codec:"version"`     // Full version object this channel points to.
-	Description string  `codec:"description"` // Description.
-	CreatedAt   int64   `codec:"createdAt"`   // When the channel was created.
-	UpdatedAt   int64   `codec:"updatedAt"`   // When the channel was last updated.
+	Namespace   string  `json:"namespace"`   // Namespace this channel belongs to.
+	Resource    string  `json:"resource"`    // Resource this channel belongs to.
+	Name        string  `json:"name"`        // Channel name.
+	Version     Version `json:"version"`     // Full version object this channel points to.
+	Description string  `json:"description"` // Description.
+	CreatedAt   int64   `json:"createdAt"`   // When the channel was created.
+	UpdatedAt   int64   `json:"updatedAt"`   // When the channel was last updated.
 }
 
 // Validates the channel.
@@ -102,7 +102,7 @@ func (ch *Channel) Validate() error {
 type ChannelList struct {
 
 	// List of channels.
-	Channels []ChannelSummary `codec:"channels"`
+	Channels []ChannelSummary `json:"channels"`
 }
 
 // Validates the channel list.

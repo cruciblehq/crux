@@ -1,6 +1,6 @@
 package codec
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Implemented by types that support structural validation.
 //

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 var (
@@ -24,11 +26,11 @@ type identifierParser struct {
 // Parses the tokens into an Identifier.
 func (p *identifierParser) parse(contextType string) (*Identifier, error) {
 	if !typePattern.MatchString(contextType) {
-		return nil, wrap(ErrInvalidIdentifier, ErrInvalidContextType)
+		return nil, crex.Wrap(ErrInvalidIdentifier, ErrInvalidContextType)
 	}
 
 	if len(p.tokens) == 0 {
-		return nil, wrap(ErrInvalidIdentifier, ErrEmptyIdentifier)
+		return nil, crex.Wrap(ErrInvalidIdentifier, ErrEmptyIdentifier)
 	}
 
 	id := &Identifier{}
@@ -42,7 +44,7 @@ func (p *identifierParser) parse(contextType string) (*Identifier, error) {
 	}
 
 	if _, ok := p.peek(); ok {
-		return nil, wrap(ErrInvalidIdentifier, ErrUnexpectedToken)
+		return nil, crex.Wrap(ErrInvalidIdentifier, ErrUnexpectedToken)
 	}
 
 	return id, nil
@@ -87,7 +89,7 @@ func (p *identifierParser) parseType(id *Identifier, contextType string) error {
 
 	// Token is a type; must match context.
 	if tok != contextType {
-		return wrap(ErrTypeMismatch, fmt.Errorf("type %q does not match context %q", tok, contextType))
+		return crex.Wrap(ErrTypeMismatch, fmt.Errorf("type %q does not match context %q", tok, contextType))
 	}
 	p.pos++
 
@@ -101,7 +103,7 @@ func (p *identifierParser) parseType(id *Identifier, contextType string) error {
 func (p *identifierParser) parseLocation(id *Identifier) error {
 	tok, ok := p.next()
 	if !ok {
-		return wrap(ErrInvalidIdentifier, ErrEmptyIdentifier)
+		return crex.Wrap(ErrInvalidIdentifier, ErrEmptyIdentifier)
 	}
 
 	parts := strings.Split(tok, "/")
@@ -110,17 +112,17 @@ func (p *identifierParser) parseLocation(id *Identifier) error {
 	case 1:
 		// name
 		if !namePattern.MatchString(parts[0]) {
-			return wrap(ErrInvalidIdentifier, ErrInvalidName)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidName)
 		}
 		id.name = parts[0]
 
 	case 2:
 		// namespace/name
 		if !namePattern.MatchString(parts[0]) {
-			return wrap(ErrInvalidIdentifier, ErrInvalidNamespace)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidNamespace)
 		}
 		if !namePattern.MatchString(parts[1]) {
-			return wrap(ErrInvalidIdentifier, ErrInvalidName)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidName)
 		}
 		id.namespace = parts[0]
 		id.name = parts[1]
@@ -128,20 +130,20 @@ func (p *identifierParser) parseLocation(id *Identifier) error {
 	case 3:
 		// registry/namespace/name
 		if parts[0] == "" {
-			return wrap(ErrInvalidIdentifier, ErrInvalidRegistry)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidRegistry)
 		}
 		if !namePattern.MatchString(parts[1]) {
-			return wrap(ErrInvalidIdentifier, ErrInvalidNamespace)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidNamespace)
 		}
 		if !namePattern.MatchString(parts[2]) {
-			return wrap(ErrInvalidIdentifier, ErrInvalidName)
+			return crex.Wrap(ErrInvalidIdentifier, ErrInvalidName)
 		}
 		id.registry = parts[0]
 		id.namespace = parts[1]
 		id.name = parts[2]
 
 	default:
-		return wrap(ErrInvalidIdentifier, ErrInvalidPath)
+		return crex.Wrap(ErrInvalidIdentifier, ErrInvalidPath)
 	}
 
 	return nil

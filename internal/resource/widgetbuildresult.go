@@ -6,7 +6,7 @@ import (
 	"sort"
 	"unicode"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 

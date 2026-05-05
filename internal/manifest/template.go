@@ -10,7 +10,7 @@ type Template struct {
 	// Declared parameters for this template.
 	//
 	// Lists the values the template accepts when instantiated.
-	Schema Schema `codec:"schema,omitempty"`
+	Schema Schema `json:"schema,omitempty"`
 }
 
 // Validates the template configuration.

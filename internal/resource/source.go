@@ -3,7 +3,7 @@ package resource
 import (
 	"context"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
 	"github.com/cruciblehq/crux/internal/reference"
 )

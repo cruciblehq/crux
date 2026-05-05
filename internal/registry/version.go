@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Mutable properties of a version for creation or update.
 //
@@ -9,7 +9,7 @@ import "github.com/cruciblehq/crex"
 // update context. Contains only user-modifiable fields. The media type is
 // [MediaTypeVersionInfo].
 type VersionInfo struct {
-	String string `codec:"string"` // Version string (e.g., "1.0.0").
+	String string `json:"string"` // Version string (e.g., "1.0.0").
 }
 
 // Validates the version info.
@@ -28,9 +28,9 @@ func (info *VersionInfo) Validate() error {
 // listings and version lists to keep payloads compact. Includes read-only
 // fields like publication status and timestamps.
 type VersionSummary struct {
-	String    string `codec:"string"`    // Version string (e.g., "1.0.0").
-	CreatedAt int64  `codec:"createdAt"` // When the version was created.
-	UpdatedAt int64  `codec:"updatedAt"` // When the version was last updated.
+	String    string `json:"string"`    // Version string (e.g., "1.0.0").
+	CreatedAt int64  `json:"createdAt"` // When the version was created.
+	UpdatedAt int64  `json:"updatedAt"` // When the version was last updated.
 }
 
 // Validates the version summary.
@@ -56,14 +56,14 @@ func (s *VersionSummary) Validate() error {
 // scoping information to identify the version's location. The media type is
 // [MediaTypeVersion].
 type Version struct {
-	Namespace string  `codec:"namespace"` // Namespace this version belongs to.
-	Resource  string  `codec:"resource"`  // Resource this version belongs to.
-	String    string  `codec:"string"`    // Version string (e.g., "1.0.0").
-	Archive   *string `codec:"archive"`   // Download URL or null if not uploaded.
-	Size      *int64  `codec:"size"`      // Archive size in bytes (null if not uploaded).
-	Digest    *string `codec:"digest"`    // Archive digest (e.g., "sha256:abc...", null if not uploaded).
-	CreatedAt int64   `codec:"createdAt"` // When the version was created.
-	UpdatedAt int64   `codec:"updatedAt"` // When the version was last updated.
+	Namespace string  `json:"namespace"` // Namespace this version belongs to.
+	Resource  string  `json:"resource"`  // Resource this version belongs to.
+	String    string  `json:"string"`    // Version string (e.g., "1.0.0").
+	Archive   *string `json:"archive"`   // Download URL or null if not uploaded.
+	Size      *int64  `json:"size"`      // Archive size in bytes (null if not uploaded).
+	Digest    *string `json:"digest"`    // Archive digest (e.g., "sha256:abc...", null if not uploaded).
+	CreatedAt int64   `json:"createdAt"` // When the version was created.
+	UpdatedAt int64   `json:"updatedAt"` // When the version was last updated.
 }
 
 // Validates the version.
@@ -92,7 +92,7 @@ func (v *Version) Validate() error {
 type VersionList struct {
 
 	// List of versions.
-	Versions []VersionSummary `codec:"versions"`
+	Versions []VersionSummary `json:"versions"`
 }
 
 // Validates the version list.

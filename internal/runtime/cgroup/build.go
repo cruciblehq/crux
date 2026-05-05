@@ -8,7 +8,7 @@ import (
 	"github.com/cruciblehq/crux/internal/crex"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -53,11 +53,11 @@ func (s *Subsystem) Name() shared.Name {
 // validated against the private typed model, which enforces v2 semantics
 // and rejects conflicting scalar grants. On success, the grant is projected
 // into the OCI write target.
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	knob, value, err := parseGrant(&g)
+	knob, value, err := parseGrant(g)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 	}
 	for _, d := range src.OCI.Linux.Resources.Devices {
 		if !d.Allow {
-			continue // Deny entries are part of the deny-all baseline, not a grant.
+			continue // Deny entries are part of the deny-all baseline, not a aegis.
 		}
 		if err := s.projectDeviceEntry(d); err != nil {
 			return err
@@ -187,12 +187,12 @@ func (s *Subsystem) flushUnified(knob string) {
 	s.oci.Unified[knob] = strings.Join(s.applied[knob], "\n")
 }
 
-// Validates the surface shape of a cgroup grant.
+// Validates the surface shape of a cgroup aegis.
 //
 // Rejects grants with a where clause (cgroup grants are unconditional), grants
 // with no knob name, and grants with no value at all (no positional after the
 // knob and no kwargs). Per-knob value validation runs later in the dispatcher.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if g.Where != nil {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in cgroup expression")
 	}
@@ -210,9 +210,9 @@ func check(g *grant.Grant) error {
 // The knob name is g.Args[0], which must be of type ArgName; otherwise
 // returns ErrInvalidGrant. The value is buildValue applied to the remaining
 // positional and keyword arguments.
-func parseGrant(g *grant.Grant) (string, string, error) {
+func parseGrant(g *aegis.Model) (string, string, error) {
 	knobArg := g.Args[0]
-	if knobArg.Type != grant.ArgName {
+	if knobArg.Type != aegis.ArgName {
 		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as knob in cgroup expression")
 	}
 	return knobArg.Value, buildValue(g.Args[1:], g.Kwargs), nil
@@ -223,7 +223,7 @@ func parseGrant(g *grant.Grant) (string, string, error) {
 // Produces the kernel-format value string that per-knob parsers consume.
 // Positional arguments come first in declaration order, then keyword
 // arguments in declaration order rendered as key=value.
-func buildValue(args []grant.Arg, kwargs []grant.Kwarg) string {
+func buildValue(args []aegis.Arg, kwargs []aegis.Kwarg) string {
 	parts := make([]string, 0, len(args)+len(kwargs))
 	for _, a := range args {
 		parts = append(parts, a.Value)

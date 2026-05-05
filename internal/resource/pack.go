@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/archive"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/paths"
 )
 

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Reads a named file from a tar archive.

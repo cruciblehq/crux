@@ -2,6 +2,8 @@ package reference
 
 import (
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Content-addressable digest for resource verification.
@@ -26,18 +28,18 @@ func ParseDigest(s string) (*Digest, error) {
 
 	colonIdx := strings.Index(s, ":")
 	if colonIdx == -1 {
-		return nil, wrap(ErrInvalidDigest, ErrMissingDigestColon)
+		return nil, crex.Wrap(ErrInvalidDigest, ErrMissingDigestColon)
 	}
 
 	algorithm := strings.ToLower(s[:colonIdx])
 	hash := strings.ToLower(s[colonIdx+1:])
 
 	if algorithm == "" {
-		return nil, wrap(ErrInvalidDigest, ErrEmptyDigestAlgorithm)
+		return nil, crex.Wrap(ErrInvalidDigest, ErrEmptyDigestAlgorithm)
 	}
 
 	if hash == "" {
-		return nil, wrap(ErrInvalidDigest, ErrEmptyDigestHash)
+		return nil, crex.Wrap(ErrInvalidDigest, ErrEmptyDigestHash)
 	}
 
 	return &Digest{

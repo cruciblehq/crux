@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Represents a parsed semantic version.
@@ -44,7 +46,7 @@ func ParseVersion(version string) (*Version, error) {
 		s = s[:idx]
 
 		if v.Build == "" || !buildPattern.MatchString(v.Build) {
-			return nil, wrap(ErrInvalidVersion, ErrInvalidBuildMetadata)
+			return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidBuildMetadata)
 		}
 	}
 
@@ -54,27 +56,27 @@ func ParseVersion(version string) (*Version, error) {
 		s = s[:idx]
 
 		if !prereleasePattern.MatchString(v.Prerelease) {
-			return nil, wrap(ErrInvalidVersion, ErrInvalidPrereleaseFormat)
+			return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidPrereleaseFormat)
 		}
 	}
 
 	// Parse version numbers
 	parts := strings.Split(s, ".")
 	if len(parts) != 3 {
-		return nil, wrap(ErrInvalidVersion, ErrInvalidVersionComponents)
+		return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidVersionComponents)
 	}
 
 	var err error
 	if v.Major, err = strconv.Atoi(parts[0]); err != nil || v.Major < 0 {
-		return nil, wrap(ErrInvalidVersion, ErrInvalidMajorVersion)
+		return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidMajorVersion)
 	}
 
 	if v.Minor, err = strconv.Atoi(parts[1]); err != nil || v.Minor < 0 {
-		return nil, wrap(ErrInvalidVersion, ErrInvalidMinorVersion)
+		return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidMinorVersion)
 	}
 
 	if v.Patch, err = strconv.Atoi(parts[2]); err != nil || v.Patch < 0 {
-		return nil, wrap(ErrInvalidVersion, ErrInvalidPatchVersion)
+		return nil, crex.Wrap(ErrInvalidVersion, ErrInvalidPatchVersion)
 	}
 
 	return v, nil

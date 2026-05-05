@@ -3,9 +3,6 @@ package local
 import "errors"
 
 var (
-
-	// Host environment errors.
-
 	ErrUnsupportedPlatform = errors.New("unsupported platform")
 	ErrHostNotCreated      = errors.New("host has not been created")
 	ErrHostAlreadyRunning  = errors.New("host is already running")
@@ -15,8 +12,5 @@ var (
 	ErrHostDestroy         = errors.New("failed to destroy host")
 	ErrHostExec            = errors.New("failed to execute command in host")
 	ErrHostConfig          = errors.New("failed to generate host configuration")
-
-	// Lima installation errors.
-
-	ErrLimaDownload = errors.New("failed to download lima")
+	ErrLimaDownload        = errors.New("failed to download lima")
 )

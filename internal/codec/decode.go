@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/go-viper/mapstructure/v2"
 	"gopkg.in/yaml.v3"
 )
@@ -116,7 +116,7 @@ func Field(src map[string]any, v any, fieldName string) error {
 // Returns a decode hook that delegates to [Decodable.Decode] for any target
 // type that implements [Decodable].
 func decoderHook() mapstructure.DecodeHookFuncType {
-	iface := reflect.TypeOf((*Decodable)(nil)).Elem()
+	iface := reflect.TypeFor[Decodable]()
 	return func(from, to reflect.Type, data any) (any, error) {
 		ptr := reflect.PointerTo(to)
 		if !ptr.Implements(iface) {

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // Interface for provider implementations.
@@ -53,7 +52,4 @@ type Backend interface {
 
 	// Runs a command on the instance's host.
 	Exec(ctx context.Context, name string, command string, args ...string) (*ExecResult, error)
-
-	// Returns a runtime connected to the instance's containerd.
-	Runtime(ctx context.Context, name string) (*runtime.Runtime, error)
 }

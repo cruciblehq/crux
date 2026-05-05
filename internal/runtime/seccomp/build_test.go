@@ -6,11 +6,11 @@ import (
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
-func nameArg(v string) grant.Arg { return grant.Arg{Type: grant.ArgName, Value: v} }
+func nameArg(v string) aegis.Arg { return aegis.Arg{Type: aegis.ArgName, Value: v} }
 
 // Returns a Subsystem with an empty seccomp section.
 func newSub() (*Subsystem, *specs.LinuxSeccomp) {
@@ -25,7 +25,7 @@ func wrap(s *specs.LinuxSeccomp) shared.Spec {
 
 func TestBuildIoctlSubFilterExpands(t *testing.T) {
 	sub, s := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if len(s.Syscalls) == 0 {
@@ -43,10 +43,10 @@ func TestBuildIoctlSubFilterExpands(t *testing.T) {
 
 func TestBuildUnconditionalSubsumesFiltered(t *testing.T) {
 	sub, s := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl")}}); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.Syscalls) != 1 {
@@ -59,10 +59,10 @@ func TestBuildUnconditionalSubsumesFiltered(t *testing.T) {
 
 func TestBuildFilteredAfterUnconditionalIsRedundant(t *testing.T) {
 	sub, s := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl")}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.Syscalls) != 1 {
@@ -72,11 +72,11 @@ func TestBuildFilteredAfterUnconditionalIsRedundant(t *testing.T) {
 
 func TestBuildIdempotent(t *testing.T) {
 	sub, s := newSub()
-	g := grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("read")}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("read")}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
-	if err := sub.Build(g); err != nil {
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.Syscalls) != 1 {
@@ -86,8 +86,8 @@ func TestBuildIdempotent(t *testing.T) {
 
 func TestBuildRejectsWhere(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp",
-		Args: []grant.Arg{nameArg("read")}, Where: &grant.CompareExpr{}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp",
+		Args: []aegis.Arg{nameArg("read")}, Where: &aegis.CompareExpr{}})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -95,8 +95,8 @@ func TestBuildRejectsWhere(t *testing.T) {
 
 func TestBuildRejectsKwargs(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp",
-		Args: []grant.Arg{nameArg("read")}, Kwargs: []grant.Kwarg{{Key: "x", Value: nameArg("y")}}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp",
+		Args: []aegis.Arg{nameArg("read")}, Kwargs: []aegis.Kwarg{{Key: "x", Value: nameArg("y")}}})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -104,8 +104,8 @@ func TestBuildRejectsKwargs(t *testing.T) {
 
 func TestBuildRejectsTooManyArgs(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp",
-		Args: []grant.Arg{nameArg("read"), nameArg("a"), nameArg("b")}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp",
+		Args: []aegis.Arg{nameArg("read"), nameArg("a"), nameArg("b")}})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -113,8 +113,8 @@ func TestBuildRejectsTooManyArgs(t *testing.T) {
 
 func TestBuildRejectsSubFilterOnArbitrarySyscall(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp",
-		Args: []grant.Arg{nameArg("read"), nameArg("tty")}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp",
+		Args: []aegis.Arg{nameArg("read"), nameArg("tty")}})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -122,8 +122,8 @@ func TestBuildRejectsSubFilterOnArbitrarySyscall(t *testing.T) {
 
 func TestBuildRejectsUnknownSubFilter(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp",
-		Args: []grant.Arg{nameArg("ioctl"), nameArg("bogus")}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp",
+		Args: []aegis.Arg{nameArg("ioctl"), nameArg("bogus")}})
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -131,11 +131,11 @@ func TestBuildRejectsUnknownSubFilter(t *testing.T) {
 
 func TestMergeUnionsAndSubsumes(t *testing.T) {
 	dstSub, dst := newSub()
-	if err := dstSub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
+	if err := dstSub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl"), nameArg("tty")}}); err != nil {
 		t.Fatal(err)
 	}
 	srcSub, src := newSub()
-	if err := srcSub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("ioctl")}}); err != nil {
+	if err := srcSub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("ioctl")}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := dstSub.Merge(wrap(src)); err != nil {
@@ -148,7 +148,7 @@ func TestMergeUnionsAndSubsumes(t *testing.T) {
 
 func TestMergeNilIsNoOp(t *testing.T) {
 	sub, s := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("read")}}); err != nil {
+	if err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("read")}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := sub.Merge(shared.Spec{}); err != nil {
@@ -168,7 +168,7 @@ func TestNameReturnsSeccomp(t *testing.T) {
 
 func TestBuildRejectsUnknownSyscall(t *testing.T) {
 	sub, _ := newSub()
-	err := sub.Build(grant.Grant{Subsystem: "seccomp", Args: []grant.Arg{nameArg("definitely_not_a_syscall")}})
+	err := sub.Build(&aegis.Model{Subsystem: "seccomp", Args: []aegis.Arg{nameArg("definitely_not_a_syscall")}})
 	if !errors.Is(err, ErrUnknownSyscall) {
 		t.Fatalf("err = %v, want ErrUnknownSyscall", err)
 	}

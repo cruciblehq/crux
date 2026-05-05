@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // The JavaScript bundle produced by widget builds.
 const WidgetMainFile = "index.js"
@@ -16,10 +16,10 @@ type Widget struct {
 	//
 	// Lists configuration values the widget accepts when embedded. Values
 	// are bound through environment declarations.
-	Schema Schema `codec:"schema,omitempty"`
+	Schema Schema `json:"schema,omitempty"`
 
 	// Build entry point.
-	Main string `codec:"main"`
+	Main string `json:"main"`
 }
 
 // Validates the widget configuration.

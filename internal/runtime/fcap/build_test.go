@@ -5,19 +5,19 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 	"github.com/cruciblehq/crux/internal/runtime/shared/fcapspec"
 )
 
 // Helper to create a name-typed argument for testing.
-func nameArg(v string) grant.Arg {
-	return grant.Arg{Type: grant.ArgName, Value: v}
+func nameArg(v string) aegis.Arg {
+	return aegis.Arg{Type: aegis.ArgName, Value: v}
 }
 
 // Helper to create a string-typed argument for testing.
-func strArg(v string) grant.Arg {
-	return grant.Arg{Type: grant.ArgStrASCII, Value: v}
+func strArg(v string) aegis.Arg {
+	return aegis.Arg{Type: aegis.ArgStrASCII, Value: v}
 }
 
 // Helper to create a Subsystem with a new spec for testing.
@@ -33,8 +33,8 @@ func wrap(s *fcapspec.Spec) shared.Spec {
 
 func TestBuildEffectiveSetsPermittedAndEffective(t *testing.T) {
 	sub, s := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/usr/bin/foo")}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/usr/bin/foo")}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	e, ok := s.Entries["/usr/bin/foo"]
@@ -51,8 +51,8 @@ func TestBuildEffectiveSetsPermittedAndEffective(t *testing.T) {
 
 func TestBuildInheritableOnly(t *testing.T) {
 	sub, s := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("inheritable"), strArg("/bin/sh")}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("inheritable"), strArg("/bin/sh")}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
 	e := s.Entries["/bin/sh"]
@@ -66,11 +66,11 @@ func TestBuildInheritableOnly(t *testing.T) {
 
 func TestBuildIdempotent(t *testing.T) {
 	sub, s := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/usr/bin/x")}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/usr/bin/x")}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
-	if err := sub.Build(g); err != nil {
+	if err := sub.Build(&g); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(s.Entries["/usr/bin/x"].Permitted); got != 1 {
@@ -80,64 +80,64 @@ func TestBuildIdempotent(t *testing.T) {
 
 func TestBuildRejectsWhere(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/x")}, Where: &grant.CompareExpr{}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/x")}, Where: &aegis.CompareExpr{}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildRejectsWrongArgCount(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("net_admin")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("net_admin")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsUnknownCap(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("bogus"), nameArg("effective"), strArg("/x")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("bogus"), nameArg("effective"), strArg("/x")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsUnknownMode(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("bogus"), strArg("/x")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("bogus"), strArg("/x")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsRelativePath(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("effective"), strArg("foo/bar")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("effective"), strArg("foo/bar")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsTrailingSlash(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("effective"), strArg("/usr/bin/")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("effective"), strArg("/usr/bin/")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsUnclean(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("effective"), strArg("/usr//bin/x")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("effective"), strArg("/usr//bin/x")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestBuildRejectsNUL(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("chown"), nameArg("effective"), strArg("/x\x00y")}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	g := aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("chown"), nameArg("effective"), strArg("/x\x00y")}}
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -145,7 +145,7 @@ func TestBuildRejectsNUL(t *testing.T) {
 func TestMergeUnions(t *testing.T) {
 	dstSub, dst := newSub()
 	srcSub, src := newSub()
-	if err := srcSub.Build(grant.Grant{Subsystem: "fcap", Args: []grant.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/x")}}); err != nil {
+	if err := srcSub.Build(&aegis.Model{Subsystem: "fcap", Args: []aegis.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/x")}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := dstSub.Merge(wrap(src)); err != nil {

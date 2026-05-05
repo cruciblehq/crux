@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Mutable properties of a namespace for creation or update.
 //
@@ -11,8 +11,8 @@ import "github.com/cruciblehq/crex"
 // are set by the server and appear only in response types. The media type is
 // [MediaTypeNamespaceInfo].
 type NamespaceInfo struct {
-	Name        string `codec:"name"`        // Namespace name.
-	Description string `codec:"description"` // Description.
+	Name        string `json:"name"`        // Namespace name.
+	Description string `json:"description"` // Description.
 }
 
 // Validates the namespace info.
@@ -31,11 +31,11 @@ func (info *NamespaceInfo) Validate() error {
 // responses to keep payloads compact. Includes read-only fields like creation
 // timestamps and statistics that are not present in [NamespaceInfo].
 type NamespaceSummary struct {
-	Name          string `codec:"name"`          // Namespace name.
-	Description   string `codec:"description"`   // Description.
-	ResourceCount int    `codec:"resourceCount"` // Number of resources in this namespace.
-	CreatedAt     int64  `codec:"createdAt"`     // When the namespace was created.
-	UpdatedAt     int64  `codec:"updatedAt"`     // When the namespace was last updated.
+	Name          string `json:"name"`          // Namespace name.
+	Description   string `json:"description"`   // Description.
+	ResourceCount int    `json:"resourceCount"` // Number of resources in this namespace.
+	CreatedAt     int64  `json:"createdAt"`     // When the namespace was created.
+	UpdatedAt     int64  `json:"updatedAt"`     // When the namespace was last updated.
 }
 
 // Validates the namespace summary.
@@ -59,11 +59,11 @@ func (s *NamespaceSummary) Validate() error {
 // details. For complete resource information, fetch individual resources. The
 // media type is [MediaTypeNamespace].
 type Namespace struct {
-	Name        string            `codec:"name"`        // Namespace name.
-	Description string            `codec:"description"` // Description.
-	Resources   []ResourceSummary `codec:"resources"`   // List of resources (summary form).
-	CreatedAt   int64             `codec:"createdAt"`   // When the namespace was created.
-	UpdatedAt   int64             `codec:"updatedAt"`   // When the namespace was last updated.
+	Name        string            `json:"name"`        // Namespace name.
+	Description string            `json:"description"` // Description.
+	Resources   []ResourceSummary `json:"resources"`   // List of resources (summary form).
+	CreatedAt   int64             `json:"createdAt"`   // When the namespace was created.
+	UpdatedAt   int64             `json:"updatedAt"`   // When the namespace was last updated.
 }
 
 // Validates the namespace.
@@ -89,7 +89,7 @@ func (ns *Namespace) Validate() error {
 type NamespaceList struct {
 
 	// List of namespaces.
-	Namespaces []NamespaceSummary `codec:"namespaces"`
+	Namespaces []NamespaceSummary `json:"namespaces"`
 }
 
 // Validates the namespace list.

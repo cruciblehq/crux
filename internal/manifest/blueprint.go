@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Holds configuration specific to blueprint resources.
 //
@@ -14,20 +14,20 @@ type Blueprint struct {
 	// Each entry names a service from the registry. Services carry only
 	// an ID and a reference; affordances and configuration come from the
 	// service manifest fetched during the build.
-	Services []Ref `codec:"services"`
+	Services []Ref `json:"services"`
 
 	// Gateway routing configuration.
 	//
 	// Maps URL path patterns to service IDs. Services without a route
 	// still run but do not receive external traffic.
-	Gateway Gateway `codec:"gateway"`
+	Gateway Gateway `json:"gateway"`
 
 	// Named environment variable sets.
 	//
 	// Each environment provides concrete values for the config/env and
 	// config/secret affordances declared by services. Which environment
 	// to use is selected at build time.
-	Environments []Environment `codec:"environments,omitempty"`
+	Environments []Environment `json:"environments,omitempty"`
 }
 
 // Validates the blueprint configuration.

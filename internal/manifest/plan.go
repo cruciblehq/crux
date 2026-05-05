@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Current plan format version.
 const PlanVersion = 0
@@ -11,12 +11,12 @@ const PlanVersion = 0
 // required to run them. Generated during the planning phase by resolving
 // references, allocating infrastructure, and determining routing.
 type Plan struct {
-	Version      int           `codec:"version"`                // Version of the plan format.
-	Services     []Ref         `codec:"services"`               // Services included in the deployment.
-	Compute      []Compute     `codec:"compute"`                // Compute resources to provision.
-	Environments []Environment `codec:"environments,omitempty"` // Environment variable sets for service configuration.
-	Containers   []Container   `codec:"containers"`             // Containers to deploy.
-	Gateway      Gateway       `codec:"gateway"`                // Gateway routing configuration.
+	Version      int           `json:"version"`                // Version of the plan format.
+	Services     []Ref         `json:"services"`               // Services included in the deployment.
+	Compute      []Compute     `json:"compute"`                // Compute resources to provision.
+	Environments []Environment `json:"environments,omitempty"` // Environment variable sets for service configuration.
+	Containers   []Container   `json:"containers"`             // Containers to deploy.
+	Gateway      Gateway       `json:"gateway"`                // Gateway routing configuration.
 }
 
 // Validates the plan.

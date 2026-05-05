@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/cruciblehq/crex"
+import "github.com/cruciblehq/crux/internal/crex"
 
 // Holds configuration specific to service resources.
 //
@@ -8,18 +8,18 @@ import "github.com/cruciblehq/crex"
 // systems by exposing an API. They build on top of a base image defined by
 // the embedded [Recipe], which specifies the source image and build steps.
 type Service struct {
-	Recipe `codec:",squash"`
+	Recipe `json:",squash"`
 
 	// Declared parameters for this service.
 	//
 	// Lists configuration values the service accepts at runtime. Values are
 	// bound through environment declarations.
-	Schema Schema `codec:"schema,omitempty"`
+	Schema Schema `json:"schema,omitempty"`
 
 	// Command to run when the container starts.
 	//
 	// Sets the entrypoint on the output image produced by the recipe.
-	Entrypoint []string `codec:"entrypoint,omitempty"`
+	Entrypoint []string `json:"entrypoint,omitempty"`
 }
 
 // Validates the service configuration.

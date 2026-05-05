@@ -4,7 +4,7 @@ package codec
 type Format int
 
 // The struct tag key used by all codec operations.
-const tag = "codec"
+const tag = "json"
 
 const (
 	JSON Format = iota // JSON serialization format.

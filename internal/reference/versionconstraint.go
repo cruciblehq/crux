@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 var (
@@ -125,7 +127,7 @@ func (vc *VersionConstraint) Intersect(other *VersionConstraint) (*VersionConstr
 func ParseVersionConstraint(s string) (*VersionConstraint, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return nil, wrap(ErrInvalidReference, ErrEmptyConstraint)
+		return nil, crex.Wrap(ErrInvalidReference, ErrEmptyConstraint)
 	}
 
 	vc := &VersionConstraint{}
@@ -134,18 +136,18 @@ func ParseVersionConstraint(s string) (*VersionConstraint, error) {
 	for _, orPart := range orParts {
 		orPart = strings.TrimSpace(orPart)
 		if orPart == "" {
-			return nil, wrap(ErrInvalidReference, ErrEmptyOrExpression)
+			return nil, crex.Wrap(ErrInvalidReference, ErrEmptyOrExpression)
 		}
 
 		group, err := parseConstraintGroup(orPart)
 		if err != nil {
-			return nil, wrap(ErrInvalidReference, err)
+			return nil, crex.Wrap(ErrInvalidReference, err)
 		}
 		vc.constraints = append(vc.constraints, group)
 	}
 
 	if len(vc.constraints) == 0 {
-		return nil, wrap(ErrInvalidReference, ErrEmptyConstraint)
+		return nil, crex.Wrap(ErrInvalidReference, ErrEmptyConstraint)
 	}
 
 	return vc, nil
@@ -159,7 +161,7 @@ func ParseVersionConstraint(s string) (*VersionConstraint, error) {
 func parseConstraintGroup(s string) (constraintGroup, error) {
 	tokens := strings.Fields(s)
 	if len(tokens) == 0 {
-		return constraintGroup{}, wrap(ErrInvalidReference, ErrEmptyConstraintGroup)
+		return constraintGroup{}, crex.Wrap(ErrInvalidReference, ErrEmptyConstraintGroup)
 	}
 
 	constraints, err := parseTokens(tokens)
@@ -202,12 +204,12 @@ func parseTokens(tokens []string) ([]constraint, error) {
 		if i+2 < len(tokens) && isHyphenOperator(tokens[i+1]) {
 			lower, err := parseRangeBound(">=", tokens[i])
 			if err != nil {
-				return nil, wrap(ErrInvalidReference, ErrInvalidRangeBound)
+				return nil, crex.Wrap(ErrInvalidReference, ErrInvalidRangeBound)
 			}
 
 			upper, err := parseRangeBound("<=", tokens[i+2])
 			if err != nil {
-				return nil, wrap(ErrInvalidReference, ErrInvalidRangeBound)
+				return nil, crex.Wrap(ErrInvalidReference, ErrInvalidRangeBound)
 			}
 
 			constraints = append(constraints, lower, upper)
@@ -237,23 +239,23 @@ func validateHyphenPositions(tokens []string) error {
 		}
 
 		if i == 0 {
-			return wrap(ErrInvalidReference, ErrLeadingHyphen)
+			return crex.Wrap(ErrInvalidReference, ErrLeadingHyphen)
 		}
 
 		if i == len(tokens)-1 {
-			return wrap(ErrInvalidReference, ErrTrailingHyphen)
+			return crex.Wrap(ErrInvalidReference, ErrTrailingHyphen)
 		}
 
 		if isHyphenOperator(tokens[i-1]) || isHyphenOperator(tokens[i+1]) {
-			return wrap(ErrInvalidReference, ErrConsecutiveHyphens)
+			return crex.Wrap(ErrInvalidReference, ErrConsecutiveHyphens)
 		}
 
 		if startsWithOperator(tokens[i-1]) {
-			return wrap(ErrInvalidReference, ErrHyphenWithOperator)
+			return crex.Wrap(ErrInvalidReference, ErrHyphenWithOperator)
 		}
 
 		if startsWithOperator(tokens[i+1]) {
-			return wrap(ErrInvalidReference, ErrHyphenWithOperator)
+			return crex.Wrap(ErrInvalidReference, ErrHyphenWithOperator)
 		}
 	}
 
@@ -278,11 +280,11 @@ func startsWithOperator(s string) bool {
 // allowed in range bounds.
 func parseRangeBound(op, version string) (constraint, error) {
 	if startsWithOperator(version) {
-		return constraint{}, wrap(ErrInvalidReference, ErrRangeBoundWithOperator)
+		return constraint{}, crex.Wrap(ErrInvalidReference, ErrRangeBoundWithOperator)
 	}
 
 	if strings.Contains(version, "x") || strings.Contains(version, "X") {
-		return constraint{}, wrap(ErrInvalidReference, ErrRangeBoundWithWildcard)
+		return constraint{}, crex.Wrap(ErrInvalidReference, ErrRangeBoundWithWildcard)
 	}
 
 	return parseSingleConstraint(op, version)
@@ -294,7 +296,7 @@ func parseRangeBound(op, version string) (constraint, error) {
 // wildcard versions (1.x, 1.2.x). Bare wildcards (*) are not allowed.
 func parseConstraint(s string) (constraint, error) {
 	if s == "*" {
-		return constraint{}, wrap(ErrInvalidReference, ErrBareWildcard)
+		return constraint{}, crex.Wrap(ErrInvalidReference, ErrBareWildcard)
 	}
 
 	// Handle x wildcards
@@ -305,7 +307,7 @@ func parseConstraint(s string) (constraint, error) {
 	// Extract operator
 	match := operatorPattern.FindStringSubmatch(s)
 	if match == nil {
-		return constraint{}, wrap(ErrInvalidReference, ErrInvalidConstraintOperator)
+		return constraint{}, crex.Wrap(ErrInvalidReference, ErrInvalidConstraintOperator)
 	}
 
 	op := match[1]
@@ -331,19 +333,19 @@ func parseSingleConstraint(op, version string) (constraint, error) {
 
 	match := versionPattern.FindStringSubmatch(version)
 	if match == nil {
-		return c, wrap(ErrInvalidReference, ErrInvalidVersionFormat)
+		return c, crex.Wrap(ErrInvalidReference, ErrInvalidVersionFormat)
 	}
 
 	major, err := strconv.Atoi(match[1])
 	if err != nil {
-		return c, wrap(ErrInvalidReference, ErrInvalidMajorVersion)
+		return c, crex.Wrap(ErrInvalidReference, ErrInvalidMajorVersion)
 	}
 	c.major = major
 
 	if match[2] != "" {
 		minor, err := strconv.Atoi(match[2])
 		if err != nil {
-			return c, wrap(ErrInvalidReference, ErrInvalidMinorVersion)
+			return c, crex.Wrap(ErrInvalidReference, ErrInvalidMinorVersion)
 		}
 		c.minor = minor
 		c.minorSet = true
@@ -352,14 +354,14 @@ func parseSingleConstraint(op, version string) (constraint, error) {
 	if match[3] != "" {
 		patch, err := strconv.Atoi(match[3])
 		if err != nil {
-			return c, wrap(ErrInvalidReference, ErrInvalidPatchVersion)
+			return c, crex.Wrap(ErrInvalidReference, ErrInvalidPatchVersion)
 		}
 		c.patch = patch
 		c.patchSet = true
 	}
 
 	if match[4] != "" {
-		return c, wrap(ErrInvalidReference, ErrPrereleaseInConstraint)
+		return c, crex.Wrap(ErrInvalidReference, ErrPrereleaseInConstraint)
 	}
 
 	return c, nil
@@ -374,14 +376,14 @@ func parseSingleConstraint(op, version string) (constraint, error) {
 func validateWildcardFormat(s string) error {
 
 	if s == "" || s == "x" || s == "X" {
-		return wrap(ErrInvalidReference, ErrBareWildcard)
+		return crex.Wrap(ErrInvalidReference, ErrBareWildcard)
 	}
 
 	xCount := strings.Count(s, ".x") + strings.Count(s, ".X")
 	dotCount := strings.Count(s, ".")
 
 	if xCount > 1 || (xCount == 1 && dotCount > 2) {
-		return wrap(ErrInvalidReference, ErrMultipleWildcards)
+		return crex.Wrap(ErrInvalidReference, ErrMultipleWildcards)
 	}
 
 	return nil
@@ -398,7 +400,7 @@ func parseWildcard(s string) (constraint, error) {
 	if len(s) > 0 {
 		switch s[0] {
 		case '>', '<', '!', '~', '^':
-			return constraint{}, wrap(ErrInvalidReference, ErrWildcardWithOperator)
+			return constraint{}, crex.Wrap(ErrInvalidReference, ErrWildcardWithOperator)
 		case '=':
 			s = s[1:] // Strip explicit = prefix
 		}
@@ -420,7 +422,7 @@ func parseWildcard(s string) (constraint, error) {
 	if len(parts) >= 1 && parts[0] != "" {
 		major, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return c, wrap(ErrInvalidReference, ErrInvalidMajorVersion)
+			return c, crex.Wrap(ErrInvalidReference, ErrInvalidMajorVersion)
 		}
 		c.major = major
 	}
@@ -428,7 +430,7 @@ func parseWildcard(s string) (constraint, error) {
 	if len(parts) >= 2 && parts[1] != "" {
 		minor, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return c, wrap(ErrInvalidReference, ErrInvalidMinorVersion)
+			return c, crex.Wrap(ErrInvalidReference, ErrInvalidMinorVersion)
 		}
 		c.minor = minor
 		c.minorSet = true
@@ -479,7 +481,7 @@ func validateConstraintGroup(g constraintGroup) error {
 	}
 
 	if needsUpper && !hasUpper {
-		return wrap(ErrInvalidReference, ErrMissingUpperBound)
+		return crex.Wrap(ErrInvalidReference, ErrMissingUpperBound)
 	}
 
 	return nil

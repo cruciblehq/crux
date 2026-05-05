@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/registry"
 )

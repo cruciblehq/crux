@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/cache"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/reference"
 	"github.com/cruciblehq/crux/internal/registry"
 )
@@ -13,7 +13,7 @@ import (
 // Holds the output of a successful [Source.Pull] call.
 //
 // Digest and Size always reflect the archive content regardless of whether
-// it was freshly downloaded or already present in the cache.
+// it was newly downloaded or already present in the cache.
 type PullResult struct {
 	Namespace string // Namespace name.
 	Resource  string // Resource name.

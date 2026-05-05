@@ -7,7 +7,7 @@ import (
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 )
 
@@ -76,52 +76,52 @@ func TestMergeNilCapIsNoOp(t *testing.T) {
 
 func TestBuildRejectsWhere(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{
+	g := aegis.Model{
 		Subsystem: "cap",
-		Args:      []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}},
-		Where:     &grant.CompareExpr{},
+		Args:      []aegis.Arg{{Type: aegis.ArgName, Value: "net_admin"}},
+		Where:     &aegis.CompareExpr{},
 	}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildRejectsKwargs(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{
+	g := aegis.Model{
 		Subsystem: "cap",
-		Args:      []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}},
-		Kwargs:    []grant.Kwarg{{Key: "k", Value: grant.Arg{Type: grant.ArgName, Value: "v"}}},
+		Args:      []aegis.Arg{{Type: aegis.ArgName, Value: "net_admin"}},
+		Kwargs:    []aegis.Kwarg{{Key: "k", Value: aegis.Arg{Type: aegis.ArgName, Value: "v"}}},
 	}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildRejectsMissingArgs(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{Subsystem: "cap"}); !errors.Is(err, ErrInvalidGrant) {
+	if err := sub.Build(&aegis.Model{Subsystem: "cap"}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildRejectsTooManyArgs(t *testing.T) {
 	sub, _ := newSub()
-	g := grant.Grant{Subsystem: "cap", Args: []grant.Arg{
-		{Type: grant.ArgName, Value: "net_admin"},
-		{Type: grant.ArgName, Value: "full"},
-		{Type: grant.ArgName, Value: "extra"},
+	g := aegis.Model{Subsystem: "cap", Args: []aegis.Arg{
+		{Type: aegis.ArgName, Value: "net_admin"},
+		{Type: aegis.ArgName, Value: "full"},
+		{Type: aegis.ArgName, Value: "extra"},
 	}}
-	if err := sub.Build(g); !errors.Is(err, ErrInvalidGrant) {
+	if err := sub.Build(&g); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
 }
 
 func TestBuildRejectsUnknownCap(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{
+	if err := sub.Build(&aegis.Model{
 		Subsystem: "cap",
-		Args:      []grant.Arg{{Type: grant.ArgName, Value: "not_a_cap"}},
+		Args:      []aegis.Arg{{Type: aegis.ArgName, Value: "not_a_cap"}},
 	}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
 	}
@@ -129,11 +129,11 @@ func TestBuildRejectsUnknownCap(t *testing.T) {
 
 func TestBuildRejectsUnknownMode(t *testing.T) {
 	sub, _ := newSub()
-	if err := sub.Build(grant.Grant{
+	if err := sub.Build(&aegis.Model{
 		Subsystem: "cap",
-		Args: []grant.Arg{
-			{Type: grant.ArgName, Value: "net_admin"},
-			{Type: grant.ArgName, Value: "bogus"},
+		Args: []aegis.Arg{
+			{Type: aegis.ArgName, Value: "net_admin"},
+			{Type: aegis.ArgName, Value: "bogus"},
 		},
 	}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v, want ErrInvalidGrant", err)
@@ -142,11 +142,11 @@ func TestBuildRejectsUnknownMode(t *testing.T) {
 
 func TestBuildEffectiveMode(t *testing.T) {
 	sub, caps := newSub()
-	if err := sub.Build(grant.Grant{
+	if err := sub.Build(&aegis.Model{
 		Subsystem: "cap",
-		Args: []grant.Arg{
-			{Type: grant.ArgName, Value: "chown"},
-			{Type: grant.ArgName, Value: "effective"},
+		Args: []aegis.Arg{
+			{Type: aegis.ArgName, Value: "chown"},
+			{Type: aegis.ArgName, Value: "effective"},
 		},
 	}); err != nil {
 		t.Fatalf("Build: %v", err)
@@ -161,11 +161,11 @@ func TestBuildEffectiveMode(t *testing.T) {
 
 func TestBuildIdempotent(t *testing.T) {
 	sub, caps := newSub()
-	g := grant.Grant{Subsystem: "cap", Args: []grant.Arg{{Type: grant.ArgName, Value: "net_admin"}}}
-	if err := sub.Build(g); err != nil {
+	g := aegis.Model{Subsystem: "cap", Args: []aegis.Arg{{Type: aegis.ArgName, Value: "net_admin"}}}
+	if err := sub.Build(&g); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	if err := sub.Build(g); err != nil {
+	if err := sub.Build(&g); err != nil {
 		t.Fatalf("Build re: %v", err)
 	}
 	if len(caps.Effective) != 1 {

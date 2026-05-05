@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 )
 
 // Identifier of a runtime subsystem.
@@ -37,7 +37,7 @@ type Subsystem interface {
 	//
 	// Subsystems must check the grant's syntax and semantics and return an
 	// error if the grant is invalid or cannot be applied.
-	Build(g grant.Grant) error
+	Build(p *aegis.Model) error
 
 	// Folds the matching section of src into the wired-in section.
 	//

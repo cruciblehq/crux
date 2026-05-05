@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/archive"
 	"github.com/cruciblehq/crux/internal/compute/internal/provider"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/paths"
 )
 

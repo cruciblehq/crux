@@ -3,9 +3,9 @@ package resource
 import (
 	"context"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
-	"github.com/cruciblehq/crux/internal/resource/subsystem"
+	"github.com/cruciblehq/crux/internal/runtime"
 )
 
 // [Builder] for Crucible affordances.
@@ -30,19 +30,14 @@ type AffordanceBuilder struct {
 	// subsystem knows how to build grants for its domain and apply them at
 	// runtime. The builder delegates to subsystems when building domain
 	// grants during resolution.
-	subsystems map[subsystem.Domain]subsystem.Subsystem
+	builder *runtime.Builder
 }
 
 // Returns an [AffordanceBuilder] configured with the given source.
 func NewAffordanceBuilder(source Source) *AffordanceBuilder {
 	return &AffordanceBuilder{
-		source: source,
-		subsystems: map[subsystem.Domain]subsystem.Subsystem{
-			subsystem.DomainSeccomp: &subsystem.SeccompSubsystem{},
-			subsystem.DomainCap:     &subsystem.CapsSubsystem{},
-			subsystem.DomainFcap:    &subsystem.FcapsSubsystem{},
-			subsystem.DomainCgroup:  &subsystem.CgroupSubsystem{},
-		},
+		source:  source,
+		builder: runtime.NewBuilder(),
 	}
 }
 
@@ -104,7 +99,7 @@ func (ab *AffordanceBuilder) resolve(ctx context.Context, scopes []manifest.Gran
 
 	for _, scope := range scopes {
 		for _, g := range scope.Grants {
-			if g.Subsystem == "" {
+			if g.IsRef() {
 				ref, err := ab.resolveReference(ctx, g, scope.Platform)
 				if err != nil {
 					return nil, err
@@ -149,9 +144,10 @@ func (ab *AffordanceBuilder) resolveReference(ctx context.Context, g manifest.Gr
 	if platform != "" {
 		return nil, crex.Wrapf(manifest.ErrInvalidAffordance, "references cannot appear in platform-scoped grants")
 	}
-	aff, _, err := pullAffordance(ctx, ab.source, g.Expr)
+	target := g.RefTarget()
+	aff, _, err := pullAffordance(ctx, ab.source, target)
 	if err != nil {
-		return nil, crex.Wrapf(ErrResolutionFailed, "pull %s: %w", g.Expr, err)
+		return nil, crex.Wrapf(ErrResolutionFailed, "pull %s: %w", target, err)
 	}
 	return aff.Scopes, nil
 }
@@ -175,24 +171,18 @@ func mergeScopes(dst, src []manifest.GrantScope) []manifest.GrantScope {
 
 // Builds a domain grant by routing to the appropriate subsystem.
 //
-// The subsystem validates, normalizes, and expands the grant. Returns
-// an error for unknown domains.
-func (ab *AffordanceBuilder) buildGrant(ctx context.Context, g manifest.Grant) ([]manifest.Grant, error) {
-	sub, ok := ab.subsystems[subsystem.Domain(g.Subsystem)]
-	if !ok {
-		return nil, crex.Wrapf(ErrResolutionFailed, "unknown domain %q", g.Subsystem)
-	}
-	grants, err := sub.Build(ctx, subsystem.Domain(g.Subsystem), g)
+// Parses the grant source into an AST and dispatches to the matching
+// subsystem builder. Returns an error for unparseable sources or unknown
+// subsystems.
+func (ab *AffordanceBuilder) buildGrant(_ context.Context, g manifest.Grant) ([]manifest.Grant, error) {
+	parsed, err := g.Parse()
 	if err != nil {
-		return nil, crex.Wrapf(ErrResolutionFailed, "build %s: %w", g.Subsystem, err)
+		return nil, crex.Wrapf(ErrResolutionFailed, "parse %q: %w", g.Source, err)
 	}
-
-	// Sanity check: each returned grant must have the same Subsystem as the input.
-	for i := range grants {
-		crex.Assertf(grants[i].Subsystem == g.Subsystem, "subsystem %q returned grant with subsystem %q", g.Subsystem, grants[i].Subsystem)
+	if err := ab.builder.Build(parsed); err != nil {
+		return nil, crex.Wrapf(ErrResolutionFailed, "build %s: %w", parsed.Subsystem, err)
 	}
-
-	return grants, nil
+	return []manifest.Grant{g}, nil
 }
 
 // Pulls an affordance resource and extracts its configuration.

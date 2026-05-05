@@ -1,6 +1,6 @@
 // Package codec provides format-neutral encoding and decoding.
 //
-// All types in the project carry a single codec:"name" struct tag. The codec
+// All types in the project carry a single json:"name" struct tag. The codec
 // package converts between Go values and byte representations in JSON or YAML
 // using mapstructure as the struct-to-map bridge and standard library encoders
 // for the final byte format.
@@ -36,7 +36,7 @@
 //
 // Struct fields may declare a default value in their tag:
 //
-//	Weight uint16 `codec:"weight,default=100"`
+//	Weight uint16 `json:"weight,default=100"`
 //
 // Defaults are applied only when the field's key is absent from the source
 // map. Explicitly provided values, including zero, are never overwritten.

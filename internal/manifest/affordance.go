@@ -1,8 +1,8 @@
 package manifest
 
 import (
-	"github.com/cruciblehq/crex"
 	"github.com/cruciblehq/crux/internal/codec"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Holds configuration specific to affordance resources.
@@ -18,7 +18,7 @@ type Affordance struct {
 	// Lists the named arguments the affordance accepts. When [Schema.Default]
 	// is set, scalar values passed by a caller are assigned to that parameter
 	// instead of requiring an explicit key. Zero value means no parameters.
-	Schema Schema `codec:"schema,omitempty"`
+	Schema Schema `json:"schema,omitempty"`
 
 	// Grant scopes.
 	//
@@ -26,7 +26,7 @@ type Affordance struct {
 	// live in a scope with an empty Platform. Custom Encode flattens
 	// universal grants into the top-level list; platform-scoped grants
 	// are written as platform group entries.
-	Scopes []GrantScope `codec:"-"`
+	Scopes []GrantScope `json:"-"`
 }
 
 // Validates the affordance configuration.

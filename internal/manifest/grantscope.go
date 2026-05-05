@@ -1,8 +1,7 @@
 package manifest
 
 import (
-	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal/codec"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // Groups [Grant] values under a shared platform constraint.
@@ -21,14 +20,13 @@ type GrantScope struct {
 	// format is "os/arch" (e.g. "linux/amd64") and the grants apply only
 	// to matching platforms. The builder groups grants under scopes based
 	// on their platform selectors.
-	Platform string `codec:"platform,omitempty"`
+	Platform string `json:"platform,omitempty"`
 
 	// Grants within this scope.
 	//
-	// Each grant targets a subsystem domain and carries its expression and
-	// optional arguments. The builder produces scopes by grouping grants
-	// with the same platform selector together.
-	Grants []Grant `codec:"grants,omitempty"`
+	// Each grant targets a subsystem and carries its expression. The builder
+	// produces scopes by grouping grants with the same platform selector.
+	Grants []Grant `json:"grants,omitempty"`
 }
 
 // Validates the scope.
@@ -50,15 +48,26 @@ func (gs *GrantScope) Validate() error {
 // one map per grant, suitable for flattening into the parent list.
 func (gs *GrantScope) Encode() (any, error) {
 	if gs.Platform != "" {
-		return codec.ToMap(*gs)
+		entries := make([]any, 0, len(gs.Grants))
+		for i := range gs.Grants {
+			ge, err := gs.Grants[i].Encode()
+			if err != nil {
+				return nil, err
+			}
+			entries = append(entries, ge)
+		}
+		return map[string]any{
+			"platform": gs.Platform,
+			"grants":   entries,
+		}, nil
 	}
 	entries := make([]any, 0, len(gs.Grants))
-	for _, g := range gs.Grants {
-		gm, err := codec.ToMap(g)
+	for i := range gs.Grants {
+		ge, err := gs.Grants[i].Encode()
 		if err != nil {
 			return nil, err
 		}
-		entries = append(entries, gm)
+		entries = append(entries, ge)
 	}
 	return entries, nil
 }

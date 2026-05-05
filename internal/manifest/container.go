@@ -6,10 +6,10 @@ package manifest
 // an environment variable set. Grants holds the resolved grants produced
 // during plan resolution.
 type Container struct {
-	Service     string  `codec:"service"`               // Service ID to run in this container.
-	Compute     string  `codec:"compute"`               // Compute resource ID to run the container on.
-	Environment string  `codec:"environment,omitempty"` // Environment set ID to inject (optional).
-	Grants      []Grant `codec:"grants,omitempty"`      // Resolved grants for this container.
+	Service     string  `json:"service"`               // Service ID to run in this container.
+	Compute     string  `json:"compute"`               // Compute resource ID to run the container on.
+	Environment string  `json:"environment,omitempty"` // Environment set ID to inject (optional).
+	Grants      []Grant `json:"grants,omitempty"`      // Resolved grants for this container.
 }
 
 // Validates that the container references a service and compute resource.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/cruciblehq/crex"
+	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/manifest"
 )
 
@@ -52,6 +52,7 @@ type Builder interface {
 type Options struct {
 	DefaultRegistry  string // Fallback registry for unqualified references.
 	DefaultNamespace string // Fallback namespace for unqualified references.
+	Environment      string // Blueprint environment to build against.
 }
 
 // Creates a new [Options] with the given defaults.
@@ -100,7 +101,7 @@ func ResolveBuilder(ctx context.Context, manifestPath string, opts Options) (*ma
 		b = NewAffordanceBuilder(source)
 
 	case manifest.TypeBlueprint:
-		b = NewBlueprintBuilder(source, "")
+		b = NewBlueprintBuilder(source, opts.Environment)
 
 	default:
 		return nil, nil, crex.Wrapf(ErrResolveBuilder, "resource type %q is not supported", man.Resource.Type)

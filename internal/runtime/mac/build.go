@@ -3,7 +3,7 @@ package mac
 import (
 	"github.com/cruciblehq/crux/internal/crex"
 
-	"github.com/cruciblehq/crux/internal/manifest/grant"
+	"github.com/cruciblehq/crux/internal/aegis"
 	"github.com/cruciblehq/crux/internal/runtime/shared"
 	"github.com/cruciblehq/crux/internal/runtime/shared/macspec"
 )
@@ -28,11 +28,11 @@ func (s *Subsystem) Name() shared.Name {
 // Applies a parsed grant to the wired-in section.
 //
 // The grant has the form ".mac HOOK [where EXPR]".
-func (s *Subsystem) Build(g grant.Grant) error {
-	if err := check(&g); err != nil {
+func (s *Subsystem) Build(g *aegis.Model) error {
+	if err := check(g); err != nil {
 		return err
 	}
-	allow, err := parse(&g)
+	allow, err := parse(g)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (s *Subsystem) Merge(src shared.Spec) error {
 }
 
 // Validates the grant's structural shape against what the mac subsystem accepts.
-func check(g *grant.Grant) error {
+func check(g *aegis.Model) error {
 	if len(g.Kwargs) != 0 {
 		return crex.Wrapf(ErrCompile, "unexpected keyword arguments in mac expression")
 	}
@@ -68,9 +68,9 @@ func check(g *grant.Grant) error {
 // well-formed and references only fields available on the hook. Does not check
 // for semantic validity of the where clause beyond field reference checks;
 // the resulting Allow may still be rejected by the ward-lsm runtime.
-func parse(g *grant.Grant) (*macspec.Allow, error) {
+func parse(g *aegis.Model) (*macspec.Allow, error) {
 	hookArg := g.Args[0]
-	if hookArg.Type != grant.ArgName {
+	if hookArg.Type != aegis.ArgName {
 		return nil, crex.Wrapf(ErrCompile, "expected name as hook in mac expression")
 	}
 	hook := catalog().LookupHook(hookArg.Value)
@@ -90,21 +90,21 @@ func parse(g *grant.Grant) (*macspec.Allow, error) {
 
 // Translates a grant expression tree into a MAC expression tree, validating
 // field references against the hook schema.
-func translateExpr(expr grant.Expr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateExpr(expr aegis.Expr, hook *macspec.Hook) (*macspec.Expr, error) {
 	switch e := expr.(type) {
-	case *grant.BinaryExpr:
+	case *aegis.BinaryExpr:
 		return translateBinary(e, hook)
-	case *grant.UnaryExpr:
+	case *aegis.UnaryExpr:
 		return translateUnary(e, hook)
-	case *grant.CompareExpr:
+	case *aegis.CompareExpr:
 		return translateCompare(e, hook)
-	case *grant.InExpr:
+	case *aegis.InExpr:
 		return translateIn(e, hook)
-	case *grant.LikeExpr:
+	case *aegis.LikeExpr:
 		return translateLike(e, hook)
-	case *grant.BetweenExpr:
+	case *aegis.BetweenExpr:
 		return translateBetween(e, hook)
-	case *grant.BitTestExpr:
+	case *aegis.BitTestExpr:
 		return translateBitTest(e, hook)
 	default:
 		return nil, crex.Wrapf(ErrCompile, "unknown expression type %T", expr)
@@ -112,7 +112,7 @@ func translateExpr(expr grant.Expr, hook *macspec.Hook) (*macspec.Expr, error) {
 }
 
 // Translates a binary boolean expression (and/or).
-func translateBinary(e *grant.BinaryExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateBinary(e *aegis.BinaryExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	left, err := translateExpr(e.Left, hook)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func translateBinary(e *grant.BinaryExpr, hook *macspec.Hook) (*macspec.Expr, er
 }
 
 // Translates a unary boolean expression (not).
-func translateUnary(e *grant.UnaryExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateUnary(e *aegis.UnaryExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	operand, err := translateExpr(e.Operand, hook)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func translateUnary(e *grant.UnaryExpr, hook *macspec.Hook) (*macspec.Expr, erro
 }
 
 // Translates a comparison expression and verifies operand type compatibility.
-func translateCompare(e *grant.CompareExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateCompare(e *aegis.CompareExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	lhs, err := translateOperand(e.Left, hook)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func translateCompare(e *grant.CompareExpr, hook *macspec.Hook) (*macspec.Expr, 
 }
 
 // Translates an "in" set-membership expression.
-func translateIn(e *grant.InExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateIn(e *aegis.InExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	field, err := translateOperand(e.Field, hook)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func translateIn(e *grant.InExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 }
 
 // Translates a "like" pattern match, requiring a string-typed field.
-func translateLike(e *grant.LikeExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateLike(e *aegis.LikeExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	field, err := translateOperand(e.Field, hook)
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func translateLike(e *grant.LikeExpr, hook *macspec.Hook) (*macspec.Expr, error)
 }
 
 // Translates a "between" range expression, requiring a numeric field.
-func translateBetween(e *grant.BetweenExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateBetween(e *aegis.BetweenExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	field, err := translateOperand(e.Field, hook)
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func translateBetween(e *grant.BetweenExpr, hook *macspec.Hook) (*macspec.Expr, 
 }
 
 // Translates a bitwise mask test, requiring a numeric field.
-func translateBitTest(e *grant.BitTestExpr, hook *macspec.Hook) (*macspec.Expr, error) {
+func translateBitTest(e *aegis.BitTestExpr, hook *macspec.Hook) (*macspec.Expr, error) {
 	field, err := translateOperand(e.Field, hook)
 	if err != nil {
 		return nil, err
@@ -218,7 +218,7 @@ func translateBitTest(e *grant.BitTestExpr, hook *macspec.Hook) (*macspec.Expr, 
 }
 
 // Verifies that op, when it references a field, has the expected scalar type.
-func requireFieldType(op grant.Operand, hook *macspec.Hook, want macspec.FieldType, label string) error {
+func requireFieldType(op aegis.Operand, hook *macspec.Hook, want macspec.FieldType, label string) error {
 	if !op.IsField {
 		return nil
 	}
@@ -234,7 +234,7 @@ func requireFieldType(op grant.Operand, hook *macspec.Hook, want macspec.FieldTy
 }
 
 // Translates a grant operand into a MAC value, validating field references.
-func translateOperand(op grant.Operand, hook *macspec.Hook) (*macspec.Value, error) {
+func translateOperand(op aegis.Operand, hook *macspec.Hook) (*macspec.Value, error) {
 	if op.IsField {
 		f, ok := hook.Fields[op.Field]
 		if !ok {
@@ -246,11 +246,11 @@ func translateOperand(op grant.Operand, hook *macspec.Hook) (*macspec.Value, err
 		return &macspec.Value{IsField: true, Field: op.Field}, nil
 	}
 	switch op.Value.Type {
-	case grant.ValueInt:
+	case aegis.ValueInt:
 		return &macspec.Value{IntVal: op.Value.Int}, nil
-	case grant.ValueStr:
+	case aegis.ValueStr:
 		return &macspec.Value{StrVal: op.Value.Str}, nil
-	case grant.ValueVar:
+	case aegis.ValueVar:
 		return nil, crex.Wrapf(ErrCompile, "variable references are not supported in mac filters")
 	default:
 		return nil, crex.Wrapf(ErrCompile, "unsupported operand value")
@@ -258,7 +258,7 @@ func translateOperand(op grant.Operand, hook *macspec.Hook) (*macspec.Value, err
 }
 
 // Verifies that two operands have compatible value types.
-func checkTypeCompat(left, right grant.Operand, hook *macspec.Hook) error {
+func checkTypeCompat(left, right aegis.Operand, hook *macspec.Hook) error {
 	lt := resolveType(left, hook)
 	rt := resolveType(right, hook)
 	if lt == nil || rt == nil {
@@ -272,7 +272,7 @@ func checkTypeCompat(left, right grant.Operand, hook *macspec.Hook) error {
 
 // Returns the inferred field type of an operand, or nil if it cannot be
 // determined.
-func resolveType(op grant.Operand, hook *macspec.Hook) *macspec.FieldType {
+func resolveType(op aegis.Operand, hook *macspec.Hook) *macspec.FieldType {
 	if op.IsField {
 		f, ok := hook.Fields[op.Field]
 		if !ok {
@@ -281,10 +281,10 @@ func resolveType(op grant.Operand, hook *macspec.Hook) *macspec.FieldType {
 		return &f.Type
 	}
 	switch op.Value.Type {
-	case grant.ValueInt:
+	case aegis.ValueInt:
 		t := macspec.TypeUint64
 		return &t
-	case grant.ValueStr:
+	case aegis.ValueStr:
 		t := macspec.TypeString
 		return &t
 	default:
