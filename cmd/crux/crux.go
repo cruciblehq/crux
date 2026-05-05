@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cruciblehq/crex"
-	"github.com/cruciblehq/crux/internal"
-	"github.com/cruciblehq/crux/internal/cli"
+	"github.com/cruciblehq/crux/cmd/crux/internal"
+	"github.com/cruciblehq/crux/cmd/crux/internal/cli"
+	"github.com/cruciblehq/crux/internal/crex"
 )
 
 // The entry point for the Crux CLI application.
@@ -29,19 +29,8 @@ func main() {
 		"args", os.Args,
 	)
 
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
+	ctx, stop := setUpSignalHandler()
 	defer stop()
-
-	// Restore default signal behaviour after the first cancellation so a
-	// second CTRL-C terminates the process immediately.
-	go func() {
-		<-ctx.Done()
-		stop()
-	}()
 
 	if err := cli.Execute(ctx); err != nil {
 		slog.Error(err.Error())
@@ -59,7 +48,31 @@ func logger() *slog.Logger {
 	return slog.New(handler.WithGroup(internal.Name))
 }
 
+// Sets up a signal handler.
+//
+// The handler cancels a context on the first SIGINT or SIGTERM received. After
+// the first signal, default behaviour is restored so a second signal terminates
+// the process immediately.
+func setUpSignalHandler() (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
+	// Restore default behaviour on second signal.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+
+	return ctx, stop
+}
+
 // Returns the log level derived from build-time linker flags.
+//
+// Debug builds default to debug level, quiet builds default to warn level, and
+// all others default to info level.
 func logLevel() slog.Level {
 	if internal.IsDebug() {
 		return slog.LevelDebug
