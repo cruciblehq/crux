@@ -9,7 +9,7 @@ import "github.com/cruciblehq/crux/internal/crex"
 // packages, copying configuration files, setting environment variables, etc.)
 // to produce a base that service resources build on top of.
 type Runtime struct {
-	Recipe `json:",squash"`
+	Recipe
 
 	// Declared parameters for this runtime.
 	//

@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"errors"
+	"maps"
 	"testing"
 )
 
@@ -160,86 +161,70 @@ func TestManifestDecodeUnknownResourceType(t *testing.T) {
 	}
 }
 
-func TestManifestDecodeAllResourceTypes(t *testing.T) {
-	cases := []struct {
-		typ    ResourceType
-		extra  map[string]any
-		assert func(t *testing.T, m *Manifest)
-	}{
-		{
-			typ:   TypeRuntime,
-			extra: map[string]any{"stages": []any{map[string]any{"steps": []any{map[string]any{"run": "x"}}}}},
-			assert: func(t *testing.T, m *Manifest) {
-				if _, ok := m.Config.(*Runtime); !ok {
-					t.Fatalf("config = %T, want *Runtime", m.Config)
-				}
-			},
-		},
-		{
-			typ: TypeService,
-			extra: map[string]any{
-				"stages":     []any{map[string]any{"steps": []any{map[string]any{"run": "x"}}}},
-				"entrypoint": []any{"/bin/run"},
-			},
-			assert: func(t *testing.T, m *Manifest) {
-				if _, ok := m.Config.(*Service); !ok {
-					t.Fatalf("config = %T, want *Service", m.Config)
-				}
-			},
-		},
-		{
-			typ:   TypeTemplate,
-			extra: map[string]any{},
-			assert: func(t *testing.T, m *Manifest) {
-				if _, ok := m.Config.(*Template); !ok {
-					t.Fatalf("config = %T, want *Template", m.Config)
-				}
-			},
-		},
-		{
-			typ:   TypeAffordance,
-			extra: map[string]any{"grants": []any{".cap effective net_admin"}},
-			assert: func(t *testing.T, m *Manifest) {
-				a, ok := m.Config.(*Affordance)
-				if !ok {
-					t.Fatalf("config = %T, want *Affordance", m.Config)
-				}
-				if len(a.Scopes) != 1 || len(a.Scopes[0].Grants) != 1 {
-					t.Fatalf("scopes = %+v", a.Scopes)
-				}
-			},
-		},
-		{
-			typ: TypeBlueprint,
-			extra: map[string]any{
-				"services": []any{map[string]any{"id": "svc", "ref": "ns/x"}},
-				"gateway":  map[string]any{},
-			},
-			assert: func(t *testing.T, m *Manifest) {
-				if _, ok := m.Config.(*Blueprint); !ok {
-					t.Fatalf("config = %T, want *Blueprint", m.Config)
-				}
-			},
+func decodeManifest(t *testing.T, typ ResourceType, extra map[string]any) *Manifest {
+	t.Helper()
+	raw := map[string]any{
+		"version": 0,
+		"resource": map[string]any{
+			"type":    string(typ),
+			"name":    "ns/x",
+			"version": "1.0.0",
 		},
 	}
-	for _, tc := range cases {
-		raw := map[string]any{
-			"version": 0,
-			"resource": map[string]any{
-				"type":    string(tc.typ),
-				"name":    "ns/x",
-				"version": "1.0.0",
-			},
-		}
-		for k, v := range tc.extra {
-			raw[k] = v
-		}
-		var m Manifest
-		if err := m.Decode(raw); err != nil {
-			t.Errorf("type %s: %v", tc.typ, err)
-			continue
-		}
-		tc.assert(t, &m)
+	maps.Copy(raw, extra)
+	var m Manifest
+	if err := m.Decode(raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return &m
+}
+
+func TestManifestDecodeRuntime(t *testing.T) {
+	m := decodeManifest(t, TypeRuntime, map[string]any{
+		"stages": []any{map[string]any{"steps": []any{map[string]any{"run": "x"}}}},
+	})
+	if _, ok := m.Config.(*Runtime); !ok {
+		t.Fatalf("config = %T, want *Runtime", m.Config)
+	}
+}
+
+func TestManifestDecodeService(t *testing.T) {
+	m := decodeManifest(t, TypeService, map[string]any{
+		"stages":     []any{map[string]any{"steps": []any{map[string]any{"run": "x"}}}},
+		"entrypoint": []any{"/bin/run"},
+	})
+	if _, ok := m.Config.(*Service); !ok {
+		t.Fatalf("config = %T, want *Service", m.Config)
+	}
+}
+
+func TestManifestDecodeTemplate(t *testing.T) {
+	m := decodeManifest(t, TypeTemplate, nil)
+	if _, ok := m.Config.(*Template); !ok {
+		t.Fatalf("config = %T, want *Template", m.Config)
+	}
+}
+
+func TestManifestDecodeAffordance(t *testing.T) {
+	m := decodeManifest(t, TypeAffordance, map[string]any{
+		"grants": []any{".cap effective net_admin"},
+	})
+	a, ok := m.Config.(*Affordance)
+	if !ok {
+		t.Fatalf("config = %T, want *Affordance", m.Config)
+	}
+	if len(a.Scopes) != 1 || len(a.Scopes[0].Grants) != 1 {
+		t.Fatalf("scopes = %+v", a.Scopes)
+	}
+}
+
+func TestManifestDecodeBlueprint(t *testing.T) {
+	m := decodeManifest(t, TypeBlueprint, map[string]any{
+		"services": []any{map[string]any{"id": "svc", "ref": "ns/x"}},
+		"gateway":  map[string]any{},
+	})
+	if _, ok := m.Config.(*Blueprint); !ok {
+		t.Fatalf("config = %T, want *Blueprint", m.Config)
 	}
 }
 

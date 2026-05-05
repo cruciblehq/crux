@@ -10,8 +10,8 @@ type nested struct {
 }
 
 type squashed struct {
-	sample `json:",squash"`
-	Extra  string `json:"extra"`
+	sample
+	Extra string `json:"extra"`
 }
 
 type custom struct {

@@ -19,7 +19,7 @@ var errMachineProvisioning = errors.New("VM provisioning from derived images is 
 // is a no-op. Provisioning a new VM is not yet supported—VM images will be
 // derived from blueprint resolution rather than pulled as a standalone
 // machine resource.
-func ensureHostRunning(ctx context.Context, name string, source resource.Source) error {
+func ensureHostRunning(ctx context.Context, _ string, _ resource.Source) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
@@ -40,9 +40,6 @@ func ensureHostRunning(ctx context.Context, name string, source resource.Source)
 		return nil
 
 	case provider.StateNotProvisioned:
-		// TODO: VM images are now derived from blueprint resolution rather
-		// than pulled as a standalone machine resource. This path needs to
-		// accept a resolved VM image path from the plan layer.
 		return crex.Wrap(ErrHostStart, errMachineProvisioning)
 
 	default:

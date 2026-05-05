@@ -31,8 +31,8 @@ type Decodable interface {
 // Populates dst from a map.
 //
 // Field names are matched by the codec struct tag. Type coercions such as
-// string-to-int are applied automatically. Fields with a "default=X" tag
-// option receive that default when absent from the input. At each node in
+// string-to-int are applied automatically. Fields with a `default:"X"` tag
+// receive that default when absent from the input. At each node in
 // the type tree, if the target implements [Decodable], its Decode method
 // is called with the raw map.
 func Decode(src map[string]any, dst any) error {

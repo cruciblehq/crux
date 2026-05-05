@@ -46,8 +46,8 @@ func Encode(v any, f Format) ([]byte, error) {
 
 // Converts a struct to a map[string]any.
 //
-// Field names are determined by the codec struct tag. Embedded structs with
-// tag:",squash" are flattened into the parent map.
+// Field names are determined by the codec struct tag. Anonymous embedded
+// structs are flattened into the parent map.
 func ToMap(v any) (map[string]any, error) {
 	var m map[string]any
 	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{

@@ -6,6 +6,9 @@ type Format int
 // The struct tag key used by all codec operations.
 const tag = "json"
 
+// The struct tag key used to declare a field default.
+const defaultTag = "default"
+
 const (
 	JSON Format = iota // JSON serialization format.
 	YAML               // YAML serialization format.

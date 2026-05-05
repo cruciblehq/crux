@@ -28,7 +28,7 @@ func provision(ctx context.Context, name string, source resource.Source) error {
 //
 // The VM must have been provisioned already. containerd starts automatically
 // when the VM boots.
-func start(ctx context.Context, name string) error {
+func start(ctx context.Context, _ string) error {
 	state, err := hostStatus(ctx)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func start(ctx context.Context, name string) error {
 }
 
 // Stops the VM.
-func stop(ctx context.Context, name string) error {
+func stop(ctx context.Context, _ string) error {
 	state, err := hostStatus(ctx)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func stop(ctx context.Context, name string) error {
 }
 
 // Tears down the instance and destroys the VM.
-func deprovision(ctx context.Context, name string) error {
+func deprovision(ctx context.Context, _ string) error {
 	return destroyHost(ctx)
 }
 

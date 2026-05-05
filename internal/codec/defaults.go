@@ -46,7 +46,7 @@ func applyFieldDefault(field reflect.Value, sf reflect.StructField, src map[stri
 		}
 	}
 
-	def, ok := parseDefault(rawTag)
+	def, ok := sf.Tag.Lookup(defaultTag)
 	if !ok {
 		return nil
 	}
@@ -98,19 +98,6 @@ func deref(v reflect.Value) reflect.Value {
 		return v.Elem()
 	}
 	return v
-}
-
-// Extracts the default value from a codec struct tag.
-//
-// Splits the tag on commas and looks for an option prefixed with "default=".
-// Returns the value and true if found, or an empty string and false otherwise.
-func parseDefault(tag string) (string, bool) {
-	for _, opt := range strings.Split(tag, ",")[1:] {
-		if v, ok := strings.CutPrefix(opt, "default="); ok {
-			return v, true
-		}
-	}
-	return "", false
 }
 
 // Assigns a string default to a scalar reflect.Value.

@@ -14,7 +14,7 @@ type recipeBuilder struct {
 }
 
 // Builds a recipe by resolving sources and executing it against the runtime.
-func (b *recipeBuilder) build(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (*BuildResult, error) {
+func (b *recipeBuilder) build(_ context.Context, _ manifest.Manifest, _ *manifest.Recipe, _ string, _ []string) (*BuildResult, error) {
 	return nil, crex.ProgrammingError("build failed", "recipe execution not implemented").
 		Fallback("Recipe builds must be rewritten to execute remotely against the VM runtime.").
 		Err()

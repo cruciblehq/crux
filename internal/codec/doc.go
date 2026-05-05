@@ -36,7 +36,7 @@
 //
 // Struct fields may declare a default value in their tag:
 //
-//	Weight uint16 `json:"weight,default=100"`
+//	Weight uint16 `json:"weight" default:"100"`
 //
 // Defaults are applied only when the field's key is absent from the source
 // map. Explicitly provided values, including zero, are never overwritten.
