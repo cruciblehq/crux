@@ -54,3 +54,41 @@ func isQuantitySuffix(s string) bool {
 	_, ok := quantitySuffixes[QuantitySuffix(s)]
 	return ok
 }
+
+// Returns the integer scale factor for the suffix.
+//
+// Returns the factor and true for IEC binary suffixes (Ki–Ei, powers of 1024)
+// and SI decimal suffixes (k/K–E, powers of 1000). Returns zero and false for
+// sub-unit suffixes (m, u, n) and for any value not in the recognised set;
+// sub-unit suffixes represent fractions of the base unit and cannot be
+// expressed as an integer multiplier.
+func (s QuantitySuffix) Multiplier() (uint64, bool) {
+	switch s {
+	case SuffixKi:
+		return 1 << 10, true
+	case SuffixMi:
+		return 1 << 20, true
+	case SuffixGi:
+		return 1 << 30, true
+	case SuffixTi:
+		return 1 << 40, true
+	case SuffixPi:
+		return 1 << 50, true
+	case SuffixEi:
+		return 1 << 60, true
+	case SuffixKLower, SuffixK:
+		return 1_000, true
+	case SuffixM:
+		return 1_000_000, true
+	case SuffixG:
+		return 1_000_000_000, true
+	case SuffixT:
+		return 1_000_000_000_000, true
+	case SuffixP:
+		return 1_000_000_000_000_000, true
+	case SuffixE:
+		return 1_000_000_000_000_000_000, true
+	default:
+		return 0, false
+	}
+}

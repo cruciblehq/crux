@@ -168,40 +168,6 @@ func (p *parser) parseKwarg() (Kwarg, error) {
 	}, nil
 }
 
-// Builds an Arg from a NAME, INT, or STRING token.
-//
-// For string tokens, the surrounding quotes are stripped and recognised escape
-// sequences are resolved via Token.Unquote. For names and integers the source
-// text is used verbatim.
-func tokenToArg(tok Token) (Arg, error) {
-	switch tok.Type {
-	case TokenName:
-		return Arg{Type: ArgName, Value: tok.Text}, nil
-	case TokenInt:
-		return Arg{Type: ArgInt, Value: tok.Text}, nil
-	case TokenQuantity:
-		return Arg{Type: ArgQuantity, Value: tok.Text}, nil
-	case TokenString:
-		unquoted, err := tok.Unquote()
-		if err != nil {
-			return Arg{}, crex.Wrapf(ErrParse, "invalid string literal: %w", err)
-		}
-		enc, err := tokEncodingToAST(tok.Encoding)
-		if err != nil {
-			return Arg{}, crex.Wrapf(ErrParse, "invalid string encoding: %w", err)
-		}
-		argType := ArgStrASCII
-		if enc == StrUnicode {
-			argType = ArgStrUnicode
-		}
-		return Arg{Type: argType, Value: unquoted}, nil
-	case TokenVar:
-		return Arg{Type: ArgVar, Value: tok.Text}, nil
-	default:
-		return Arg{}, crex.Wrapf(ErrParse, "unsupported argument token %q", tok.Type)
-	}
-}
-
 // Entry point for expression parsing.
 //
 // Delegates directly to the or-expression level, which has the lowest
@@ -564,21 +530,7 @@ func (p *parser) expect(typ TokenType) (Token, error) {
 	return p.advance(), nil
 }
 
-// Maps a lexer string-token encoding to its AST counterpart.
-//
-// Returns an error for any encoding value that is not explicitly recognised.
-func tokEncodingToAST(enc TokenEncoding) (StrEncoding, error) {
-	switch enc {
-	case EncodingASCII:
-		return StrASCII, nil
-	case EncodingUnicode:
-		return StrUnicode, nil
-	default:
-		return 0, crex.Wrapf(ErrParse, "unknown token encoding %q", enc)
-	}
-}
-
-// Maps a comparison operator token type to its AST CmpOp counterpart.
+// Maps a comparison-operator token type to its AST counterpart.
 //
 // Returns an error for any token type that is not one of the six recognised
 // comparison operators.
@@ -601,6 +553,54 @@ func tokenToCmpOp(t TokenType) (CmpOp, error) {
 	}
 }
 
+// Converts a token to a positional argument, decoding string literals.
+//
+// Handles NAME, INT, QUANTITY, STRING, and VAR tokens. For STRING tokens the
+// surrounding quotes are stripped and recognised escape sequences are resolved
+// via Token.Unquote.
+func tokenToArg(t Token) (Arg, error) {
+	switch t.Type {
+	case TokenName:
+		return Arg{Type: ArgName, Value: t.Text}, nil
+	case TokenInt:
+		return Arg{Type: ArgInt, Value: t.Text}, nil
+	case TokenQuantity:
+		return Arg{Type: ArgQuantity, Value: t.Text}, nil
+	case TokenString:
+		unquoted, err := t.Unquote()
+		if err != nil {
+			return Arg{}, crex.Wrapf(ErrParse, "invalid string literal: %w", err)
+		}
+		enc, err := tokEncodingToAST(t.Encoding)
+		if err != nil {
+			return Arg{}, crex.Wrapf(ErrParse, "invalid string encoding: %w", err)
+		}
+		argType := ArgStrASCII
+		if enc == StrUnicode {
+			argType = ArgStrUnicode
+		}
+		return Arg{Type: argType, Value: unquoted}, nil
+	case TokenVar:
+		return Arg{Type: ArgVar, Value: t.Text}, nil
+	default:
+		return Arg{}, crex.Wrapf(ErrParse, "unsupported argument token %q", t.Type)
+	}
+}
+
+// Maps a lexer string-token encoding to its AST counterpart.
+//
+// Returns an error for any encoding value that is not explicitly recognised.
+func tokEncodingToAST(enc TokenEncoding) (StrEncoding, error) {
+	switch enc {
+	case EncodingASCII:
+		return StrASCII, nil
+	case EncodingUnicode:
+		return StrUnicode, nil
+	default:
+		return 0, crex.Wrapf(ErrParse, "unknown token encoding %q", enc)
+	}
+}
+
 // Whether the current token is a positional argument.
 //
 // A positional is a NAME, INT, STRING, or VAR token that is not immediately
@@ -610,7 +610,7 @@ func tokenToCmpOp(t TokenType) (CmpOp, error) {
 func (p *parser) isPositional() bool {
 	switch p.peek().Type {
 	case TokenName, TokenInt, TokenQuantity, TokenString, TokenVar:
-		return !isOperator(p.peekN(1).Type)
+		return !p.peekN(1).Type.isOperator()
 	default:
 		return false
 	}
@@ -626,20 +626,7 @@ func (p *parser) isPositional() bool {
 func (p *parser) isKwarg() bool {
 	switch p.peek().Type {
 	case TokenName, TokenInt, TokenQuantity, TokenString, TokenVar:
-		return isOperator(p.peekN(1).Type)
-	default:
-		return false
-	}
-}
-
-// Whether t is a comparison or bitwise operator token.
-func isOperator(t TokenType) bool {
-	switch t {
-	case TokenEq, TokenNeq,
-		TokenGt, TokenGte,
-		TokenLt, TokenLte,
-		TokenAmpersand:
-		return true
+		return p.peekN(1).Type.isOperator()
 	default:
 		return false
 	}

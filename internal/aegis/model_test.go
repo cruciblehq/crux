@@ -43,8 +43,6 @@ func TestModelStringWithWhere(t *testing.T) {
 	}
 }
 
-// Asserts that String renders a form that Parse can read back into an
-// equivalent Model whose String matches the first round.
 func TestModelStringRoundTrip(t *testing.T) {
 	srcs := []string{
 		".cap net_admin",

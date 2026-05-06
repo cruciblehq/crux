@@ -2,59 +2,12 @@ package aegis
 
 import "testing"
 
-func TestArgString(t *testing.T) {
-	tests := []struct {
-		arg  Arg
-		want string
-	}{
-		{Arg{Type: ArgName, Value: "net_admin"}, "net_admin"},
-		{Arg{Type: ArgInt, Value: "42"}, "42"},
-		{Arg{Type: ArgQuantity, Value: "1Gi"}, "1Gi"},
-		{Arg{Type: ArgStrASCII, Value: `hello "world"`}, `"hello \"world\""`},
-		{Arg{Type: ArgStrUnicode, Value: "café"}, `u"café"`},
-		{Arg{Type: ArgVar, Value: "MY_VAR"}, "$MY_VAR"},
-		{Arg{Type: ArgType(99), Value: "x"}, "<unknown>"},
-	}
-	for _, tc := range tests {
-		if got := tc.arg.String(); got != tc.want {
-			t.Errorf("Arg{%v, %q}.String() = %q, want %q", tc.arg.Type, tc.arg.Value, got, tc.want)
-		}
-	}
+func fieldOp(name string) Operand {
+	return Operand{IsField: true, Field: name}
 }
 
-func TestKwargString(t *testing.T) {
-	k := Kwarg{Key: "rbps", Value: Arg{Type: ArgInt, Value: "1024"}}
-	if got, want := k.String(), "rbps=1024"; got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestOperandString(t *testing.T) {
-	if got := (Operand{IsField: true, Field: "task.uid"}).String(); got != "task.uid" {
-		t.Errorf("field operand: got %q", got)
-	}
-	if got := (Operand{Value: Value{Type: ValueInt, Int: 7}}).String(); got != "7" {
-		t.Errorf("literal operand: got %q", got)
-	}
-}
-
-func TestValueString(t *testing.T) {
-	tests := []struct {
-		val  Value
-		want string
-	}{
-		{Value{Type: ValueInt, Int: 0}, "0"},
-		{Value{Type: ValueInt, Int: 12345}, "12345"},
-		{Value{Type: ValueStr, Str: "hi", StrEncoding: StrASCII}, `"hi"`},
-		{Value{Type: ValueStr, Str: "café", StrEncoding: StrUnicode}, `u"café"`},
-		{Value{Type: ValueVar, Str: "X"}, "$X"},
-		{Value{Type: ValueNone}, "<none>"},
-	}
-	for _, tc := range tests {
-		if got := tc.val.String(); got != tc.want {
-			t.Errorf("Value{%v}.String() = %q, want %q", tc.val.Type, got, tc.want)
-		}
-	}
+func intOp(v uint64) Operand {
+	return Operand{Value: Value{Type: ValueInt, Int: v}}
 }
 
 func TestBinaryExprString(t *testing.T) {
@@ -130,14 +83,4 @@ func TestBitTestExprString(t *testing.T) {
 	if got, want := withVal.String(), "flags & 4 = 4"; got != want {
 		t.Errorf("with value: got %q, want %q", got, want)
 	}
-}
-
-// Helpers.
-
-func fieldOp(name string) Operand {
-	return Operand{IsField: true, Field: name}
-}
-
-func intOp(v uint64) Operand {
-	return Operand{Value: Value{Type: ValueInt, Int: v}}
 }

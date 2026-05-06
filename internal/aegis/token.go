@@ -42,6 +42,19 @@ const (
 	TokenEOF       TokenType = "EOF"       // End of file.
 )
 
+// Whether t is a comparison or bitwise operator token.
+func (t TokenType) isOperator() bool {
+	switch t {
+	case TokenEq, TokenNeq,
+		TokenGt, TokenGte,
+		TokenLt, TokenLte,
+		TokenAmpersand:
+		return true
+	default:
+		return false
+	}
+}
+
 // Declares which character set a token's value was written in.
 //
 // The lexer distinguishes between ASCII and Unicode for string literals,
@@ -141,3 +154,5 @@ func unescapeBody(src, body string) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+

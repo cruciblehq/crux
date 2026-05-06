@@ -27,8 +27,6 @@ func parseErr(t *testing.T, src string) {
 	}
 }
 
-// --- Grant header ---
-
 func TestSimpleGrant(t *testing.T) {
 	g := parseOK(t, ".seccomp read")
 	if g.Subsystem != "seccomp" {
@@ -90,8 +88,6 @@ func TestGrantWithDottedName(t *testing.T) {
 	}
 }
 
-// --- Kwargs ---
-
 func TestGrantKwarg(t *testing.T) {
 	g := parseOK(t, ".cgroup io.max 8 0 rbps=1048576")
 	if len(g.Args) != 3 {
@@ -149,8 +145,6 @@ func TestErrorKwargWithoutValue(t *testing.T) {
 	parseErr(t, ".net listen port=")
 }
 
-// --- Quoted strings as positional args ---
-
 func TestStringQuotedPositional(t *testing.T) {
 	g := parseOK(t, ".cgroup cpuset.cpus \"0-3,5\"")
 	if len(g.Args) != 2 {
@@ -198,8 +192,6 @@ func TestUnicodeStringQuoted(t *testing.T) {
 	}
 }
 
-// --- Expression: comparisons ---
-
 func TestWhereFieldCompare(t *testing.T) {
 	g := parseOK(t, ".mac socket_bind where socket.port >= 1024")
 	cmp, ok := g.Where.(*CompareExpr)
@@ -227,8 +219,6 @@ func TestWhereFieldToField(t *testing.T) {
 		t.Errorf("Right: got %+v", cmp.Right)
 	}
 }
-
-// --- Expression: like / not like ---
 
 func TestWhereLike(t *testing.T) {
 	g := parseOK(t, `.mac file_open where file.path like "/usr/bin/**"`)
@@ -268,8 +258,6 @@ func TestStringInLikeUnquoted(t *testing.T) {
 	}
 }
 
-// --- Expression: in ---
-
 func TestWhereIn(t *testing.T) {
 	g := parseOK(t, ".seccomp ioctl where arg1 in (0x5401, 0x5402, 0x540e)")
 	in := g.Where.(*InExpr)
@@ -306,8 +294,6 @@ func TestWhereInPaths(t *testing.T) {
 	}
 }
 
-// --- Expression: between ---
-
 func TestWhereBetween(t *testing.T) {
 	g := parseOK(t, ".mac socket_bind where socket.port between 1024 and 65535")
 	between := g.Where.(*BetweenExpr)
@@ -318,8 +304,6 @@ func TestWhereBetween(t *testing.T) {
 		t.Errorf("High: got %d", between.High.Value.Int)
 	}
 }
-
-// --- Expression: bitwise ---
 
 func TestWhereBitwiseTruthTest(t *testing.T) {
 	g := parseOK(t, ".seccomp mmap where arg2 & 0x4")
@@ -342,8 +326,6 @@ func TestWhereBitwiseEqualityTest(t *testing.T) {
 		t.Errorf("Val: got %d", bit.Val.Value.Int)
 	}
 }
-
-// --- Expression: boolean combinators ---
 
 func TestWhereAnd(t *testing.T) {
 	g := parseOK(t, ".seccomp socket where arg0 in (1, 2) and arg1 in (1, 2)")
@@ -387,8 +369,6 @@ func TestWhereParen(t *testing.T) {
 		t.Errorf("top-level: got %s", bin.Op)
 	}
 }
-
-// --- Error cases ---
 
 func TestErrorNoDot(t *testing.T) {
 	parseErr(t, "seccomp read")
@@ -443,8 +423,6 @@ func TestErrorBadEscape(t *testing.T) {
 	}
 }
 
-// --- Integer literal bases ---
-
 func TestIntLiteralHex(t *testing.T) {
 	g := parseOK(t, ".seccomp ioctl where arg1 in (0x5401, 0x5402)")
 	in := g.Where.(*InExpr)
@@ -484,8 +462,6 @@ func TestErrorInvalidOctalDigit(t *testing.T) {
 	}
 }
 
-// --- Lexer-level errors surfaced by Parse ---
-
 func TestErrorAtIsInvalid(t *testing.T) {
 	_, err := Parse(".fcap net_raw @/opt/bin")
 	if err == nil {
@@ -513,8 +489,6 @@ func TestGlobBracketRejected(t *testing.T) {
 		t.Fatal("expected error for '[' in unquoted glob")
 	}
 }
-
-// --- Variables ---
 
 func TestVarPositional(t *testing.T) {
 	g := parseOK(t, ".cgroup cpu.max $cpumin $cpumax")
