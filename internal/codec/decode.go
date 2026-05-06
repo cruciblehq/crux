@@ -73,7 +73,7 @@ func Unmarshal(data []byte, v any, f Format) error {
 // if fieldName does not exist on v's type or v is not a pointer to a struct.
 func Field(src map[string]any, v any, fieldName string) error {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+	if rv.Kind() != reflect.Pointer || rv.Elem().Kind() != reflect.Struct {
 		return crex.ProgrammingError("decode field failed", "v must be a pointer to a struct").Err()
 	}
 	rv = rv.Elem()

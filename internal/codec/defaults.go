@@ -80,7 +80,7 @@ func recurseInto(field reflect.Value) bool {
 	switch field.Kind() {
 	case reflect.Struct:
 		return true
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return !field.IsNil() && field.Type().Elem().Kind() == reflect.Struct
 	}
 	return false

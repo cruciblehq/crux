@@ -10,6 +10,7 @@ import (
 )
 
 const (
+
 	// Interval between non-blocking flock retries.
 	lockRetryInterval = 100 * time.Millisecond
 )
