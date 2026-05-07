@@ -27,8 +27,8 @@ const colorReset = "\033[0m"
 //	crux [info]: server started port=8080 host=localhost
 //	crux [error]: build failed: invalid type. Use widget or service. class=user
 type PrettyFormatter struct {
-	UseColor bool
-	verbose  bool
+	UseColor bool // Whether to colorize log levels using ANSI escape codes.
+	Verbose  bool // Whether to include all attributes in the output.
 }
 
 // Creates a new pretty formatter.
@@ -37,17 +37,6 @@ type PrettyFormatter struct {
 // Verbose mode is disabled by default.
 func NewPrettyFormatter(useColor bool) *PrettyFormatter {
 	return &PrettyFormatter{UseColor: useColor}
-}
-
-// Enables or disables verbose output.
-func (f *PrettyFormatter) SetVerbose(verbose bool) *PrettyFormatter {
-	f.verbose = verbose
-	return f
-}
-
-// Returns whether verbose output is enabled.
-func (f *PrettyFormatter) Verbose() bool {
-	return f.verbose
 }
 
 // Writes a log record as a human-readable line.
@@ -92,7 +81,7 @@ func (f *PrettyFormatter) writeMessage(sb *strings.Builder, rctx *RecordContext)
 			f.writeCrexError(sb, errMap)
 			return true
 		}
-		if f.verbose {
+		if f.Verbose {
 			f.writeInlineAttr(sb, attr)
 		}
 		return true
@@ -138,7 +127,7 @@ func (f *PrettyFormatter) writeCrexError(sb *strings.Builder, errMap map[string]
 	}
 
 	// In verbose mode, include additional error details
-	if f.verbose {
+	if f.Verbose {
 		for key, val := range errMap {
 			if key == "reason" || key == "fallback" || key == "description" || key == crexErrorMarker {
 				continue

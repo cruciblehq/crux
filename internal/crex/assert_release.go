@@ -2,12 +2,12 @@
 
 package crex
 
-// No-op assertions in release builds.
+// Assert is a no-op in release builds.
 func Assert(condition bool, message string) {
-	// No-op
+	// No-op.
 }
 
-// No-op assertions in release builds.
+// Assertf is a no-op in release builds.
 func Assertf(condition bool, format string, args ...any) {
-	// No-op
+	// No-op.
 }

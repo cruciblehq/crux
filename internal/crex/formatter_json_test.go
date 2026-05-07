@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -127,84 +128,46 @@ func TestResolveValue(t *testing.T) {
 	tests := []struct {
 		name  string
 		value slog.Value
-		check func(t *testing.T, result any)
+		want  any
 	}{
 		{
 			name:  "string",
 			value: slog.StringValue("test"),
-			check: func(t *testing.T, result any) {
-				if result != "test" {
-					t.Errorf("result = %v, want test", result)
-				}
-			},
+			want:  "test",
 		},
 		{
 			name:  "int",
 			value: slog.IntValue(42),
-			check: func(t *testing.T, result any) {
-				if result != int64(42) {
-					t.Errorf("result = %v, want 42", result)
-				}
-			},
+			want:  int64(42),
 		},
 		{
 			name:  "bool",
 			value: slog.BoolValue(true),
-			check: func(t *testing.T, result any) {
-				if result != true {
-					t.Errorf("result = %v, want true", result)
-				}
-			},
+			want:  true,
 		},
 		{
-			name: "group",
-			value: slog.GroupValue(
-				slog.String("a", "1"),
-				slog.Int("b", 2),
-			),
-			check: func(t *testing.T, result any) {
-				m, ok := result.(map[string]any)
-				if !ok {
-					t.Fatal("result is not a map")
-				}
-				if m["a"] != "1" {
-					t.Errorf("m[a] = %v, want 1", m["a"])
-				}
-				if m["b"] != int64(2) {
-					t.Errorf("m[b] = %v, want 2", m["b"])
-				}
-			},
+			name:  "group",
+			value: slog.GroupValue(slog.String("a", "1"), slog.Int("b", 2)),
+			want:  map[string]any{"a": "1", "b": int64(2)},
 		},
 		{
 			name: "nested group",
 			value: slog.GroupValue(
 				slog.String("key", "value"),
-				slog.Group("nested",
-					slog.String("inner", "data"),
-				),
+				slog.Group("nested", slog.String("inner", "data")),
 			),
-			check: func(t *testing.T, result any) {
-				m, ok := result.(map[string]any)
-				if !ok {
-					t.Fatal("result is not a map")
-				}
-
-				nested, ok := m["nested"].(map[string]any)
-				if !ok {
-					t.Fatal("nested is not a map")
-				}
-
-				if nested["inner"] != "data" {
-					t.Errorf("nested[inner] = %v, want data", nested["inner"])
-				}
+			want: map[string]any{
+				"key":    "value",
+				"nested": map[string]any{"inner": "data"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resolveValue(tt.value)
-			tt.check(t, result)
+			if got := resolveValue(tt.value); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("resolveValue() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
@@ -212,29 +175,24 @@ func TestResolveValue(t *testing.T) {
 func TestJSONFormatter_SetVerbose(t *testing.T) {
 	f := NewJSONFormatter()
 
-	// Default should be non-verbose
-	if f.Verbose() {
-		t.Error("default verbose = true, want false")
+	if f.Verbose {
+		t.Error("default Verbose = true, want false")
 	}
 
-	// Test setting verbose
-	f.SetVerbose(true)
-	if !f.Verbose() {
-		t.Error("after SetVerbose(true), Verbose() = false")
+	f.Verbose = true
+	if !f.Verbose {
+		t.Error("after Verbose = true, Verbose = false")
 	}
 
-	// Test chaining
-	result := f.SetVerbose(false)
-	if result != f {
-		t.Error("SetVerbose() did not return formatter for chaining")
-	}
-	if f.Verbose() {
-		t.Error("after SetVerbose(false), Verbose() = true")
+	f.Verbose = false
+	if f.Verbose {
+		t.Error("after Verbose = false, Verbose = true")
 	}
 }
 
 func TestJSONFormatter_Write_Verbose(t *testing.T) {
-	f := NewJSONFormatter().SetVerbose(true)
+	f := NewJSONFormatter()
+f.Verbose = true
 	var buf bytes.Buffer
 
 	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
@@ -268,7 +226,8 @@ func TestJSONFormatter_Write_Verbose(t *testing.T) {
 }
 
 func TestJSONFormatter_Write_VerboseWithGroups(t *testing.T) {
-	f := NewJSONFormatter().SetVerbose(true)
+	f := NewJSONFormatter()
+f.Verbose = true
 	var buf bytes.Buffer
 
 	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
@@ -301,7 +260,8 @@ func TestJSONFormatter_Write_VerboseWithGroups(t *testing.T) {
 }
 
 func TestJSONFormatter_Write_VerboseWithNestedGroups(t *testing.T) {
-	f := NewJSONFormatter().SetVerbose(true)
+	f := NewJSONFormatter()
+f.Verbose = true
 	var buf bytes.Buffer
 
 	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)

@@ -66,24 +66,6 @@ func TestProgrammingErrorf(t *testing.T) {
 	}
 }
 
-func TestBug(t *testing.T) {
-	err := Bug("test", "reason").Err()
-	crexErr := err.(*Error)
-
-	if crexErr.Class() != ErrorClassProgramming {
-		t.Errorf("Class() = %v, want %v", crexErr.Class(), ErrorClassProgramming)
-	}
-}
-
-func TestBugf(t *testing.T) {
-	err := Bugf("test", "nil pointer at line %d", 123).Err()
-	crexErr := err.(*Error)
-
-	if crexErr.Reason() != "nil pointer at line 123" {
-		t.Errorf("Reason() = %q, want %q", crexErr.Reason(), "nil pointer at line 123")
-	}
-}
-
 func TestNewError_EmptyDescription_Panics(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {

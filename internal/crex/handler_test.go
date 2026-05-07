@@ -253,7 +253,7 @@ func TestHandler_FlushNoFormatter(t *testing.T) {
 func TestHandler_WithAttrs(t *testing.T) {
 	var buf bytes.Buffer
 	formatter := NewPrettyFormatter(false)
-	formatter.SetVerbose(true)
+	formatter.Verbose = true
 
 	h := NewHandler().
 		SetStream(&buf).
@@ -286,7 +286,7 @@ func TestHandler_WithAttrs(t *testing.T) {
 func TestHandler_WithGroup(t *testing.T) {
 	var buf bytes.Buffer
 	formatter := NewPrettyFormatter(false)
-	formatter.SetVerbose(true)
+	formatter.Verbose = true
 
 	h := NewHandler().
 		SetStream(&buf).
@@ -326,7 +326,7 @@ func TestHandler_WithGroup_Empty(t *testing.T) {
 func TestHandler_WithGroup_Nested(t *testing.T) {
 	var buf bytes.Buffer
 	formatter := NewPrettyFormatter(false)
-	formatter.SetVerbose(true)
+	formatter.Verbose = true
 
 	h := NewHandler().
 		SetStream(&buf).

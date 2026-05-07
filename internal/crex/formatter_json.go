@@ -15,23 +15,12 @@ import (
 // additional attributes are included as top-level fields, and group values
 // are recursively resolved into nested objects.
 type JSONFormatter struct {
-	verbose bool
+	Verbose bool // Whether to include all attributes in the output.
 }
 
 // Creates a new JSON formatter.
 func NewJSONFormatter() *JSONFormatter {
 	return &JSONFormatter{}
-}
-
-// Enables or disables verbose output.
-func (f *JSONFormatter) SetVerbose(verbose bool) *JSONFormatter {
-	f.verbose = verbose
-	return f
-}
-
-// Returns whether verbose output is enabled.
-func (f *JSONFormatter) Verbose() bool {
-	return f.verbose
 }
 
 // Writes a log record as a JSON line.
@@ -41,7 +30,7 @@ func (f *JSONFormatter) Write(w io.Writer, rctx *RecordContext) error {
 		"message": rctx.Record.Message,
 	}
 
-	if f.verbose {
+	if f.Verbose {
 		if len(rctx.Groups) > 0 {
 			entry["groups"] = rctx.Groups
 		}

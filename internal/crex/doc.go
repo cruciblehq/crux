@@ -20,7 +20,7 @@
 //	did or didn't do, it is a good candidate for Crex.
 //
 // Crex provides factory functions to create errors with different classes:
-// [UserError], [SystemError], [ProgrammingError], and [Bug]. Each returns an
+// [UserError], [SystemError], and [ProgrammingError]. Each returns an
 // [ErrorBuilder] for further configuration:
 //
 //	err := crex.UserError("could not retrieve data", "connection timed out").

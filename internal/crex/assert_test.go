@@ -28,28 +28,26 @@ func TestAssertf_True(t *testing.T) {
 // Note: The following tests only work when compiled with -tags=debug
 // In release builds, assertions are no-ops and will not panic
 
+// Verifies that r is a string panic value containing every substring in want.
+func checkAssertPanic(t *testing.T, r any, want ...string) {
+	t.Helper()
+	msg, ok := r.(string)
+	if !ok {
+		t.Errorf("panic value is not a string: %v", r)
+		return
+	}
+	for _, sub := range want {
+		if !strings.Contains(msg, sub) {
+			t.Errorf("panic message does not contain %q: %s", sub, msg)
+		}
+	}
+}
+
 func TestAssert_False_Debug(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			msg, ok := r.(string)
-			if !ok {
-				t.Errorf("panic value is not a string: %v", r)
-				return
-			}
-
-			if !strings.Contains(msg, "assertion failed") {
-				t.Errorf("panic message does not contain 'assertion failed': %s", msg)
-			}
-			if !strings.Contains(msg, "test message") {
-				t.Errorf("panic message does not contain 'test message': %s", msg)
-			}
-			if !strings.Contains(msg, "at ") {
-				t.Errorf("panic message does not contain file location: %s", msg)
-			}
-			if !strings.Contains(msg, "assert_test.go") {
-				t.Errorf("panic message does not contain filename: %s", msg)
-			}
+			checkAssertPanic(t, r, "assertion failed", "test message", "at ", "assert_test.go")
 		} else {
 			// In release builds, this is expected (no-op)
 			t.Skip("Assert is no-op in release builds (compiled without -tags=debug)")
@@ -63,21 +61,7 @@ func TestAssertf_False_Debug(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			msg, ok := r.(string)
-			if !ok {
-				t.Errorf("panic value is not a string: %v", r)
-				return
-			}
-
-			if !strings.Contains(msg, "assertion failed") {
-				t.Errorf("panic message does not contain 'assertion failed': %s", msg)
-			}
-			if !strings.Contains(msg, "test value: 42") {
-				t.Errorf("panic message does not contain formatted text: %s", msg)
-			}
-			if !strings.Contains(msg, "at ") {
-				t.Errorf("panic message does not contain file location: %s", msg)
-			}
+			checkAssertPanic(t, r, "assertion failed", "test value: 42", "at ")
 		} else {
 			// In release builds, this is expected (no-op)
 			t.Skip("Assertf is no-op in release builds (compiled without -tags=debug)")

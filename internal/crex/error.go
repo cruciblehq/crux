@@ -29,13 +29,13 @@ const crexErrorMarker = "!github.com/cruciblehq/crex.Error"
 // Errors can carry additional details as key-value pairs for more context,
 // wrap an underlying cause error, and include a context.
 type Error struct {
-	description string          // Description of what failed
-	reason      string          // Reason why it failed
-	fallback    string          // Fallback suggestion or compromise
-	cause       error           // Underlying cause error
-	class       ErrorClass      // Classification of the error
-	details     map[string]any  // Additional details about the error
-	context     context.Context // Context associated with the error
+	description string          // What failed.
+	reason      string          // Why it failed.
+	fallback    string          // Fallback suggestion or compromise, if any.
+	cause       error           // Underlying cause error, if any.
+	class       ErrorClass      // Classification of the error.
+	details     map[string]any  // Additional key-value details about the error.
+	context     context.Context // Context associated with the error, if any.
 }
 
 // Returns the error description.

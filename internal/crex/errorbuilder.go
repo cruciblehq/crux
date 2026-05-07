@@ -12,8 +12,8 @@ import (
 // and setter methods. The factories are organized according to error class,
 // allowing the caller to specify whether the error is a user error with
 // [UserError], a system error with [SystemError], or a programming/bug error
-// with [Bug] or [ProgrammingError]. Each factory method also includes a
-// formatted variant (e.g., [UserErrorf]).
+// with [ProgrammingError]. Each factory method also includes a formatted
+// variant (e.g., [UserErrorf]).
 //
 // [ErrorBuilder] allows setting various attributes of an error: description,
 // reason, fallback, cause, additional details, and context. Description and
@@ -24,7 +24,7 @@ import (
 // Once all desired attributes are set, [Err] can be called to retrieve the
 // constructed [Error] instance.
 type ErrorBuilder struct {
-	err Error
+	err Error // The error being built.
 }
 
 // Creates a user error with the given description and reason.
@@ -57,19 +57,8 @@ func ProgrammingErrorf(description string, reasonFormat string, args ...any) *Er
 	return ProgrammingError(description, fmt.Sprintf(reasonFormat, args...))
 }
 
-// Creates a programming error with the given description and reason.
-func Bug(description, reason string) *ErrorBuilder {
-	return ProgrammingError(description, reason)
-}
-
-// Creates a programming error with the given description and formatted reason.
-func Bugf(description string, reasonFormat string, args ...any) *ErrorBuilder {
-	return ProgrammingError(description, fmt.Sprintf(reasonFormat, args...))
-}
-
 // Creates a new ErrorBuilder with the specified class, description, and reason.
 //
-// This is the internal factory method used by the public factory methods.
 // Panics if description or reason are empty after trimming whitespace in order
 // to enforce error construction conventions.
 func newError(class ErrorClass, description, reason string) *ErrorBuilder {

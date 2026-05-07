@@ -64,62 +64,29 @@ type Handler interface {
 	Flush() (bool, error)
 }
 
-// Provides context for formatting a log record.
-//
-// This structure is used to preserve log groups along with the record itself
-// during formatting.
-type RecordContext struct {
-	Record slog.Record
-	Groups []string
-}
-
 // Holds the mutable state shared between a parent handler and its children
 // (created via WithAttrs/WithGroup).
 type sharedState struct {
-	mux       sync.RWMutex
-	level     slog.Level
-	buffer    []RecordContext
-	formatter Formatter
-	stream    io.Writer
+	mux       sync.RWMutex    // Guards all other fields.
+	level     slog.Level      // Minimum level for records to be processed.
+	buffer    []RecordContext // Buffered records pending a formatter.
+	formatter Formatter       // Formatter used to write records; nil means buffer-only.
+	stream    io.Writer       // Destination stream; defaults to os.Stderr.
 }
 
-// Concrete implementation of the Handler interface.
-//
-// It buffers log records and can flush them to an output stream using a specified
-// Formatter. The handler supports setting log attributes and groups, and allows
-// dynamic configuration of the output stream and formatter.
-//
-// The handler is safe for concurrent use.
+// Concrete implementation of [Handler].
 type handler struct {
-	state  *sharedState // Pointer to shared state
-	attrs  []slog.Attr  // Local attributes
-	groups []string     // Local groups
+	state  *sharedState // Shared state between parent and child handlers.
+	attrs  []slog.Attr  // Attributes appended to every record this handler processes.
+	groups []string     // Active group path, accumulated via WithGroup.
 }
 
-// Creates a new [Handler] with the default log level (slog.LevelInfo).
-//
-// The handler starts with an empty buffer and no formatter. The default log
-// level is [slog.LevelInfo]. The default output stream is [os.Stderr], but it
-// can be changed using [SetStream]. The handler buffers log records until a
-// formatter is set using [SetFormatter], at which point it will start flushing
-// buffered records to the output stream. The flush can also be triggered
-// manually by calling [Flush].
-//
-// The handler is safe for concurrent use.
+// Creates a new [Handler] with the default level ([slog.LevelInfo]).
 func NewHandler() Handler {
 	return NewHandlerWithLevel(slog.LevelInfo)
 }
 
-// Creates a new [Handler] with the specified log level.
-//
-// The handler starts with an empty buffer and no formatter. The default log
-// level is [slog.LevelInfo]. The default output stream is [os.Stderr], but it
-// can be changed using [SetStream]. The handler buffers log records until a
-// formatter is set using [SetFormatter], at which point it will start flushing
-// buffered records to the output stream. The flush can also be triggered
-// manually by calling [Flush].
-//
-// The handler is safe for concurrent use.
+// Creates a new [Handler] with the given minimum log level.
 func NewHandlerWithLevel(level slog.Level) Handler {
 	return &handler{
 		state: &sharedState{
@@ -133,13 +100,7 @@ func NewHandlerWithLevel(level slog.Level) Handler {
 	}
 }
 
-// Sets the minimum level for the handler.
-//
-// Only log records with a level equal to or higher than this level will be
-// processed. The default level is [slog.LevelInfo]. The method returns the
-// handler itself to allow method chaining. The current log level can be
-// retrieved using [Level]. Setting the log level only affects new records;
-// it does not retroactively filter already buffered records.
+// Acquires the shared write lock and updates the minimum log level.
 func (h *handler) SetLevel(level slog.Level) Handler {
 	h.state.mux.Lock()
 	defer h.state.mux.Unlock()
@@ -149,11 +110,7 @@ func (h *handler) SetLevel(level slog.Level) Handler {
 	return h
 }
 
-// Returns the current minimum level of the handler.
-//
-// Only log records with a level equal to or higher than this level are
-// processed. The default level is [slog.LevelInfo]. The log level can be
-// changed using [SetLevel].
+// Acquires the shared read lock and returns the current minimum log level.
 func (h *handler) Level() slog.Level {
 	h.state.mux.RLock()
 	defer h.state.mux.RUnlock()
@@ -161,7 +118,7 @@ func (h *handler) Level() slog.Level {
 	return h.state.level
 }
 
-// Sets the output stream for the handler.
+// Acquires the shared write lock and updates the output stream.
 func (h *handler) SetStream(stream io.Writer) Handler {
 	h.state.mux.Lock()
 	defer h.state.mux.Unlock()
@@ -171,9 +128,7 @@ func (h *handler) SetStream(stream io.Writer) Handler {
 	return h
 }
 
-// Returns the current output stream of the handler.
-//
-// The default stream is [os.Stderr].
+// Acquires the shared read lock and returns the current output stream. Defaults to [os.Stderr].
 func (h *handler) Stream() io.Writer {
 	h.state.mux.RLock()
 	defer h.state.mux.RUnlock()
@@ -181,10 +136,7 @@ func (h *handler) Stream() io.Writer {
 	return h.state.stream
 }
 
-// Sets the formatter for the handler.
-//
-// After setting the formatter, buffered log records can be flushed to the
-// output stream by calling [Flush], or implicitly on the next log record.
+// Acquires the shared write lock and updates the formatter.
 func (h *handler) SetFormatter(formatter Formatter) Handler {
 	h.state.mux.Lock()
 	defer h.state.mux.Unlock()
@@ -194,7 +146,7 @@ func (h *handler) SetFormatter(formatter Formatter) Handler {
 	return h
 }
 
-// Returns the current Formatter of the handler.
+// Acquires the shared read lock and returns the current formatter.
 func (h *handler) Formatter() Formatter {
 	h.state.mux.RLock()
 	defer h.state.mux.RUnlock()
@@ -202,13 +154,7 @@ func (h *handler) Formatter() Formatter {
 	return h.state.formatter
 }
 
-// Writes all buffered records to the output stream using the set formatter.
-//
-// The bool return value indicates whether a flush was attempted, which happens
-// only if a formatter is set. The error return value indicates whether an error
-// occurred during formatting or writing. After a successful flush, the buffer
-// is cleared. If an error occurs after some records have been written, those
-// records are removed from the buffer.
+// Acquires the shared write lock and delegates to the internal [handler.flush].
 func (h *handler) Flush() (bool, error) {
 	h.state.mux.Lock()
 	defer h.state.mux.Unlock()
@@ -245,13 +191,7 @@ func (h *handler) flush() (bool, error) {
 	return true, err
 }
 
-// Determines whether a log record with the given level should be processed.
-//
-// Only records with a level equal to or higher than the handler's current
-// level are processed. If the record is not enabled, it is ignored, not even
-// being buffered.
-//
-// Implements [slog.Handler.Enabled].
+// Reports whether the given level meets the handler's current minimum level.
 func (h *handler) Enabled(_ context.Context, level slog.Level) bool {
 	h.state.mux.RLock()
 	defer h.state.mux.RUnlock()
@@ -259,11 +199,8 @@ func (h *handler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.state.level
 }
 
-// Handles a log record by buffering it and attempting to flush the buffer.
-//
-// The record is considered only if its level is enabled according to [Enabled].
-// The method returns any error encountered during an implicit flush that may
-// occur after buffering the record (if a formatter is set).
+// Appends a clone of the record (with local attrs merged) to the shared buffer
+// and triggers an implicit flush.
 func (h *handler) Handle(_ context.Context, record slog.Record) error {
 	newRecord := record.Clone()
 	newRecord.AddAttrs(h.attrs...)
@@ -279,13 +216,7 @@ func (h *handler) Handle(_ context.Context, record slog.Record) error {
 	return err
 }
 
-// Creates a new handler with the given attributes added.
-//
-// The new handler shares the same underlying state (buffer, level, stream,
-// formatter) as the original handler, but has its own set of attributes and
-// groups. The original handler remains unchanged.
-//
-// Implements [slog.Handler.WithAttrs].
+// Returns a new handler sharing state with this one but with the given attrs appended.
 func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	// No lock needed here as we are creating a new struct with copied data
 	// and h.attrs and h.groups are immutable after creation.
@@ -301,13 +232,7 @@ func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
-// Creates a new handler with the given group added.
-//
-// The new handler shares the same underlying state (buffer, level, stream,
-// formatter) as the original handler, but has its own set of attributes and
-// groups. The original handler remains unchanged.
-//
-// Implements [slog.Handler.WithGroup].
+// Returns a new handler sharing state with this one but with name appended to groups.
 func (h *handler) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return h

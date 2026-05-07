@@ -14,17 +14,17 @@ func TestNewPrettyFormatter(t *testing.T) {
 	if !f.UseColor {
 		t.Error("UseColor = false, want true")
 	}
-	if f.Verbose() {
+	if f.Verbose {
 		t.Error("Verbose() = true, want false (default)")
 	}
 }
 
 func TestPrettyFormatter_SetVerbose(t *testing.T) {
 	f := NewPrettyFormatter(false)
-	f.SetVerbose(true)
+	f.Verbose = true
 
-	if !f.Verbose() {
-		t.Error("Verbose() = false after SetVerbose(true)")
+	if !f.Verbose {
+		t.Error("Verbose = false after setting true")
 	}
 }
 
@@ -97,7 +97,7 @@ func TestPrettyFormatter_Write_WithGroups(t *testing.T) {
 
 func TestPrettyFormatter_Write_WithAttributes_NonVerbose(t *testing.T) {
 	f := NewPrettyFormatter(false)
-	f.SetVerbose(false)
+	f.Verbose = false
 	var buf bytes.Buffer
 
 	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
@@ -118,7 +118,7 @@ func TestPrettyFormatter_Write_WithAttributes_NonVerbose(t *testing.T) {
 
 func TestPrettyFormatter_Write_WithAttributes_Verbose(t *testing.T) {
 	f := NewPrettyFormatter(false)
-	f.SetVerbose(true)
+	f.Verbose = true
 	var buf bytes.Buffer
 
 	record := slog.NewRecord(time.Now(), slog.LevelInfo, "message", 0)
@@ -188,7 +188,8 @@ func TestPrettyFormatter_Write_CrexError_WithFallback(t *testing.T) {
 }
 
 func TestPrettyFormatter_Write_CrexError_Verbose(t *testing.T) {
-	f := NewPrettyFormatter(false).SetVerbose(true)
+	f := NewPrettyFormatter(false)
+	f.Verbose = true
 	var buf bytes.Buffer
 
 	crexErr := SystemError("network error", "connection timeout").
