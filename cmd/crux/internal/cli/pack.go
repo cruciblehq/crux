@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/crux/paths"
 )
 
 // Represents the 'crux pack' command.
@@ -27,7 +27,7 @@ func (c *PackCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, b, err := resource.ResolveBuilder(ctx, manifestPath, opts)
+	_, b, err := resource.ResolveHandler(ctx, manifestPath, opts)
 	if err != nil {
 		return err
 	}

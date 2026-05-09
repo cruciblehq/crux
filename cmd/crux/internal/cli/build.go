@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/crex"
-	"github.com/cruciblehq/crux/internal/paths"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/internal/watch"
+	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/watch"
 )
 
 // Represents the 'crux build' command.
@@ -73,7 +73,6 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 		return nil
 	}
 
-	// Watch
 	if _, err := watch.WatchRecursive(RootCmd.Context, callback); err != nil {
 		return err
 	}
@@ -91,7 +90,8 @@ func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildR
 	}
 	opts.Environment = c.Environment
 
-	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), opts)
+	manPath := paths.Manifest(RootCmd.Context)
+	man, b, err := resource.ResolveHandler(ctx, manPath, opts)
 	if err != nil {
 		return nil, err
 	}

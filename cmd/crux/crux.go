@@ -9,7 +9,7 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/cmd/crux/internal/cli"
-	"github.com/cruciblehq/crux/internal/crex"
+	"github.com/cruciblehq/crux/crex"
 )
 
 // The entry point for the Crux CLI application.

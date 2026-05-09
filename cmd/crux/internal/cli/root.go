@@ -8,7 +8,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/crex"
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Represents the root command for the Crux CLI.
@@ -43,8 +43,8 @@ func Execute(ctx context.Context) error {
 
 	configureLogger()
 
-	// Resolve -C to an absolute path so all downstream consumers
-	// get a fully qualified path.
+	// Resolve -C to an absolute path so all downstream consumers get a fully
+	// qualified path.
 	if abs, err := filepath.Abs(RootCmd.Context); err == nil {
 		RootCmd.Context = abs
 	}
@@ -61,7 +61,7 @@ func configureLogger() {
 
 	// Configure formatter
 	formatter := crex.NewPrettyFormatter(isatty(os.Stderr))
-	formatter.SetVerbose(RootCmd.Verbose)
+	formatter.Verbose = RootCmd.Verbose
 
 	// Configure handler
 	if RootCmd.Debug {

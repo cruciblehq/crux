@@ -1,0 +1,122 @@
+package codec
+
+import "testing"
+
+// Test fixture with fields that declare default values.
+type withDefaults struct {
+	Name   string `json:"name"`                 // Name with no declared default.
+	Weight uint16 `json:"weight" default:"100"` // Defaults to 100.
+	Mode   string `json:"mode" default:"auto"`  // Defaults to "auto".
+}
+
+// Test fixture with a nested struct that carries defaults.
+type nestedDefaults struct {
+	Inner withDefaults `json:"inner"` // Nested struct with its own defaults.
+}
+
+// Test fixture covering bool, int64, and float64 defaults.
+type allDefaults struct {
+	B bool    `json:"b" default:"true"` // Defaults to true.
+	I int64   `json:"i" default:"-42"`  // Defaults to -42.
+	F float64 `json:"f" default:"3.14"` // Defaults to 3.14.
+}
+
+func TestDecode_Defaults(t *testing.T) {
+	m := map[string]any{"name": "x"}
+	var s withDefaults
+	if err := Decode(m, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Name != "x" {
+		t.Errorf("name = %q, want %q", s.Name, "x")
+	}
+	if s.Weight != 100 {
+		t.Errorf("weight = %d, want 100", s.Weight)
+	}
+	if s.Mode != "auto" {
+		t.Errorf("mode = %q, want %q", s.Mode, "auto")
+	}
+}
+
+func TestDecode_DefaultsOverridden(t *testing.T) {
+	m := map[string]any{"name": "x", "weight": 50, "mode": "manual"}
+	var s withDefaults
+	if err := Decode(m, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Weight != 50 {
+		t.Errorf("weight = %d, want 50", s.Weight)
+	}
+	if s.Mode != "manual" {
+		t.Errorf("mode = %q, want %q", s.Mode, "manual")
+	}
+}
+
+func TestDecode_DefaultsNested(t *testing.T) {
+	m := map[string]any{"inner": map[string]any{"name": "n"}}
+	var s nestedDefaults
+	if err := Decode(m, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Inner.Weight != 100 {
+		t.Errorf("inner weight = %d, want 100", s.Inner.Weight)
+	}
+	if s.Inner.Mode != "auto" {
+		t.Errorf("inner mode = %q, want %q", s.Inner.Mode, "auto")
+	}
+}
+
+func TestDecode_DefaultsExplicitZero(t *testing.T) {
+	m := map[string]any{"name": "x", "weight": 0, "mode": ""}
+	var s withDefaults
+	if err := Decode(m, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Weight != 0 {
+		t.Errorf("weight = %d, want 0", s.Weight)
+	}
+	if s.Mode != "" {
+		t.Errorf("mode = %q, want %q", s.Mode, "")
+	}
+}
+
+func TestDecode_DefaultBool(t *testing.T) {
+	var s allDefaults
+	if err := Decode(map[string]any{}, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.B != true {
+		t.Errorf("b = %v, want true", s.B)
+	}
+}
+
+func TestDecode_DefaultInt(t *testing.T) {
+	var s allDefaults
+	if err := Decode(map[string]any{}, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.I != -42 {
+		t.Errorf("i = %d, want -42", s.I)
+	}
+}
+
+func TestDecode_DefaultFloat(t *testing.T) {
+	var s allDefaults
+	if err := Decode(map[string]any{}, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.F != 3.14 {
+		t.Errorf("f = %f, want 3.14", s.F)
+	}
+}
+
+func TestDecode_DefaultUnsupportedType(t *testing.T) {
+	type unsupported struct {
+		Sl []int `json:"sl" default:"nope"`
+	}
+	var s unsupported
+	err := Decode(map[string]any{}, &s)
+	if err == nil {
+		t.Fatal("expected error for unsupported default type")
+	}
+}

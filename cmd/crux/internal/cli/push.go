@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/paths"
 	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/crux/paths"
 )
 
 // Represents the 'crux push' command.
@@ -28,7 +28,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	man, b, err := resource.ResolveBuilder(ctx, paths.Manifest(RootCmd.Context), opts)
+	man, b, err := resource.ResolveHandler(ctx, paths.Manifest(RootCmd.Context), opts)
 	if err != nil {
 		return err
 	}

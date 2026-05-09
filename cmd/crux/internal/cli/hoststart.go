@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/internal/compute"
-	"github.com/cruciblehq/crux/internal/crex"
 	"github.com/cruciblehq/crux/internal/resource"
 )
 

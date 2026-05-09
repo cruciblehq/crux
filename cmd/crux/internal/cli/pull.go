@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/crex"
-	"github.com/cruciblehq/crux/internal/manifest"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/internal/resource"
+	"github.com/cruciblehq/crux/manifest"
 )
 
 // Represents the 'crux pull' command.
