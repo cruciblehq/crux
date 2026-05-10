@@ -11,6 +11,11 @@ import (
 	"github.com/cruciblehq/crux/crex"
 )
 
+const (
+	headerContentType = "Content-Type" // Content-Type HTTP header.
+	headerAccept      = "Accept"       // Accept HTTP header.
+)
+
 // HTTP client for interacting with the Crucible Hub registry.
 //
 // Implements the Registry interface over HTTP, providing a remote client for
@@ -42,12 +47,12 @@ func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Name
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/namespaces", bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, namespacesPath(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeNamespaceInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
+	req.Header.Set(headerContentType, MediaTypeNamespaceInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
 
 	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
@@ -58,12 +63,11 @@ func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Name
 
 // Retrieves namespace metadata and resource summaries.
 func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*Namespace, error) {
-	path, _ := url.JoinPath("/namespaces", namespace)
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, namespacePath(namespace), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
+	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
 
 	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
@@ -79,13 +83,8 @@ func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info Nam
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace)
-	req, err := c.newRequest(ctx, "PUT", path, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", string(MediaTypeNamespaceInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeNamespace)+"+json")
+	req, err := c.newRequest(ctx, http.MethodPut, namespacePath(namespace), bytes.NewReader(body))
+	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
 
 	var ns Namespace
 	if err := c.do(req, &ns); err != nil {
@@ -96,8 +95,7 @@ func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info Nam
 
 // Permanently deletes a namespace.
 func (c *Client) DeleteNamespace(ctx context.Context, namespace string) error {
-	path, _ := url.JoinPath("/namespaces", namespace)
-	req, err := c.newRequest(ctx, "DELETE", path, nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, namespacePath(namespace), nil)
 	if err != nil {
 		return err
 	}
@@ -106,11 +104,11 @@ func (c *Client) DeleteNamespace(ctx context.Context, namespace string) error {
 
 // Lists all namespaces.
 func (c *Client) ListNamespaces(ctx context.Context) (*NamespaceList, error) {
-	req, err := c.newRequest(ctx, "GET", "/namespaces", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, namespacesPath(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeNamespaceList)+"+json")
+	req.Header.Set(headerAccept, MediaTypeNamespaceList.JSON())
 
 	var list NamespaceList
 	if err := c.do(req, &list); err != nil {
@@ -126,13 +124,12 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info Reso
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources")
-	req, err := c.newRequest(ctx, "POST", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, resourcesPath(namespace), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeResourceInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
+	req.Header.Set(headerContentType, MediaTypeResourceInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeResource.JSON())
 
 	var resource Resource
 	if err := c.do(req, &resource); err != nil {
@@ -143,12 +140,11 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info Reso
 
 // Retrieves resource metadata with version and channel summaries.
 func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*Resource, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource)
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, resourcePath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
+	req.Header.Set(headerAccept, MediaTypeResource.JSON())
 
 	var res Resource
 	if err := c.do(req, &res); err != nil {
@@ -164,13 +160,12 @@ func (c *Client) UpdateResource(ctx context.Context, namespace, resource string,
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource)
-	req, err := c.newRequest(ctx, "PUT", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, resourcePath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeResourceInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeResource)+"+json")
+	req.Header.Set(headerContentType, MediaTypeResourceInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeResource.JSON())
 
 	var res Resource
 	if err := c.do(req, &res); err != nil {
@@ -181,8 +176,7 @@ func (c *Client) UpdateResource(ctx context.Context, namespace, resource string,
 
 // Permanently deletes a resource.
 func (c *Client) DeleteResource(ctx context.Context, namespace, resource string) error {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource)
-	req, err := c.newRequest(ctx, "DELETE", path, nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, resourcePath(namespace, resource), nil)
 	if err != nil {
 		return err
 	}
@@ -191,12 +185,11 @@ func (c *Client) DeleteResource(ctx context.Context, namespace, resource string)
 
 // Lists all resources in a namespace.
 func (c *Client) ListResources(ctx context.Context, namespace string) (*ResourceList, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources")
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, resourcesPath(namespace), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeResourceList)+"+json")
+	req.Header.Set(headerAccept, MediaTypeResourceList.JSON())
 
 	var list ResourceList
 	if err := c.do(req, &list); err != nil {
@@ -212,13 +205,12 @@ func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, 
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions")
-	req, err := c.newRequest(ctx, "POST", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, versionsPath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeVersionInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
+	req.Header.Set(headerContentType, MediaTypeVersionInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
 
 	var version Version
 	if err := c.do(req, &version); err != nil {
@@ -229,12 +221,11 @@ func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, 
 
 // Retrieves version metadata with archive details.
 func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version string) (*Version, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version)
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, versionPath(namespace, resource, version), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
+	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
 
 	var ver Version
 	if err := c.do(req, &ver); err != nil {
@@ -250,13 +241,12 @@ func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version)
-	req, err := c.newRequest(ctx, "PUT", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, versionPath(namespace, resource, version), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeVersionInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
+	req.Header.Set(headerContentType, MediaTypeVersionInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
 
 	var ver Version
 	if err := c.do(req, &ver); err != nil {
@@ -267,8 +257,7 @@ func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version
 
 // Permanently deletes a version.
 func (c *Client) DeleteVersion(ctx context.Context, namespace, resource, version string) error {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version)
-	req, err := c.newRequest(ctx, "DELETE", path, nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, versionPath(namespace, resource, version), nil)
 	if err != nil {
 		return err
 	}
@@ -277,12 +266,11 @@ func (c *Client) DeleteVersion(ctx context.Context, namespace, resource, version
 
 // Lists all versions for a resource.
 func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (*VersionList, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions")
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, versionsPath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeVersionList)+"+json")
+	req.Header.Set(headerAccept, MediaTypeVersionList.JSON())
 
 	var list VersionList
 	if err := c.do(req, &list); err != nil {
@@ -293,13 +281,12 @@ func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (
 
 // Uploads a version archive.
 func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*Version, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version, "archive")
-	req, err := c.newRequest(ctx, "PUT", path, archive)
+	req, err := c.newRequest(ctx, http.MethodPut, archivePath(namespace, resource, version), archive)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeArchive))
-	req.Header.Set("Accept", string(MediaTypeVersion)+"+json")
+	req.Header.Set(headerContentType, string(MediaTypeArchive))
+	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
 
 	var ver Version
 	if err := c.do(req, &ver); err != nil {
@@ -310,12 +297,11 @@ func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version
 
 // Downloads a version archive.
 func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "versions", version, "archive")
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, archivePath(namespace, resource, version), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeArchive))
+	req.Header.Set(headerAccept, string(MediaTypeArchive))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -341,13 +327,12 @@ func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, 
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels")
-	req, err := c.newRequest(ctx, "POST", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, channelsPath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeChannelInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
+	req.Header.Set(headerContentType, MediaTypeChannelInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
 
 	var channel Channel
 	if err := c.do(req, &channel); err != nil {
@@ -358,12 +343,11 @@ func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, 
 
 // Retrieves channel metadata with full version details.
 func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*Channel, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels", channel)
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, channelPath(namespace, resource, channel), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
+	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
 
 	var ch Channel
 	if err := c.do(req, &ch); err != nil {
@@ -379,13 +363,12 @@ func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel
 		return nil, crex.Wrap(ErrMarshal, err)
 	}
 
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels", channel)
-	req, err := c.newRequest(ctx, "PUT", path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, channelPath(namespace, resource, channel), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(MediaTypeChannelInfo)+"+json")
-	req.Header.Set("Accept", string(MediaTypeChannel)+"+json")
+	req.Header.Set(headerContentType, MediaTypeChannelInfo.JSON())
+	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
 
 	var ch Channel
 	if err := c.do(req, &ch); err != nil {
@@ -396,8 +379,7 @@ func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel
 
 // Permanently deletes a channel.
 func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel string) error {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels", channel)
-	req, err := c.newRequest(ctx, "DELETE", path, nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, channelPath(namespace, resource, channel), nil)
 	if err != nil {
 		return err
 	}
@@ -406,12 +388,11 @@ func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel
 
 // Lists all channels for a resource.
 func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*ChannelList, error) {
-	path, _ := url.JoinPath("/namespaces", namespace, "resources", resource, "channels")
-	req, err := c.newRequest(ctx, "GET", path, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, channelsPath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", string(MediaTypeChannelList)+"+json")
+	req.Header.Set(headerAccept, MediaTypeChannelList.JSON())
 
 	var list ChannelList
 	if err := c.do(req, &list); err != nil {

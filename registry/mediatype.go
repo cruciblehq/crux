@@ -23,3 +23,13 @@ const (
 	MediaTypeChannelList   MediaType = "application/vnd.crucible.channel-list.v0"   // Collection of channel summaries.
 	MediaTypeArchive       MediaType = "application/vnd.crucible.archive.v0"        // Binary archive data (tar.zst format).
 )
+
+// Returns the media type as a string.
+func (m MediaType) String() string {
+	return string(m)
+}
+
+// Returns the media type with the JSON syntax suffix (+json).
+func (m MediaType) JSON() string {
+	return string(m) + "+json"
+}
