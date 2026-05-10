@@ -1,7 +1,5 @@
 package codec
 
-import "github.com/cruciblehq/crux/crex"
-
 // Implemented by types that support structural validation.
 //
 // Types implementing this interface can be validated via the package-level
@@ -27,7 +25,7 @@ type Validatable interface {
 func Validate(v any) error {
 	val, ok := v.(Validatable)
 	if !ok {
-		return crex.ProgrammingError("validate failed", "type does not implement Validatable").Err()
+		return ErrNotValidatable
 	}
 	return val.Validate()
 }

@@ -74,13 +74,13 @@ func Unmarshal(data []byte, v any, f Format) error {
 func Field(src map[string]any, v any, fieldName string) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Pointer || rv.Elem().Kind() != reflect.Struct {
-		return crex.ProgrammingError("decode field failed", "v must be a pointer to a struct").Err()
+		return ErrInvalidInput
 	}
 	rv = rv.Elem()
 
 	sf, ok := rv.Type().FieldByName(fieldName)
 	if !ok {
-		return crex.ProgrammingErrorf("decode field failed", "%s has no field %q", rv.Type().Name(), fieldName).Err()
+		return crex.Wrapf(ErrMissingField, "%s has no field %q", rv.Type().Name(), fieldName)
 	}
 
 	rawTag := sf.Tag.Get(tag)
