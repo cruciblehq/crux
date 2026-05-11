@@ -1,10 +1,11 @@
 package codec
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Applies tag-declared defaults to unset fields in a struct.
@@ -51,7 +52,7 @@ func applyFieldDefault(field reflect.Value, sf reflect.StructField, src map[stri
 		return nil
 	}
 	if err := setDefault(field, def); err != nil {
-		return fmt.Errorf("field %s: %w", sf.Name, err)
+		return crex.Wrapf(ErrSetDefault, "field %s: %w", sf.Name, err)
 	}
 	return nil
 }
@@ -135,7 +136,7 @@ func setDefault(field reflect.Value, val string) error {
 		}
 		field.SetFloat(n)
 	default:
-		return fmt.Errorf("unsupported type %s", field.Type())
+		return crex.Wrapf(ErrUnsupportedType, "%s", field.Type())
 	}
 	return nil
 }
