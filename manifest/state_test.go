@@ -3,14 +3,12 @@ package manifest
 import (
 	"errors"
 	"testing"
-	"time"
 )
 
 func TestStateValidateOK(t *testing.T) {
 	s := &State{
-		Version:    StateVersion,
-		Deployment: Deployment{DeployedAt: time.Now()},
-		Services:   []Ref{{ID: "s1", Target: "ns/x"}},
+		Version:     StateVersion,
+		Deployments: []Deployment{{Service: "s1", Container: "s1", Compute: "c1"}},
 	}
 	if err := s.Validate(); err != nil {
 		t.Fatal(err)
@@ -18,28 +16,20 @@ func TestStateValidateOK(t *testing.T) {
 }
 
 func TestStateValidateBadVersion(t *testing.T) {
-	s := &State{Version: 99, Deployment: Deployment{DeployedAt: time.Now()}}
+	s := &State{Version: 99}
 	err := s.Validate()
 	if !errors.Is(err, ErrUnsupportedStateVersion) {
 		t.Fatalf("err = %v, want ErrUnsupportedStateVersion", err)
 	}
 }
 
-func TestStateValidateMissingDeployedAt(t *testing.T) {
-	err := (&State{Version: StateVersion}).Validate()
-	if !errors.Is(err, ErrMissingDeployedAt) {
-		t.Fatalf("err = %v, want ErrMissingDeployedAt", err)
-	}
-}
-
-func TestStateValidateServiceMissingID(t *testing.T) {
+func TestStateValidateMissingDeploymentService(t *testing.T) {
 	s := &State{
-		Version:    StateVersion,
-		Deployment: Deployment{DeployedAt: time.Now()},
-		Services:   []Ref{{Target: "ns/x"}},
+		Version:     StateVersion,
+		Deployments: []Deployment{{Container: "c1", Compute: "c1"}},
 	}
 	err := s.Validate()
-	if !errors.Is(err, ErrMissingServiceID) {
-		t.Fatalf("err = %v, want ErrMissingServiceID", err)
+	if !errors.Is(err, ErrMissingDeploymentService) {
+		t.Fatalf("err = %v, want ErrMissingDeploymentService", err)
 	}
 }

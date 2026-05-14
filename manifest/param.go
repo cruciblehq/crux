@@ -1,21 +1,14 @@
 package manifest
 
 import (
-	"regexp"
-
 	"github.com/cruciblehq/crux/crex"
 )
 
-// Matches a valid param name.
-//
-// Accepts lowercase letters, digits, and underscores, starting with a letter.
-var validParamName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-
 // A named parameter.
 //
-// Parameters define the arguments a resource accepts from callers. Each
-// param has a unique name within its schema. A param with a non-nil Default
-// is optional; the default value is used when the caller omits it. A param
+// Parameters define the arguments a resource accepts. Each parameter has
+// a unique name within its schema. A parameter with a non-nil Default is
+// optional; the default value is used when the caller omits it. A parameter
 // with no default (nil) is required and must be supplied by the caller.
 type Param struct {
 
@@ -23,14 +16,14 @@ type Param struct {
 	//
 	// Used as the key in the argument map passed by callers. Must be
 	// non-empty and unique within the parent [Schema].
-	Name string `json:"name"`
+	Name string `codec:"name"`
 
 	// Fallback value used when the caller does not supply this argument.
 	//
 	// When nil, the parameter is required and omitting it is a validation
 	// error. When non-nil, the parameter is optional and the default value
 	// is substituted.
-	Default any `json:"default,omitempty"`
+	Default any `codec:"default,omitempty"`
 }
 
 // Validates the param.
@@ -41,7 +34,7 @@ func (p *Param) Validate() error {
 	if p.Name == "" {
 		return crex.Wrap(ErrInvalidParam, ErrMissingParamName)
 	}
-	if !validParamName.MatchString(p.Name) {
+	if !isValidName(p.Name) {
 		return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, ErrInvalidParamName)
 	}
 	if p.Default != nil {

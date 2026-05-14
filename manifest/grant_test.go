@@ -155,3 +155,142 @@ func TestDecodeGrantUnsupportedTypeWrapsAffordance(t *testing.T) {
 		t.Fatalf("error = %v, want wrapped ErrInvalidGrant", err)
 	}
 }
+
+func TestDecodeGrantRefWithScalarValue(t *testing.T) {
+	raw := map[string]any{
+		"ns/policy": "strict",
+	}
+	g, err := decodeGrant(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Source != "ns/policy" {
+		t.Fatalf("source = %q, want %q", g.Source, "ns/policy")
+	}
+	if g.Value != "strict" {
+		t.Fatalf("value = %q, want %q", g.Value, "strict")
+	}
+	if len(g.Args) != 0 {
+		t.Fatalf("args = %v, want empty", g.Args)
+	}
+	if err := g.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDecodeGrantRefWithNamedArgs(t *testing.T) {
+	raw := map[string]any{
+		"ns/policy": map[string]any{"level": "high", "mode": "strict"},
+	}
+	g, err := decodeGrant(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Source != "ns/policy" {
+		t.Fatalf("source = %q, want %q", g.Source, "ns/policy")
+	}
+	if g.Value != "" {
+		t.Fatalf("value = %q, want empty", g.Value)
+	}
+	if g.Args["level"] != "high" {
+		t.Fatalf("args[level] = %q, want %q", g.Args["level"], "high")
+	}
+	if g.Args["mode"] != "strict" {
+		t.Fatalf("args[mode] = %q, want %q", g.Args["mode"], "strict")
+	}
+	if err := g.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDecodeGrantRefWithNamedArgsIntValue(t *testing.T) {
+	raw := map[string]any{
+		"ns/policy": map[string]any{"level": 5},
+	}
+	_, err := decodeGrant(raw)
+	if !errors.Is(err, ErrInvalidAffordance) {
+		t.Fatalf("error = %v, want ErrInvalidAffordance", err)
+	}
+}
+
+func TestGrantEncodeWithScalarValue(t *testing.T) {
+	g := Grant{Source: "ns/policy", Value: "strict"}
+	enc, err := g.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := enc.(map[string]any)
+	if !ok {
+		t.Fatalf("encode type = %T, want map[string]any", enc)
+	}
+	if m["ns/policy"] != "strict" {
+		t.Fatalf("encoded value = %v, want %q", m["ns/policy"], "strict")
+	}
+}
+
+func TestGrantEncodeWithNamedArgs(t *testing.T) {
+	g := Grant{Source: "ns/policy", Args: map[string]string{"level": "high"}}
+	enc, err := g.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := enc.(map[string]any)
+	if !ok {
+		t.Fatalf("encode type = %T, want map[string]any", enc)
+	}
+	inner, ok := m["ns/policy"].(map[string]any)
+	if !ok {
+		t.Fatalf("inner type = %T, want map[string]any", m["ns/policy"])
+	}
+	if inner["level"] != "high" {
+		t.Fatalf("inner[level] = %v, want %q", inner["level"], "high")
+	}
+}
+
+func TestGrantValidateRejectsMixed(t *testing.T) {
+	g := Grant{Source: "ns/policy", Value: "strict", Args: map[string]string{"level": "high"}}
+	err := g.Validate()
+	if !errors.Is(err, ErrGrantArgsMixed) {
+		t.Fatalf("error = %v, want ErrGrantArgsMixed", err)
+	}
+	if !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("error = %v, want wrapped ErrInvalidGrant", err)
+	}
+}
+
+func TestGrantValidateRejectsDomainWithValue(t *testing.T) {
+	g := Grant{Source: ".cap effective net_admin", Value: "strict"}
+	err := g.Validate()
+	if !errors.Is(err, ErrDomainGrantWithArgs) {
+		t.Fatalf("error = %v, want ErrDomainGrantWithArgs", err)
+	}
+}
+
+func TestGrantValidateRejectsDomainWithArgs(t *testing.T) {
+	g := Grant{Source: ".cap effective net_admin", Args: map[string]string{"k": "v"}}
+	err := g.Validate()
+	if !errors.Is(err, ErrDomainGrantWithArgs) {
+		t.Fatalf("error = %v, want ErrDomainGrantWithArgs", err)
+	}
+}
+
+func TestDecodeGrantRefWithUnsupportedValueType(t *testing.T) {
+	raw := map[string]any{
+		"ns/policy": []any{"a", "b"},
+	}
+	_, err := decodeGrant(raw)
+	if !errors.Is(err, ErrInvalidAffordance) {
+		t.Fatalf("error = %v, want ErrInvalidAffordance", err)
+	}
+}
+
+func TestGrantValidateRejectsInvalidArgKey(t *testing.T) {
+	g := Grant{Source: "ns/policy", Args: map[string]string{"Bad-Key": "v"}}
+	err := g.Validate()
+	if !errors.Is(err, ErrInvalidArgKey) {
+		t.Fatalf("error = %v, want ErrInvalidArgKey", err)
+	}
+	if !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("error = %v, want wrapped ErrInvalidGrant", err)
+	}
+}

@@ -6,22 +6,22 @@ import (
 )
 
 func TestComputeValidateOK(t *testing.T) {
-	c := &Compute{ID: "c1", Provider: "local"}
+	c := &Compute{Provider: "local"}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestComputeValidateMissingID(t *testing.T) {
-	err := (&Compute{Provider: "local"}).Validate()
-	if !errors.Is(err, ErrMissingComputeID) {
-		t.Fatalf("err = %v, want ErrMissingComputeID", err)
+func TestComputeValidateMissingProvider(t *testing.T) {
+	err := (&Compute{}).Validate()
+	if !errors.Is(err, ErrMissingProvider) {
+		t.Fatalf("err = %v, want ErrMissingProvider", err)
 	}
 }
 
-func TestComputeValidateMissingProvider(t *testing.T) {
-	err := (&Compute{ID: "c1"}).Validate()
-	if !errors.Is(err, ErrMissingProvider) {
-		t.Fatalf("err = %v, want ErrMissingProvider", err)
+func TestComputeValidateUnknownProvider(t *testing.T) {
+	err := (&Compute{Provider: "gcp"}).Validate()
+	if !errors.Is(err, ErrInvalidProviderType) {
+		t.Fatalf("err = %v, want ErrInvalidProviderType", err)
 	}
 }

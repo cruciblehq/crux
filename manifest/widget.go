@@ -1,13 +1,11 @@
 package manifest
 
-import "github.com/cruciblehq/crux/crex"
+import (
+	"github.com/cruciblehq/crux/crex"
+)
 
-// The JavaScript bundle produced by widget builds.
-const WidgetMainFile = "index.js"
-
-// Holds configuration specific to widget resources.
-//
 // Widget resources are frontend components that can be embedded into apps.
+//
 // This structure defines configurations that are unique to widget resource
 // manifests. It is used as [Manifest.Config] for [ResourceType.Widget].
 type Widget struct {
@@ -16,10 +14,14 @@ type Widget struct {
 	//
 	// Lists configuration values the widget accepts when embedded. Values
 	// are bound through environment declarations.
-	Schema Schema `json:"schema,omitempty"`
+	Schema *Schema `codec:"schema,omitempty"`
 
 	// Build entry point.
-	Main string `json:"main"`
+	//
+	// A path to the widget's main file, relative to the manifest. This is the
+	// file that will be built and bundled for distribution. The build output
+	// is expected to be a single JavaScript file.
+	Main string `codec:"main"`
 }
 
 // Validates the widget configuration.
@@ -28,8 +30,10 @@ func (w *Widget) Validate() error {
 		return crex.Wrap(ErrInvalidWidget, ErrMissingMain)
 	}
 
-	if err := w.Schema.Validate(); err != nil {
-		return crex.Wrap(ErrInvalidWidget, err)
+	if w.Schema != nil {
+		if err := w.Schema.Validate(); err != nil {
+			return crex.Wrap(ErrInvalidWidget, err)
+		}
 	}
 
 	return nil

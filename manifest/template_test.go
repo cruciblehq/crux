@@ -9,7 +9,7 @@ func TestTemplateValidateOK(t *testing.T) {
 }
 
 func TestTemplateValidatePropagatesSchemaError(t *testing.T) {
-	tpl := &Template{Schema: Schema{Default: "missing"}}
+	tpl := &Template{Schema: &Schema{Default: "missing"}}
 	if err := tpl.Validate(); err == nil {
 		t.Fatal("expected error")
 	}

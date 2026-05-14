@@ -14,14 +14,14 @@ func TestRouteValidateOK(t *testing.T) {
 
 func TestRouteValidateMissingPattern(t *testing.T) {
 	err := (&Route{Service: "svc"}).Validate()
-	if !errors.Is(err, ErrMissingRoutePattern) {
-		t.Fatalf("err = %v, want ErrMissingRoutePattern", err)
+	if !errors.Is(err, ErrInvalidRoutePattern) {
+		t.Fatalf("err = %v, want ErrInvalidRoutePattern", err)
 	}
 }
 
 func TestRouteValidateMissingService(t *testing.T) {
 	err := (&Route{Pattern: "/api"}).Validate()
-	if !errors.Is(err, ErrMissingRouteService) {
-		t.Fatalf("err = %v, want ErrMissingRouteService", err)
+	if !errors.Is(err, ErrInvalidRouteService) {
+		t.Fatalf("err = %v, want ErrInvalidRouteService", err)
 	}
 }

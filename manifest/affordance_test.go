@@ -26,10 +26,22 @@ func TestAffordanceValidatePropagatesGrantError(t *testing.T) {
 }
 
 func TestAffordanceValidatePropagatesSchemaError(t *testing.T) {
-	a := &Affordance{Schema: Schema{Default: "missing"}}
+	a := &Affordance{Schema: &Schema{Default: "missing"}}
 	err := a.Validate()
 	if !errors.Is(err, ErrInvalidAffordance) {
 		t.Fatalf("err = %v, want ErrInvalidAffordance", err)
+	}
+}
+
+func TestAffordanceEncodeWithSchema(t *testing.T) {
+	a := &Affordance{Schema: &Schema{Params: []Param{{Name: "arg"}}}}
+	got, err := a.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got.(map[string]any)
+	if _, ok := m["schema"]; !ok {
+		t.Fatal("expected schema key in encoded affordance")
 	}
 }
 

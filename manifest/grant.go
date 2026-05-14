@@ -8,24 +8,45 @@ import (
 
 // Prefix that marks a grant source as a domain grant.
 //
-// Sources without the prefix are reference grants whose target is the bare
-// source string.
+// Sources without the prefix are reference grants whose target is the source
+// string. The prefix is not semantically meaningful and is stripped before
+// parsing; it's only used to distinguish domain grants from reference grants
+// in the manifest. The grammar for domain grants is defined in the affordance
+// builder, which is responsible for parsing them.
 const grantDomainPrefix = "."
 
-// A single Aegis grant.
+// A single grant.
 //
-// Holds the canonical source string for the grant. Domain grants begin with
-// [grantDomainPrefix] and follow the Aegis grammar; they are parsed by the
-// affordance builder in resource/affordance. Reference grants do not begin
-// with the prefix and name another affordance to be inlined during build time;
-// their target is the source string itself, returned by [Grant.RefTarget].
+// Grants can appear in one of two forms. Reference grants name an affordance
+// to be inlined during composition by the affordance builder; their source is
+// a bare affordance name. Domain grants begin with [grantDomainPrefix] and are
+// parsed by the affordance builder according to the AGL grammar. The prefix is
+// not semantically meaningful and is stripped before parsing; it's only used
+// to distinguish domain grants from reference grants in the manifest. Value
+// and Args are mutually exclusive and only valid on reference grants. When
+// present, Value is passed to the parameter named by the referenced affordance's
+// [Schema.Default]; when Args is present, each key-value pair is passed to the
+// parameter named by the key.
 type Grant struct {
 
 	// Canonical source form of the grant.
 	//
-	// For domain grants, has the form parsed by the Aegis grammar. For
-	// reference grants, is a bare affordance name. Empty is invalid.
-	Source string `json:"-"`
+	// For domain grants, has the form parsed by the AGL grammar. For reference
+	// grants, is a bare affordance name. Empty is invalid.
+	Source string `codec:"-"`
+
+	// Default argument for a reference grant.
+	//
+	// Passed to the parameter named by the affordance's [Schema.Default].
+	// Mutually exclusive with [Grant.Args]. Only valid on reference grants.
+	Value string `codec:"-"`
+
+	// Named arguments for a reference grant.
+	//
+	// Each key must match a parameter declared in the referenced affordance's
+	// [Schema.Params]. Mutually exclusive with [Grant.Value]. Only valid on
+	// reference grants.
+	Args Args `codec:"-"`
 }
 
 // Whether the grant is a reference to another affordance.
@@ -47,29 +68,55 @@ func (g *Grant) RefTarget() string {
 
 // Validates the grant source.
 //
-// Checks that the source is non-empty. Syntax validation of domain grants
-// and semantic validation against a specific subsystem happen later in the
-// affordance builder, during the build stage.
+// The source must be non-empty, args can only be present on reference grants,
+// and [Grant.Value] and [Grant.Args] cannot both be set. Syntax validation of
+// domain grants and semantic validation against a specific subsystem happen
+// later, during the build stage.
 func (g *Grant) Validate() error {
 	if g.Source == "" {
 		return crex.Wrapf(ErrInvalidGrant, "empty grant")
 	}
+	if g.IsRef() {
+		if g.Value != "" && len(g.Args) > 0 {
+			return crex.Wrap(ErrInvalidGrant, ErrGrantArgsMixed)
+		}
+		if err := g.Args.Validate(); err != nil {
+			return crex.Wrap(ErrInvalidGrant, err)
+		}
+	} else {
+		if g.Value != "" || len(g.Args) > 0 {
+			return crex.Wrap(ErrInvalidGrant, ErrDomainGrantWithArgs)
+		}
+	}
 	return nil
 }
 
-// Encodes the grant to its canonical source string.
+// Encodes the grant to its canonical serialized form.
 //
-// Implements [codec.Encodable]. The returned value is always a string suitable
-// for inclusion in a YAML or JSON grant list.
+// Implements [codec.Encodable]. A grant with no args encodes to its source
+// string. A grant with [Grant.Value] set encodes to a single-key map of source
+// to the scalar value. A grant with [Grant.Args] set encodes to a single-key
+// map of source to a string-keyed map of arg values.
 func (g *Grant) Encode() (any, error) {
+	if g.Value != "" {
+		return map[string]any{g.Source: g.Value}, nil
+	}
+	if len(g.Args) > 0 {
+		args := make(map[string]any, len(g.Args))
+		for k, v := range g.Args {
+			args[k] = v
+		}
+		return map[string]any{g.Source: args}, nil
+	}
 	return g.Source, nil
 }
 
 // Decodes a raw grant element into the receiver.
 //
-// Implements [codec.Decodable]. Strings are stored verbatim. Maps must contain
-// exactly one key whose value is nil; the key is stored as the source string.
-// The leading "." is interpreted on demand by [Grant.IsRef], not here.
+// Implements [codec.Decodable]. Strings are stored verbatim as [Grant.Source].
+// Maps must contain exactly one key. For domain grants (key starts with "."),
+// the value must be nil. For reference grants, a nil value means no args; a
+// string value sets [Grant.Value]; a string-keyed map sets [Grant.Args].
 func (g *Grant) Decode(raw any) error {
 	switch v := raw.(type) {
 	case string:
@@ -82,19 +129,66 @@ func (g *Grant) Decode(raw any) error {
 	}
 }
 
-// Populates the source from a single-entry map.
+// Populates the source and optional args from a single-entry map.
+//
+// Domain grants (key starts with ".") must have a nil value. Reference grants
+// accept a nil value (no args), a string value ([Grant.Value]), or a
+// string-keyed map ([Grant.Args]).
 func (g *Grant) decodeMap(m map[string]any) error {
-	if len(m) != 1 {
-		return crex.Wrapf(ErrInvalidGrant, "grant map must have exactly one key")
+	source, val, err := onlyKeyInGrantMap(m)
+	if err != nil {
+		return err
 	}
-	for key, val := range m {
+
+	g.Source = source
+	if !g.IsRef() {
 		if val != nil {
-			return crex.Wrapf(ErrInvalidGrant, "grant key %q does not accept a value", key)
+			return crex.Wrapf(ErrInvalidGrant, "domain grant %q does not accept args", source)
 		}
-		g.Source = key
 		return nil
 	}
-	return crex.Wrapf(ErrInvalidGrant, "empty map grant")
+	return g.decodeRefArgs(source, val)
+}
+
+// Asserts that the given map has exactly one key and returns that key and
+// its value.
+func onlyKeyInGrantMap(m map[string]any) (string, any, error) {
+	if len(m) != 1 {
+		return "", nil, crex.Wrapf(ErrInvalidGrant, "grant must name exactly one source")
+	}
+
+	var source string
+	var val any
+	for source, val = range m {
+		break
+	}
+	return source, val, nil
+}
+
+// Populates [Grant.Value] or [Grant.Args] from the value of a reference grant.
+//
+// A nil value means no args. A string value sets [Grant.Value]. A string-keyed
+// map sets [Grant.Args]; every value in the map must be a string.
+func (g *Grant) decodeRefArgs(source string, val any) error {
+	switch v := val.(type) {
+	case nil:
+		// no args
+	case string:
+		g.Value = v
+	case map[string]any:
+		args := make(map[string]string, len(v))
+		for k, av := range v {
+			s, ok := av.(string)
+			if !ok {
+				return crex.Wrapf(ErrInvalidGrant, "arg %q of ref grant %q must be a string", k, source)
+			}
+			args[k] = s
+		}
+		g.Args = args
+	default:
+		return crex.Wrapf(ErrInvalidGrant, "unsupported arg type %T for grant %q", val, source)
+	}
+	return nil
 }
 
 // Decodes a raw grant element into a typed Grant.

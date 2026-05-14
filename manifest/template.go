@@ -10,10 +10,13 @@ type Template struct {
 	// Declared parameters for this template.
 	//
 	// Lists the values the template accepts when instantiated.
-	Schema Schema `json:"schema,omitempty"`
+	Schema *Schema `codec:"schema,omitempty"`
 }
 
 // Validates the template configuration.
 func (t *Template) Validate() error {
-	return t.Schema.Validate()
+	if t.Schema != nil {
+		return t.Schema.Validate()
+	}
+	return nil
 }

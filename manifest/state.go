@@ -10,9 +10,12 @@ const StateVersion = 0
 // Records what resources have been deployed and their runtime identifiers.
 // Used for incremental deployments and resource lifecycle management.
 type State struct {
-	Version    int        `json:"version"`    // Version of the state format.
-	Deployment Deployment `json:"deployment"` // Metadata about the most recent deployment.
-	Services   []Ref      `json:"services"`   // Services that were deployed.
+
+	// Version of the state format.
+	Version int `codec:"version"`
+
+	// Deployments that were applied.
+	Deployments []Deployment `codec:"deployments"`
 }
 
 // Validates the state.
@@ -24,16 +27,9 @@ func (s *State) Validate() error {
 		return crex.Wrap(ErrInvalidState, ErrUnsupportedStateVersion)
 	}
 
-	if s.Deployment.DeployedAt.IsZero() {
-		return crex.Wrap(ErrInvalidState, ErrMissingDeployedAt)
-	}
-
-	for i := range s.Services {
-		if err := s.Services[i].Validate(); err != nil {
+	for i := range s.Deployments {
+		if err := s.Deployments[i].Validate(); err != nil {
 			return crex.Wrap(ErrInvalidState, err)
-		}
-		if s.Services[i].ID == "" {
-			return crex.Wrap(ErrInvalidState, ErrMissingServiceID)
 		}
 	}
 

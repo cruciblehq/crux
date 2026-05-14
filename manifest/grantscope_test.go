@@ -11,6 +11,14 @@ func TestGrantScopeValidateEmpty(t *testing.T) {
 	}
 }
 
+func TestGrantScopeValidateInvalidPlatform(t *testing.T) {
+	gs := &GrantScope{Platform: "Linux/AMD64"}
+	err := gs.Validate()
+	if !errors.Is(err, ErrInvalidPlatform) {
+		t.Fatalf("err = %v, want ErrInvalidPlatform", err)
+	}
+}
+
 func TestGrantScopeValidatePropagates(t *testing.T) {
 	gs := &GrantScope{Grants: []Grant{{}}}
 	err := gs.Validate()

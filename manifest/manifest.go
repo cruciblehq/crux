@@ -5,9 +5,6 @@ import (
 	"github.com/cruciblehq/crux/crex"
 )
 
-// The canonical filename for Crucible resource manifests.
-const ManifestFile = "crucible.yaml"
-
 // Defines a Crucible resource.
 //
 // A manifest specifies metadata about the resource and its type-specific
@@ -19,19 +16,19 @@ type Manifest struct {
 	//
 	// Determines how the rest of the manifest is interpreted. Currently
 	// the only supported version is 0.
-	Version int `json:"version"`
+	Version int `codec:"version"`
 
 	// Common metadata shared across all resource types.
 	//
 	// Includes the resource type, qualified name, and version. This is
 	// required and must be valid for the manifest to be considered valid.
-	Resource Resource `json:"resource"`
+	Resource Resource `codec:"resource"`
 
 	// Type-specific configuration.
 	//
 	// The concrete type depends on [Resource.Type]: [Runtime] from runtimes,
 	// [Service] for services, [Widget] for widgets, etc.
-	Config any `json:"-"`
+	Config any `codec:"-"`
 }
 
 // Validates the manifest.
@@ -60,6 +57,9 @@ func (m *Manifest) Validate() error {
 }
 
 // Validates that Config matches the resource type and is internally valid.
+//
+// Checks that Config is the expected concrete type for the resource type. Then
+// calls the config's Validate method to check its internal consistency.
 func (m *Manifest) validateConfig() error {
 	var match bool
 	switch m.Resource.Type {
@@ -81,7 +81,11 @@ func (m *Manifest) validateConfig() error {
 	if !match {
 		return ErrConfigTypeMismatch
 	}
-	return m.Config.(codec.Validatable).Validate()
+	v, ok := m.Config.(codec.Validatable)
+	if !ok {
+		return crex.Wrapf(ErrInvalidManifest, "config type %T is not validatable", m.Config)
+	}
+	return v.Validate()
 }
 
 // Encodes the manifest to a serializable map.
@@ -94,25 +98,12 @@ func (m *Manifest) Encode() (any, error) {
 		return nil, crex.Wrap(ErrEncodeFailed, err)
 	}
 
-	var cfg map[string]any
-	if enc, ok := m.Config.(codec.Encodable); ok {
-		raw, err := enc.Encode()
-		if err != nil {
-			return nil, crex.Wrap(ErrEncodeFailed, err)
-		}
-		cfg = raw.(map[string]any)
-	} else {
-		cfg, err = codec.ToMap(m.Config)
-		if err != nil {
-			return nil, crex.Wrap(ErrEncodeFailed, err)
-		}
+	cfg, err := encodeToMap(m.Config)
+	if err != nil {
+		return nil, crex.Wrap(ErrEncodeFailed, err)
 	}
 
-	for k, v := range cfg {
-		base[k] = v
-	}
-
-	return base, nil
+	return mergeMap(cfg, base)
 }
 
 // Decodes a raw parsed map into the manifest.
@@ -123,7 +114,7 @@ func (m *Manifest) Encode() (any, error) {
 func (m *Manifest) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrDecodeFailed, "expected map, got %T", raw)
+		return crex.Wrapf(ErrDecodeFailed, "unexpected type %T", raw)
 	}
 	if err := codec.Field(src, m, "Version"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
@@ -132,17 +123,21 @@ func (m *Manifest) Decode(raw any) error {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 
-	configs := map[ResourceType]any{
-		TypeRuntime:    &Runtime{},
-		TypeService:    &Service{},
-		TypeWidget:     &Widget{},
-		TypeTemplate:   &Template{},
-		TypeAffordance: &Affordance{},
-		TypeBlueprint:  &Blueprint{},
-	}
-
-	target, ok := configs[m.Resource.Type]
-	if !ok {
+	var target any
+	switch m.Resource.Type {
+	case TypeRuntime:
+		target = &Runtime{}
+	case TypeService:
+		target = &Service{}
+	case TypeWidget:
+		target = &Widget{}
+	case TypeTemplate:
+		target = &Template{}
+	case TypeAffordance:
+		target = &Affordance{}
+	case TypeBlueprint:
+		target = &Blueprint{}
+	default:
 		return crex.Wrap(ErrDecodeFailed, ErrInvalidResourceType)
 	}
 

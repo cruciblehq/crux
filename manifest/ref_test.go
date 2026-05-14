@@ -41,3 +41,26 @@ func TestRefValidateAcceptsArgsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRefValidateInvalidID(t *testing.T) {
+	r := &Ref{Target: "x", ID: "My-Service"}
+	err := r.Validate()
+	if !errors.Is(err, ErrInvalidRefID) {
+		t.Fatalf("err = %v, want ErrInvalidRefID", err)
+	}
+}
+
+func TestRefValidateValidID(t *testing.T) {
+	r := &Ref{Target: "x", ID: "api"}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRefValidateInvalidArgKey(t *testing.T) {
+	r := &Ref{Target: "x", Args: map[string]string{"Bad-Key": "v"}}
+	err := r.Validate()
+	if !errors.Is(err, ErrInvalidArgKey) {
+		t.Fatalf("err = %v, want ErrInvalidArgKey", err)
+	}
+}

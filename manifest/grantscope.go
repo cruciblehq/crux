@@ -20,19 +20,23 @@ type GrantScope struct {
 	// format is "os/arch" (e.g. "linux/amd64") and the grants apply only
 	// to matching platforms. The builder groups grants under scopes based
 	// on their platform selectors.
-	Platform string `json:"platform,omitempty"`
+	Platform string `codec:"platform,omitempty"`
 
 	// Grants within this scope.
 	//
 	// Each grant targets a subsystem and carries its expression. The builder
 	// produces scopes by grouping grants with the same platform selector.
-	Grants []Grant `json:"grants,omitempty"`
+	Grants []Grant `codec:"grants,omitempty"`
 }
 
-// Validates the scope.
+// Validates the grant scope.
 //
+// Platform, when set, must use the os/arch format (e.g. "linux/amd64").
 // Every contained grant must itself be valid.
 func (gs *GrantScope) Validate() error {
+	if gs.Platform != "" && !isValidPlatform(gs.Platform) {
+		return crex.Wrap(ErrInvalidAffordance, ErrInvalidPlatform)
+	}
 	for i := range gs.Grants {
 		if err := gs.Grants[i].Validate(); err != nil {
 			return err
@@ -41,7 +45,7 @@ func (gs *GrantScope) Validate() error {
 	return nil
 }
 
-// Encodes the scope into one or more list entries.
+// Encodes the grant scope into one or more list entries.
 //
 // Implements [codec.Encodable]. Platform-scoped grants produce a single map
 // with platform and grants keys. Universal grants (empty Platform) produce
@@ -80,7 +84,7 @@ func (gs *GrantScope) Encode() (any, error) {
 func (gs *GrantScope) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidAffordance, "expected map, got %T", raw)
+		return crex.Wrapf(ErrInvalidAffordance, "unexpected type %T", raw)
 	}
 	inner, ok := src["grants"].([]any)
 	if !ok {

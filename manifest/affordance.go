@@ -18,7 +18,7 @@ type Affordance struct {
 	// Lists the named arguments the affordance accepts. When [Schema.Default]
 	// is set, scalar values passed by a caller are assigned to that parameter
 	// instead of requiring an explicit key. Zero value means no parameters.
-	Schema Schema `json:"schema"`
+	Schema *Schema `codec:"schema,omitempty"`
 
 	// Grant scopes.
 	//
@@ -26,15 +26,18 @@ type Affordance struct {
 	// live in a scope with an empty Platform. Custom Encode flattens
 	// universal grants into the top-level list; platform-scoped grants
 	// are written as platform group entries.
-	Scopes []GrantScope `json:"-"`
+	Scopes []GrantScope `codec:"-"`
 }
 
 // Validates the affordance configuration.
 //
-// Schema and all grant scopes must be valid.
+// Grant scopes are validated recursively. The schema is validated according to
+// its own rules. Grants must have a non-empty action and valid parameters.
 func (a *Affordance) Validate() error {
-	if err := a.Schema.Validate(); err != nil {
-		return crex.Wrap(ErrInvalidAffordance, err)
+	if a.Schema != nil {
+		if err := a.Schema.Validate(); err != nil {
+			return crex.Wrap(ErrInvalidAffordance, err)
+		}
 	}
 
 	for i := range a.Scopes {
@@ -54,12 +57,14 @@ func (a *Affordance) Validate() error {
 func (a *Affordance) Encode() (any, error) {
 	m := make(map[string]any)
 
-	sm, err := codec.ToMap(a.Schema)
-	if err != nil {
-		return nil, err
-	}
-	if len(sm) > 0 {
-		m["schema"] = sm
+	if a.Schema != nil {
+		sm, err := codec.ToMap(a.Schema)
+		if err != nil {
+			return nil, err
+		}
+		if len(sm) > 0 {
+			m["schema"] = sm
+		}
 	}
 
 	list, err := encodeScopes(a.Scopes)
@@ -102,7 +107,7 @@ func encodeScopes(scopes []GrantScope) ([]any, error) {
 func (a *Affordance) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidAffordance, "expected map, got %T", raw)
+		return crex.Wrapf(ErrInvalidAffordance, "unexpected type %T", raw)
 	}
 
 	if err := codec.Field(src, a, "Schema"); err != nil {

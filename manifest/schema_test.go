@@ -37,6 +37,14 @@ func TestSchemaValidateDefaultNotInSchema(t *testing.T) {
 	}
 }
 
+func TestSchemaValidateDefaultInvalidFormat(t *testing.T) {
+	s := &Schema{Default: "INVALID"}
+	err := s.Validate()
+	if !errors.Is(err, ErrInvalidParamName) {
+		t.Fatalf("err = %v, want ErrInvalidParamName", err)
+	}
+}
+
 func TestSchemaValidatePropagatesParamError(t *testing.T) {
 	s := &Schema{Params: []Param{{Name: ""}}}
 	if err := s.Validate(); err == nil {

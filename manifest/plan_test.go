@@ -7,11 +7,12 @@ import (
 
 func TestPlanValidateOK(t *testing.T) {
 	p := &Plan{
-		Version:    PlanVersion,
-		Services:   []Ref{{Target: "ns/x"}},
-		Compute:    []Compute{{ID: "c1", Provider: "local"}},
-		Containers: []Container{{Service: "s", Compute: "c1"}},
-		Gateway:    Gateway{Routes: []Route{{Pattern: "/api", Service: "s"}}},
+		Version:     PlanVersion,
+		Services:    map[string]string{"svc": "ns/x"},
+		Compute:     map[string]Compute{"c1": {Provider: "local"}},
+		Containers:  map[string]Container{"svc": {}},
+		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1"}},
+		Gateway:     Gateway{Routes: []Route{{Pattern: "/api", Service: "svc"}}},
 	}
 	if err := p.Validate(); err != nil {
 		t.Fatal(err)
@@ -26,21 +27,21 @@ func TestPlanValidateBadVersion(t *testing.T) {
 }
 
 func TestPlanValidatePropagatesServiceError(t *testing.T) {
-	p := &Plan{Version: PlanVersion, Services: []Ref{{}}}
+	p := &Plan{Version: PlanVersion, Services: map[string]string{"svc": ""}}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestPlanValidatePropagatesComputeError(t *testing.T) {
-	p := &Plan{Version: PlanVersion, Compute: []Compute{{Provider: "local"}}}
+	p := &Plan{Version: PlanVersion, Compute: map[string]Compute{"c1": {}}}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestPlanValidatePropagatesContainerError(t *testing.T) {
-	p := &Plan{Version: PlanVersion, Containers: []Container{{Compute: "c1"}}}
+func TestPlanValidatePropagatesAssociationError(t *testing.T) {
+	p := &Plan{Version: PlanVersion, Deployments: []Deployment{{Container: "c1", Compute: "c1"}}}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
 	}
@@ -50,5 +51,16 @@ func TestPlanValidatePropagatesGatewayError(t *testing.T) {
 	p := &Plan{Version: PlanVersion, Gateway: Gateway{Routes: []Route{{}}}}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestPlanValidatePropagatesEnvironmentError(t *testing.T) {
+	p := &Plan{
+		Version:      PlanVersion,
+		Environments: map[string]Environment{"e": {ID: "Bad Name"}},
+	}
+	err := p.Validate()
+	if !errors.Is(err, ErrInvalidEnvironmentID) {
+		t.Fatalf("err = %v, want ErrInvalidEnvironmentID", err)
 	}
 }

@@ -1,5 +1,7 @@
 package manifest
 
+import "github.com/cruciblehq/crux/crex"
+
 // Identifies the infrastructure provider that the deployment plan targets.
 //
 // Controls how compute resources are configured in the generated [Plan].
@@ -17,3 +19,13 @@ const (
 	// is generated.
 	ProviderTypeLocal ProviderType = "local"
 )
+
+// Parses s as a [ProviderType], returning an error for unrecognised values.
+func ParseProviderType(s string) (ProviderType, error) {
+	switch ProviderType(s) {
+	case ProviderTypeAWS, ProviderTypeLocal:
+		return ProviderType(s), nil
+	default:
+		return "", crex.Wrapf(ErrInvalidProviderType, "unknown provider %q", s)
+	}
+}

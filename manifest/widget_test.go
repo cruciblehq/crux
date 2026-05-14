@@ -20,7 +20,7 @@ func TestWidgetValidateMissingMain(t *testing.T) {
 }
 
 func TestWidgetValidatePropagatesSchemaError(t *testing.T) {
-	w := &Widget{Main: "index.js", Schema: Schema{Default: "missing"}}
+	w := &Widget{Main: "index.js", Schema: &Schema{Default: "missing"}}
 	if err := w.Validate(); err == nil {
 		t.Fatal("expected error")
 	}
