@@ -1,6 +1,6 @@
 //go:build !windows
 
-package cache
+package fio
 
 import (
 	"os"
@@ -20,7 +20,7 @@ func TestLockExclusive(t *testing.T) {
 	}
 	defer f1.Close()
 
-	if err := lockFile(f1); err != nil {
+	if err := Lock(f1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -37,10 +37,10 @@ func TestLockExclusive(t *testing.T) {
 	}
 
 	// Release the first lock and verify the second can now succeed.
-	unlockFile(f1)
+	Unlock(f1)
 
-	if err := lockFile(f2); err != nil {
+	if err := Lock(f2); err != nil {
 		t.Fatal("expected lock to succeed after unlock: ", err)
 	}
-	unlockFile(f2)
+	Unlock(f2)
 }

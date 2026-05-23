@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/crux/fio"
 	"github.com/cruciblehq/crux/paths"
 )
 
@@ -65,7 +66,7 @@ func OpenAt(root string) (*Cache, error) {
 		return nil, err
 	}
 
-	if err := lockFile(lf); err != nil {
+	if err := fio.Lock(lf); err != nil {
 		lf.Close()
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (c *Cache) Close() error {
 
 	if c.lock != nil {
 		err := errors.Join(
-			unlockFile(c.lock),
+			fio.Unlock(c.lock),
 			c.lock.Close(),
 		)
 		c.lock = nil
@@ -100,7 +101,7 @@ func (c *Cache) Has(namespace, resource, version string) (bool, error) {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return pathExists(meta)
+	return fio.PathExists(meta)
 }
 
 // Retrieves version metadata from the cache.
@@ -145,7 +146,7 @@ func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) 
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return pathExists(dir)
+	return fio.PathExists(dir)
 }
 
 // Returns the path to the extracted contents of a cached archive.
@@ -277,7 +278,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	}
 
 	// Already extracted.
-	exists, err := pathExists(dir)
+	exists, err := fio.PathExists(dir)
 	if err != nil {
 		return "", err
 	}
@@ -311,7 +312,7 @@ func (c *Cache) put(namespace, resource, version string, archive io.Reader) (*Ve
 func (c *Cache) list() ([]*Version, error) {
 	root := c.archivesRoot()
 
-	namespaces, err := listSubdirs(root)
+	namespaces, err := fio.ListSubdirs(root)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -328,7 +329,7 @@ func (c *Cache) list() ([]*Version, error) {
 
 // Returns all versions within a single namespace directory.
 func listNamespace(root, ns string) []*Version {
-	resources, err := listSubdirs(filepath.Join(root, ns))
+	resources, err := fio.ListSubdirs(filepath.Join(root, ns))
 	if err != nil {
 		slog.Error("failed to list resources", "namespace", ns, "error", err)
 		return nil
@@ -336,7 +337,7 @@ func listNamespace(root, ns string) []*Version {
 
 	var versions []*Version
 	for _, res := range resources {
-		versionDirs, err := listSubdirs(filepath.Join(root, ns, res))
+		versionDirs, err := fio.ListSubdirs(filepath.Join(root, ns, res))
 		if err != nil {
 			slog.Error("failed to list versions", "namespace", ns, "resource", res, "error", err)
 			continue
@@ -373,7 +374,7 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 	}
 
 	archPath := filepath.Join(dir, archiveFilename)
-	digest, size, err := writeFileAtomic(r, dir, archPath)
+	digest, size, err := fio.WriteAtomic(r, dir, archPath)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +407,7 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 		filepath.Dir(eDir),
 		filepath.Dir(filepath.Dir(eDir)),
 	} {
-		if pErr := pruneEmpty(dir); pErr != nil {
+		if pErr := fio.RemoveDirIfEmpty(dir); pErr != nil {
 			slog.Error("failed to prune empty directory", "dir", dir, "error", pErr)
 		}
 	}

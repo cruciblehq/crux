@@ -1,10 +1,7 @@
 package cache
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,18 +10,6 @@ import (
 	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/paths"
 )
-
-// Checks whether a path exists on the filesystem.
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
 
 // Opens a file, returning ErrNotFound if it doesn't exist.
 func openFile(path string) (*os.File, error) {
@@ -56,41 +41,6 @@ func extractDirAtomic(r io.Reader, dir string) error {
 	}
 
 	return os.Rename(tmpDir, dir)
-}
-
-// Writes r to destPath atomically via a temp file in tmpDir.
-//
-// Computes the SHA-256 digest during the write and returns it along with the
-// number of bytes written.
-func writeFileAtomic(r io.Reader, tmpDir, destPath string) (string, int64, error) {
-	tmpFile, err := os.CreateTemp(tmpDir, ".tmp-*")
-	if err != nil {
-		return "", 0, err
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath) // No-op after successful rename.
-
-	h := sha256.New()
-	w := io.MultiWriter(tmpFile, h)
-
-	size, err := io.Copy(w, r)
-	if err != nil {
-		tmpFile.Close()
-		return "", 0, err
-	}
-	if err := tmpFile.Close(); err != nil {
-		return "", 0, err
-	}
-
-	if err := os.Rename(tmpPath, destPath); err != nil {
-		return "", 0, err
-	}
-	if err := os.Chmod(destPath, paths.DefaultFileMode); err != nil {
-		return "", 0, err
-	}
-
-	digest := fmt.Sprintf("sha256:%s", hex.EncodeToString(h.Sum(nil)))
-	return digest, size, nil
 }
 
 // Reads and parses a version metadata file.
@@ -134,38 +84,4 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 		return nil, err
 	}
 	return ver, nil
-}
-
-// Removes a directory if it is empty.
-func pruneEmpty(dir string) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	if len(entries) > 0 {
-		return nil
-	}
-	err = os.Remove(dir)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	return err
-}
-
-// Lists immediate subdirectory names.
-func listSubdirs(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	return names, nil
 }
