@@ -43,15 +43,6 @@ func Parse(s string, contextType string) (*Reference, error) {
 	return p.parse(contextType)
 }
 
-// Like [Parse], but panics on error.
-func MustParse(s string, contextType string) *Reference {
-	ref, err := Parse(s, contextType)
-	if err != nil {
-		panic(err)
-	}
-	return ref
-}
-
 // Creates a reference from an identifier, version or channel, and optional digest.
 //
 // Useful for programmatically building references when you already have the
