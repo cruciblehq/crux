@@ -16,13 +16,12 @@ import (
 // Holds a pointer to the OCI capabilities section of the unified spec, wired
 // in at construction time. Build and Merge mutate that section in place.
 type Subsystem struct {
-	lc       *specs.LinuxCapabilities // Pointer to the spec's capabilities section.
-	declared map[caps.Cap]struct{}    // Set of declared capability names.
+	spec *specs.LinuxCapabilities // Pointer to the spec's capabilities section.
 }
 
 // Returns a Subsystem wired to mutate caps.
-func New(lc *specs.LinuxCapabilities) *Subsystem {
-	return &Subsystem{lc: lc, declared: make(map[caps.Cap]struct{})}
+func New(spec *specs.LinuxCapabilities) *Subsystem {
+	return &Subsystem{spec: spec}
 }
 
 // Returns the cap subsystem identifier.
@@ -43,10 +42,7 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	if err != nil {
 		return err
 	}
-	if err := s.declare(name); err != nil {
-		return err
-	}
-	return apply(s.lc, name, mode)
+	return apply(s.spec, name, mode)
 }
 
 // Validates the grant's structural shape against what the cap subsystem accepts.
@@ -100,17 +96,16 @@ func parse(g *agl.Model) (caps.Cap, mode, error) {
 	return c, mode, nil
 }
 
-// Records name as declared.
+// Returns the deduplication key for a cap grant.
 //
-// Returns ErrConflict if name was already declared, even if the same mode and
-// path were used. This prevents redundant grants and guards against mistakes
-// where the same capability is granted in two different ways.
-func (s *Subsystem) declare(name caps.Cap) error {
-	if _, ok := s.declared[name]; ok {
-		return crex.Wrapf(ErrConflict, "capability %q already declared", name)
+// The key is the capability name (args[0]). This means .cap net_admin and
+// .cap net_admin full are treated as conflicts: the same capability may not
+// appear in more than one grant regardless of mode.
+func (s *Subsystem) Key(g *agl.Model) string {
+	if len(g.Args) == 0 {
+		return ""
 	}
-	s.declared[name] = struct{}{}
-	return nil
+	return g.Args[0].Value
 }
 
 // Applies a parsed capability and mode to the wired-in section.

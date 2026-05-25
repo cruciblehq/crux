@@ -20,7 +20,7 @@ import (
 // to the Unified map verbatim in v2 kernel format. The private typed model
 // never escapes the package.
 type Subsystem struct {
-	oci      *specs.LinuxResources // Write target.
+	spec     *specs.LinuxResources // Write target.
 	internal *spec                 // Private conflict tracker.
 	applied  map[string][]string   // Per-knob raw value strings, in insertion order, used to rebuild Unified.
 }
@@ -33,7 +33,7 @@ type Subsystem struct {
 // detection; the model never escapes the package.
 func New(resources *specs.LinuxResources) *Subsystem {
 	return &Subsystem{
-		oci:      resources,
+		spec:     resources,
 		internal: newSpec(),
 		applied:  make(map[string][]string),
 	}
@@ -42,6 +42,15 @@ func New(resources *specs.LinuxResources) *Subsystem {
 // Returns the cgroup subsystem identifier used by the runtime registry.
 func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameCgroup
+}
+
+// Returns an empty string to opt out of builder-level deduplication.
+//
+// Cgroup grants allow multiple values for the same knob (e.g. io.max for
+// different block devices), so conflict detection is handled internally by
+// the typed model rather than the builder's simple key equality check.
+func (s *Subsystem) Key(_ *agl.Model) string {
+	return ""
 }
 
 // Applies a parsed grant to the OCI write target.
@@ -105,20 +114,19 @@ func (s *Subsystem) flushDevices() {
 			Access: d.Access,
 		})
 	}
-	s.oci.Devices = out
+	s.spec.Devices = out
 }
 
 // Rewrites the Unified entry for knob from its per-knob applied list.
 //
-// Other knob entries in oci.Unified are untouched; this is called once per
-// knob whenever its applied list changes. List-typed knobs become
-// newline-separated kernel-format lines so each entry survives as a
-// distinct value.
+// Other knob entries in Unified are untouched; this is called once per knob
+// whenever its applied list changes. List-typed knobs become newline-separated
+// kernel-format lines so each entry survives as a distinct value.
 func (s *Subsystem) flushUnified(knob string) {
-	if s.oci.Unified == nil {
-		s.oci.Unified = make(map[string]string)
+	if s.spec.Unified == nil {
+		s.spec.Unified = make(map[string]string)
 	}
-	s.oci.Unified[knob] = strings.Join(s.applied[knob], "\n")
+	s.spec.Unified[knob] = strings.Join(s.applied[knob], "\n")
 }
 
 // Validates the surface shape of a cgroup agl.

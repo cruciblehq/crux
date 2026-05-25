@@ -121,18 +121,6 @@ func TestBuildEffectiveMode(t *testing.T) {
 	}
 }
 
-func TestBuildSameCapConflict(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Subsystem: "cap", Args: []agl.Arg{{Type: agl.ArgName, Value: "net_admin"}}}
-	if err := sub.Build(&g); err != nil {
-		t.Fatalf("Build: %v", err)
-	}
-	err := sub.Build(&g)
-	if !errors.Is(err, ErrConflict) {
-		t.Fatalf("err = %v, want ErrConflict", err)
-	}
-}
-
 func TestNameReturnsCap(t *testing.T) {
 	sub, _ := newSub()
 	if sub.Name() != subsystem.NameCap {

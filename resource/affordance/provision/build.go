@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/crex"
+
 	"github.com/cruciblehq/crux/resource/affordance/agl"
 	"github.com/cruciblehq/crux/resource/affordance/subsystem"
 	"github.com/cruciblehq/crux/resource/affordance/units"
@@ -12,15 +13,14 @@ import (
 
 // Implementation of the provision subsystem.
 //
-// Declares CPU, memory, and disk requirements from .provision grants into
-// a [Spec]. Each resource may be declared at most once. The blueprint builder
-// reads the spec to bin-pack services onto compute units and select instance
-// types.
+// Declares CPU, memory, and disk allocation from .provision grants into a
+// [Spec]. The blueprint builder reads the spec to bin-pack services onto
+// compute units and select instance types.
 type Subsystem struct {
 	spec *Spec // Pointer to the unified spec's provision section.
 }
 
-// Returns a Subsystem that writes into s as grants accumulate.
+// Returns a Subsystem that writes into s.
 func New(s *Spec) *Subsystem {
 	return &Subsystem{spec: s}
 }
@@ -44,10 +44,11 @@ func (s *Subsystem) Key(g *agl.Model) string {
 
 // Applies a single .provision grant to the accumulated spec.
 //
-// The grant form is ".provision RESOURCE VALUE" where RESOURCE is one of "cpu",
-// "memory", or "disk" and VALUE is a quantity appropriate for that resource.
-// Each resource may appear at most once; duplicate resource grants are rejected
-// by the builder before reaching this method.
+// Grants are of the form ".provision RESOURCE VALUE". RESOURCE is one of "cpu",
+// "memory", or "disk". VALUE is a quantity appropriate for that resource. Each
+// resource may appear at most once. Duplicate declarations of the same resource
+// must be rejected before reaching this method. The builder's Spec is mutated
+// in-place with the new provision values.
 func (s *Subsystem) Build(g *agl.Model) error {
 	if err := check(g); err != nil {
 		return err
@@ -91,7 +92,7 @@ func check(g *agl.Model) error {
 		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in provision grant")
 	}
 	if len(g.Args) != 2 {
-		return crex.Wrapf(ErrInvalidGrant, "provision grant requires exactly two arguments: resource name and value")
+		return crex.Wrapf(ErrInvalidGrant, "provision grant requires exactly two arguments (resource name and value)")
 	}
 	if g.Args[0].Type != agl.ArgName {
 		return crex.Wrapf(ErrInvalidGrant, "first argument must be a resource name (cpu, memory, disk)")
@@ -101,9 +102,9 @@ func check(g *agl.Model) error {
 
 // Parses a CPU argument into millicores.
 //
-// An integer arg (e.g. "4") is converted to millicores by multiplying by
-// 1000. A quantity arg with the "m" suffix (e.g. "500m") is stored directly.
-// Other types and suffixes are rejected.
+// An integer arg (e.g. "4") is converted to millicores. A quantity arg with
+// the "m" suffix (e.g. "500m") is stored directly. Other types and suffixes
+// are rejected.
 func parseCPU(a agl.Arg) (uint64, error) {
 	switch a.Type {
 	case agl.ArgInt:
@@ -113,23 +114,23 @@ func parseCPU(a agl.Arg) (uint64, error) {
 		}
 		return n * 1000, nil
 	case agl.ArgQuantity:
-		if !strings.HasSuffix(a.Value, "m") {
-			return 0, crex.Wrapf(ErrInvalidGrant, "cpu quantity must use the millicore suffix (e.g. 500m), got %q", a.Value)
+		if !strings.HasSuffix(a.Value, string(units.SuffixMilli)) {
+			return 0, crex.Wrapf(ErrInvalidGrant, "cpu quantity must use the millicore suffix")
 		}
-		n, err := strconv.ParseUint(strings.TrimSuffix(a.Value, "m"), 10, 64)
+		n, err := strconv.ParseUint(strings.TrimSuffix(a.Value, string(units.SuffixMilli)), 10, 64)
 		if err != nil {
 			return 0, crex.Wrap(ErrInvalidGrant, err)
 		}
 		return n, nil
 	default:
-		return 0, crex.Wrapf(ErrInvalidGrant, "cpu must be a vCPU count (e.g. 2) or millicore quantity (e.g. 500m)")
+		return 0, crex.Wrapf(ErrInvalidGrant, "cpu must be a vCPU count or millicore quantity")
 	}
 }
 
 // Parses a byte quantity argument into bytes.
 //
-// Accepts an integer arg (raw bytes) or a quantity arg with IEC binary
-// (Ki, Mi, Gi, Ti, Pi, Ei) or SI decimal (k/K, M, G, T, P) suffixes.
+// Accepts an integer or quantity arg with IEC binary (Ki, Mi, Gi, Ti, Pi, Ei)
+// or SI decimal (k/K, M, G, T, P) suffixes.
 func parseBytes(a agl.Arg) (uint64, error) {
 	switch a.Type {
 	case agl.ArgInt:
@@ -141,11 +142,11 @@ func parseBytes(a agl.Arg) (uint64, error) {
 	case agl.ArgQuantity:
 		return parseByteQuantity(a.Value)
 	default:
-		return 0, crex.Wrapf(ErrInvalidGrant, "expected a byte quantity (e.g. 8Gi, 100G)")
+		return 0, crex.Wrapf(ErrInvalidGrant, "expected a byte quantity")
 	}
 }
 
-// Converts a quantity string (e.g. "8Gi") to bytes using [agl.QuantitySuffix.Multiplier].
+// Converts a quantity string (e.g. "8Gi") to bytes.
 //
 // Tries the two-character IEC binary suffixes (Ki–Ei) before the one-character
 // SI decimal suffixes (k/K–P). Sub-unit suffixes (m, u, n) are rejected since

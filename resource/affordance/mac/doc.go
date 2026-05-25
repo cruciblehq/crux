@@ -8,7 +8,7 @@
 // unknown hooks or fields are rejected at build time, and field types are
 // checked against the operators applied to them.
 //
-// A [Subsystem] wraps a [manifest.MACSpec] and accumulates grants in place.
+// A [Subsystem] wraps a [spec.MACSpec] and accumulates grants in place.
 // Build compiles one parsed grant into a hook allow rule and folds it into
 // the spec with union semantics: rules are deduplicated by hook plus
 // structurally identical where-clause, and rules for the same hook with

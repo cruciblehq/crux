@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/spec"
 	"github.com/cruciblehq/crux/resource/affordance/agl"
 )
 
@@ -20,8 +20,8 @@ func strArg(v string) agl.Arg {
 }
 
 // Helper to create a Subsystem with a new spec for testing.
-func newSub() (*Subsystem, *manifest.FcapSpec) {
-	s := &manifest.FcapSpec{}
+func newSub() (*Subsystem, *spec.Fcap) {
+	s := &spec.Fcap{}
 	return New(s), s
 }
 
@@ -55,18 +55,6 @@ func TestBuildInheritableOnly(t *testing.T) {
 	}
 	if !slices.Equal(e.Inheritable, []string{"chown"}) {
 		t.Fatalf("Inheritable = %v", e.Inheritable)
-	}
-}
-
-func TestBuildSameGrantConflict(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Subsystem: "fcap", Args: []agl.Arg{nameArg("net_admin"), nameArg("effective"), strArg("/usr/bin/x")}}
-	if err := sub.Build(&g); err != nil {
-		t.Fatal(err)
-	}
-	err := sub.Build(&g)
-	if !errors.Is(err, ErrConflict) {
-		t.Fatalf("err = %v, want ErrConflict", err)
 	}
 }
 

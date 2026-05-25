@@ -4,12 +4,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/spec"
 	"github.com/cruciblehq/crux/resource/affordance/agl"
 )
 
-func newSub() (*Subsystem, *manifest.MACSpec) {
-	s := &manifest.MACSpec{}
+func newSub() (*Subsystem, *spec.MAC) {
+	s := &spec.MAC{}
 	return New(s), s
 }
 
@@ -92,10 +92,7 @@ func TestBuildRejectsKwargs(t *testing.T) {
 }
 
 func TestSpecEmptyWhenNoGrants(t *testing.T) {
-	got := &manifest.MACSpec{}
-	if got == nil {
-		t.Fatal("MACSpec{} = nil")
-	}
+	got := &spec.MAC{}
 	if len(got.Rules) != 0 {
 		t.Fatalf("Rules len = %d, want 0", len(got.Rules))
 	}

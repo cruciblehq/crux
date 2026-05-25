@@ -52,7 +52,7 @@ const (
 	BlockSuspend      Cap = "block_suspend"      // Employ features that can block system suspend.
 	AuditRead         Cap = "audit_read"         // Read the kernel's audit log via netlink(7).
 	Perfmon           Cap = "perfmon"            // Use performance monitoring counters.
-	Bpf               Cap = "bpf"               // Employ various BPF features that require CAP_BPF.
+	Bpf               Cap = "bpf"                // Employ various BPF features that require CAP_BPF.
 	CheckpointRestore Cap = "checkpoint_restore" // Use CRIU to checkpoint and restore processes.
 )
 
@@ -63,15 +63,12 @@ const (
 func Parse(s string) (Cap, error) {
 	c := Cap(s)
 	switch c {
-	case Chown, DacOverride, DacReadSearch, Fowner, Fsetid,
-		Kill, Setgid, Setuid, Setpcap, LinuxImmutable,
-		NetBindService, NetBroadcast, NetAdmin, NetRaw,
-		IpcLock, IpcOwner, SysModule, SysRawio, SysChroot,
-		SysPtrace, SysPacct, SysAdmin, SysBoot, SysNice,
-		SysResource, SysTime, SysTtyConfig, Mknod, Lease,
-		AuditWrite, AuditControl, Setfcap, MacOverride,
-		MacAdmin, Syslog, WakeAlarm, BlockSuspend,
-		AuditRead, Perfmon, Bpf, CheckpointRestore:
+	case Chown, DacOverride, DacReadSearch, Fowner, Fsetid, Kill, Setgid, Setuid,
+		Setpcap, LinuxImmutable, NetBindService, NetBroadcast, NetAdmin, NetRaw,
+		IpcLock, IpcOwner, SysModule, SysRawio, SysChroot, SysPtrace, SysPacct,
+		SysAdmin, SysBoot, SysNice, SysResource, SysTime, SysTtyConfig, Mknod,
+		Lease, AuditWrite, AuditControl, Setfcap, MacOverride, MacAdmin, Syslog,
+		WakeAlarm, BlockSuspend, AuditRead, Perfmon, Bpf, CheckpointRestore:
 		return c, nil
 	default:
 		return "", crex.Wrapf(ErrUnknownCap, "unknown capability %q", s)

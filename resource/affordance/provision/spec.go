@@ -9,9 +9,9 @@ type Spec struct {
 
 	// CPU allocation.
 	//
-	// Measured in millicores (1 vCPU = 1000m). The blueprint builder rounds up
-	// to the nearest vCPU when selecting instance types, so fractional millicore
-	// values can express requirements that are less than 1 vCPU.
+	// Measured in millicores. The blueprint builder rounds up to the nearest
+	// vCPU when selecting instance types, so fractional millicore values can
+	// express requirements that are less than 1 vCPU.
 	CPU uint64
 
 	// Memory allocation.

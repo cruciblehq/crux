@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/spec"
 
 	"github.com/cruciblehq/crux/resource/affordance/agl"
 	"github.com/cruciblehq/crux/resource/affordance/caps"
@@ -18,15 +18,7 @@ import (
 // instance is bound to one spec for its lifetime; callers that need a new
 // accumulator allocate a new spec and a new Subsystem.
 type Subsystem struct {
-	spec     *manifest.FcapSpec
-	declared map[fcapKey]struct{} // Set of declared (cap, mode, path) triples.
-}
-
-// Identifies a single fcap declaration.
-type fcapKey struct {
-	cap  string
-	mode manifest.FcapMode
-	path string
+	spec *spec.Fcap
 }
 
 // Returns a Subsystem bound to spec.
@@ -34,8 +26,8 @@ type fcapKey struct {
 // Subsequent Build and Merge calls mutate spec in place. The caller retains
 // ownership of spec and is responsible for any concurrency control; the
 // Subsystem performs none.
-func New(spec *manifest.FcapSpec) *Subsystem {
-	return &Subsystem{spec: spec, declared: make(map[fcapKey]struct{})}
+func New(spec *spec.Fcap) *Subsystem {
+	return &Subsystem{spec: spec}
 }
 
 // Returns the fcap subsystem identifier.
@@ -56,19 +48,20 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	if err != nil {
 		return err
 	}
-	if err := s.declare(fcapKey{cap: cap, mode: mode, path: path}); err != nil {
-		return err
-	}
 	return apply(s.spec, cap, mode, path)
 }
 
-// Records k as declared, returning ErrConflict if it was already declared.
-func (s *Subsystem) declare(k fcapKey) error {
-	if _, ok := s.declared[k]; ok {
-		return crex.Wrapf(ErrConflict, "fcap %q %s %q already declared", k.cap, k.mode, k.path)
+// Returns the deduplication key for an fcap grant.
+//
+// The key is the capability name and absolute path joined by ":". Mode is
+// intentionally excluded so that granting the same capability on the same
+// file with a different mode (e.g. permitted vs inheritable) is still
+// treated as a conflict.
+func (s *Subsystem) Key(g *agl.Model) string {
+	if len(g.Args) < 3 {
+		return ""
 	}
-	s.declared[k] = struct{}{}
-	return nil
+	return g.Args[0].Value + ":" + g.Args[2].Value
 }
 
 // Validates the grant's structural shape against what the fcap subsystem accepts.
@@ -92,11 +85,11 @@ func check(g *agl.Model) error {
 // Extracts and validates the grant's capability, mode, and target path.
 //
 // The first argument is a name resolving to a known capability (without the
-// CAP_ prefix), the second is a name naming a [manifest.FcapMode], and the third
+// CAP_ prefix), the second is a name naming a [spec.FcapMode], and the third
 // is a string or name carrying an absolute, NUL-free, already-clean path. The
 // path is normalized through pathpkg.Clean and returned in its canonical form.
 // All failures are wrapped as ErrInvalidGrant.
-func parse(g *agl.Model) (string, manifest.FcapMode, string, error) {
+func parse(g *agl.Model) (string, spec.FcapMode, string, error) {
 	capArg := g.Args[0]
 	if capArg.Type != agl.ArgName {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in fcap expression")
@@ -108,7 +101,7 @@ func parse(g *agl.Model) (string, manifest.FcapMode, string, error) {
 	if modeArg.Type != agl.ArgName {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in fcap expression")
 	}
-	mode := manifest.FcapMode(modeArg.Value)
+	mode := spec.FcapMode(modeArg.Value)
 	if !mode.IsValid() {
 		return "", "", "", crex.Wrapf(ErrInvalidGrant, "unknown fcap mode %q", modeArg.Value)
 	}
@@ -133,19 +126,19 @@ func parse(g *agl.Model) (string, manifest.FcapMode, string, error) {
 // ModeInheritable adds to the file-inheritable set, which only takes effect
 // if the exec caller also holds the capability in its own inheritable set.
 // Repeated grants for the same (path, cap, mode) are idempotent.
-func apply(s *manifest.FcapSpec, cap string, mode manifest.FcapMode, path string) error {
+func apply(s *spec.Fcap, cap string, mode spec.FcapMode, path string) error {
 	if s.Entries == nil {
-		s.Entries = make(map[string]*manifest.FcapCapabilities)
+		s.Entries = make(map[string]*spec.FcapCapabilities)
 	}
 	existing, ok := s.Entries[path]
 	if !ok {
-		existing = &manifest.FcapCapabilities{}
+		existing = &spec.FcapCapabilities{}
 		s.Entries[path] = existing
 	}
 	switch mode {
-	case manifest.FcapModeEffective:
+	case spec.FcapModeEffective:
 		existing.GrantEffective([]string{cap})
-	case manifest.FcapModeInheritable:
+	case spec.FcapModeInheritable:
 		existing.GrantInheritable([]string{cap})
 	}
 	return nil

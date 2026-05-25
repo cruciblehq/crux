@@ -1,0 +1,51 @@
+//go:build linux
+
+package local
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
+
+func TestConfigTemplate_IsValid(t *testing.T) {
+	data := limaConfig{
+		Arch:        "aarch64",
+		CPUs:        2,
+		Memory:      "2GiB",
+		Disk:        "10GiB",
+		Home:        "/home/testuser",
+		User:        "testuser",
+		ImagePath:   "/tmp/vm/machine.qcow2",
+		GuestSocket: "/run/containerd/containerd.sock",
+		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
+	}
+
+	var buf bytes.Buffer
+	if err := limaConfigTemplate.Execute(&buf, data); err != nil {
+		t.Fatalf("template execution: %v", err)
+	}
+
+	output := buf.String()
+	required := []string{
+		"vmType: qemu",
+		"arch: aarch64",
+		"cpus: 2",
+		"memory: 2GiB",
+		"disk: 10GiB",
+		"mountType: 9p",
+		"location: /home/testuser",
+		"writable: true",
+		"containerd:",
+		"system: false",
+		"user: false",
+		"portForwards:",
+		`guestSocket: "/run/containerd/containerd.sock"`,
+		`hostSocket: "/home/testuser/.cache/crux/instances/local/containerd.sock"`,
+	}
+	for _, s := range required {
+		if !strings.Contains(output, s) {
+			t.Errorf("config missing %q\nfull output:\n%s", s, output)
+		}
+	}
+}
