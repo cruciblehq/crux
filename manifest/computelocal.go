@@ -1,6 +1,20 @@
 package manifest
 
-// Local compute configuration.
+// Local machine configuration.
 //
-// No additional configuration needed for local deployments.
-type ComputeLocal struct{}
+// The identity of a compute unit backed by a directly reachable host. Unlike
+// cloud providers, no provisioning API is involved — the executor connects to
+// the host as-is and schedules services onto it.
+type ComputeLocal struct {
+
+	// Hostname or IP address of the target machine.
+	Host string `codec:"host,omitempty"`
+}
+
+// Validates the local compute configuration.
+func (c *ComputeLocal) Validate() error {
+	if c.Host == "" {
+		return ErrMissingComputeHost
+	}
+	return nil
+}

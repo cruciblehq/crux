@@ -118,11 +118,14 @@ func TestReadAsAtRoundtrip(t *testing.T) {
 
 func TestWritePlan(t *testing.T) {
 	p := &Plan{
-		Version:     PlanVersion,
-		Services:    map[string]string{"svc": "ns/x"},
-		Compute:     map[string]Compute{"c1": {Provider: "local"}},
+		Version:  PlanVersion,
+		Services: map[string]string{"svc": "ns/x"},
+		Infrastructure: Infrastructure{
+			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{}}},
+			Networks: map[string]Network{"n1": {}},
+		},
 		Containers:  map[string]Container{"svc": {}},
-		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1"}},
+		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1", Network: "n1"}},
 		Gateway:     Gateway{Routes: []Route{{Pattern: "/api", Service: "svc"}}},
 	}
 	path := t.TempDir() + "/plan.yaml"
@@ -141,11 +144,14 @@ func TestWritePlan(t *testing.T) {
 func TestWritePlanAt(t *testing.T) {
 	dir := t.TempDir()
 	p := &Plan{
-		Version:     PlanVersion,
-		Services:    map[string]string{"svc": "ns/x"},
-		Compute:     map[string]Compute{"c1": {Provider: "local"}},
+		Version:  PlanVersion,
+		Services: map[string]string{"svc": "ns/x"},
+		Infrastructure: Infrastructure{
+			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{}}},
+			Networks: map[string]Network{"n1": {}},
+		},
 		Containers:  map[string]Container{"svc": {}},
-		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1"}},
+		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1", Network: "n1"}},
 		Gateway:     Gateway{Routes: []Route{{Pattern: "/api", Service: "svc"}}},
 	}
 	if err := WritePlanAt(p, dir); err != nil {

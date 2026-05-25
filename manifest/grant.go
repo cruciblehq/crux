@@ -22,10 +22,8 @@ const grantDomainPrefix = "."
 // a bare affordance name. Domain grants begin with [grantDomainPrefix] and are
 // parsed by the affordance builder according to the AGL grammar. The prefix is
 // not semantically meaningful and is stripped before parsing; it's only used
-// to distinguish domain grants from reference grants in the manifest. Value
-// and Args are mutually exclusive and only valid on reference grants. When
-// present, Value is passed to the parameter named by the referenced affordance's
-// [Schema.Default]; when Args is present, each key-value pair is passed to the
+// to distinguish domain grants from reference grants in the manifest. Args are
+// only valid on reference grants; each key-value pair is passed to the
 // parameter named by the key.
 type Grant struct {
 
@@ -35,17 +33,10 @@ type Grant struct {
 	// grants, is a bare affordance name. Empty is invalid.
 	Source string `codec:"-"`
 
-	// Default argument for a reference grant.
-	//
-	// Passed to the parameter named by the affordance's [Schema.Default].
-	// Mutually exclusive with [Grant.Args]. Only valid on reference grants.
-	Value string `codec:"-"`
-
 	// Named arguments for a reference grant.
 	//
 	// Each key must match a parameter declared in the referenced affordance's
-	// [Schema.Params]. Mutually exclusive with [Grant.Value]. Only valid on
-	// reference grants.
+	// [Schema.Params]. Only valid on reference grants.
 	Args Args `codec:"-"`
 }
 
@@ -68,23 +59,19 @@ func (g *Grant) RefTarget() string {
 
 // Validates the grant source.
 //
-// The source must be non-empty, args can only be present on reference grants,
-// and [Grant.Value] and [Grant.Args] cannot both be set. Syntax validation of
-// domain grants and semantic validation against a specific subsystem happen
-// later, during the build stage.
+// The source must be non-empty, and args can only be present on reference
+// grants. Syntax validation of domain grants and semantic validation against a
+// specific subsystem happen later, during the build stage.
 func (g *Grant) Validate() error {
 	if g.Source == "" {
 		return crex.Wrapf(ErrInvalidGrant, "empty grant")
 	}
 	if g.IsRef() {
-		if g.Value != "" && len(g.Args) > 0 {
-			return crex.Wrap(ErrInvalidGrant, ErrGrantArgsMixed)
-		}
 		if err := g.Args.Validate(); err != nil {
 			return crex.Wrap(ErrInvalidGrant, err)
 		}
 	} else {
-		if g.Value != "" || len(g.Args) > 0 {
+		if len(g.Args) > 0 {
 			return crex.Wrap(ErrInvalidGrant, ErrDomainGrantWithArgs)
 		}
 	}
@@ -94,13 +81,9 @@ func (g *Grant) Validate() error {
 // Encodes the grant to its canonical serialized form.
 //
 // Implements [codec.Encodable]. A grant with no args encodes to its source
-// string. A grant with [Grant.Value] set encodes to a single-key map of source
-// to the scalar value. A grant with [Grant.Args] set encodes to a single-key
-// map of source to a string-keyed map of arg values.
+// string. A grant with [Grant.Args] set encodes to a single-key map of source
+// to a string-keyed map of arg values.
 func (g *Grant) Encode() (any, error) {
-	if g.Value != "" {
-		return map[string]any{g.Source: g.Value}, nil
-	}
 	if len(g.Args) > 0 {
 		args := make(map[string]any, len(g.Args))
 		for k, v := range g.Args {
@@ -116,7 +99,7 @@ func (g *Grant) Encode() (any, error) {
 // Implements [codec.Decodable]. Strings are stored verbatim as [Grant.Source].
 // Maps must contain exactly one key. For domain grants (key starts with "."),
 // the value must be nil. For reference grants, a nil value means no args; a
-// string value sets [Grant.Value]; a string-keyed map sets [Grant.Args].
+// string-keyed map sets [Grant.Args].
 func (g *Grant) Decode(raw any) error {
 	switch v := raw.(type) {
 	case string:
@@ -132,8 +115,7 @@ func (g *Grant) Decode(raw any) error {
 // Populates the source and optional args from a single-entry map.
 //
 // Domain grants (key starts with ".") must have a nil value. Reference grants
-// accept a nil value (no args), a string value ([Grant.Value]), or a
-// string-keyed map ([Grant.Args]).
+// accept a nil value (no args) or a string-keyed map ([Grant.Args]).
 func (g *Grant) decodeMap(m map[string]any) error {
 	source, val, err := onlyKeyInGrantMap(m)
 	if err != nil {
@@ -165,16 +147,14 @@ func onlyKeyInGrantMap(m map[string]any) (string, any, error) {
 	return source, val, nil
 }
 
-// Populates [Grant.Value] or [Grant.Args] from the value of a reference grant.
+// Populates [Grant.Args] from the value of a reference grant.
 //
-// A nil value means no args. A string value sets [Grant.Value]. A string-keyed
-// map sets [Grant.Args]; every value in the map must be a string.
+// A nil value means no args. A string-keyed map sets [Grant.Args]; every
+// value in the map must be a string.
 func (g *Grant) decodeRefArgs(source string, val any) error {
 	switch v := val.(type) {
 	case nil:
 		// no args
-	case string:
-		g.Value = v
 	case map[string]any:
 		args := make(map[string]string, len(v))
 		for k, av := range v {

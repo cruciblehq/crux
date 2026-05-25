@@ -239,7 +239,7 @@ func TestManifestEncodeAllResourceTypes(t *testing.T) {
 		{TypeService, &Service{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}, Entrypoint: []string{"/bin/run"}}},
 		{TypeTemplate, &Template{}},
 		{TypeAffordance, &Affordance{Scopes: []GrantScope{{Grants: []Grant{{Source: ".cap effective net_admin"}}}}}},
-		{TypeBlueprint, &Blueprint{Services: []Ref{{ID: "s", Target: "ns/x"}}}},
+		{TypeBlueprint, &Blueprint{Services: []Ref{{ID: "s", Ref: "ns/x"}}}},
 	}
 	for _, tc := range cases {
 		m := &Manifest{

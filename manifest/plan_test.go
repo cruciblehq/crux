@@ -7,11 +7,14 @@ import (
 
 func TestPlanValidateOK(t *testing.T) {
 	p := &Plan{
-		Version:     PlanVersion,
-		Services:    map[string]string{"svc": "ns/x"},
-		Compute:     map[string]Compute{"c1": {Provider: "local"}},
+		Version:  PlanVersion,
+		Services: map[string]string{"svc": "ns/x"},
+		Infrastructure: Infrastructure{
+			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{Host: "localhost"}}},
+			Networks: map[string]Network{"n1": {}},
+		},
 		Containers:  map[string]Container{"svc": {}},
-		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1"}},
+		Deployments: []Deployment{{Service: "svc", Container: "svc", Compute: "c1", Network: "n1"}},
 		Gateway:     Gateway{Routes: []Route{{Pattern: "/api", Service: "svc"}}},
 	}
 	if err := p.Validate(); err != nil {
@@ -33,15 +36,22 @@ func TestPlanValidatePropagatesServiceError(t *testing.T) {
 	}
 }
 
-func TestPlanValidatePropagatesComputeError(t *testing.T) {
-	p := &Plan{Version: PlanVersion, Compute: map[string]Compute{"c1": {}}}
+func TestPlanValidatePropagatesInfraError(t *testing.T) {
+	p := &Plan{
+		Version: PlanVersion,
+		Infrastructure: Infrastructure{
+			Networks: map[string]Network{
+				"n1": {Ingress: []IngressRule{{Protocol: "bogus"}}},
+			},
+		},
+	}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestPlanValidatePropagatesAssociationError(t *testing.T) {
-	p := &Plan{Version: PlanVersion, Deployments: []Deployment{{Container: "c1", Compute: "c1"}}}
+	p := &Plan{Version: PlanVersion, Deployments: []Deployment{{Container: "c1", Compute: "c1", Network: "n1"}}}
 	if err := p.Validate(); err == nil {
 		t.Fatal("expected error")
 	}

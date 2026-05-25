@@ -2,36 +2,39 @@ package manifest
 
 import "github.com/cruciblehq/crux/crex"
 
-// Holds common metadata about the resource.
+// Common identity envelope shared by every resource manifest.
 //
-// Includes the resource type, qualified name, version, and an optional
-// description. The type field determines how the rest of the manifest
-// is interpreted.
+// Crux reads Type first when decoding a manifest, using it to determine which
+// concrete struct the rest of the document maps to. Keeping these fields in a
+// shared type means the toolstack can inspect any manifest for its type and
+// metadata without needing to know about the specific resource types in advance.
 type Resource struct {
 
-	// The type of the resource.
+	// Discriminator that controls how the rest of the manifest is decoded.
 	//
-	// Determines how the rest of the manifest is interpreted and how
-	// Crucible manages the resource.
+	// Must be set before any other field is read. The namespace portion of the
+	// type string determines which registry is consulted; the name portion
+	// selects the resource kind within that registry.
 	Type ResourceType `codec:"type"`
 
-	// The qualified resource name.
+	// Identifier for the resource.
 	//
-	// Identifies the resource, including its namespace, using the format
-	// "namespace/name" (e.g. "cruciblehq/my-api"). The registry is not
-	// part of the name; it is resolved from configuration.
+	// Uses the format "namespace/name" (e.g. "cruciblehq/my-api"). The
+	// registry host is intentionally absent so the same manifest can be
+	// published to multiple registries without modification.
 	Name string `codec:"name"`
 
-	// Description of the resource.
+	// Human-readable summary of the resource's purpose.
 	//
-	// Documents what the resource does or provides. It's not used by crux,
-	// but higher layers may require it.
+	// Not interpreted by crux itself. Present for documentation and registry
+	// engines that surface resource metadata.
 	Description string `codec:"description,omitempty"`
 
-	// The version of the resource.
+	// Semantic version declared by this resource.
 	//
-	// This is a semantic version string that indicates the version of the
-	// resource being defined. This field is required.
+	// Set by the resource author at publish time and immutable thereafter.
+	// The registry files the artifact under this version so consumers can
+	// reference an exact, stable artifact.
 	Version string `codec:"version"`
 }
 

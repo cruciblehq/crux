@@ -6,7 +6,7 @@ import (
 )
 
 func TestRefValidateOK(t *testing.T) {
-	r := &Ref{Target: "cruciblehq/foo"}
+	r := &Ref{Ref: "cruciblehq/foo"}
 	if err := r.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -20,30 +20,15 @@ func TestRefValidateMissingTarget(t *testing.T) {
 	}
 }
 
-func TestRefValidateRejectsValueAndArgs(t *testing.T) {
-	r := &Ref{Target: "x", Value: "v", Args: map[string]string{"k": "v"}}
-	err := r.Validate()
-	if !errors.Is(err, ErrRefMixed) {
-		t.Fatalf("err = %v, want ErrRefMixed", err)
-	}
-}
-
-func TestRefValidateAcceptsValueOnly(t *testing.T) {
-	r := &Ref{Target: "x", Value: "v"}
-	if err := r.Validate(); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestRefValidateAcceptsArgsOnly(t *testing.T) {
-	r := &Ref{Target: "x", Args: map[string]string{"k": "v"}}
+	r := &Ref{Ref: "x", Args: map[string]string{"k": "v"}}
 	if err := r.Validate(); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestRefValidateInvalidID(t *testing.T) {
-	r := &Ref{Target: "x", ID: "My-Service"}
+	r := &Ref{Ref: "x", ID: "My-Service"}
 	err := r.Validate()
 	if !errors.Is(err, ErrInvalidRefID) {
 		t.Fatalf("err = %v, want ErrInvalidRefID", err)
@@ -51,14 +36,14 @@ func TestRefValidateInvalidID(t *testing.T) {
 }
 
 func TestRefValidateValidID(t *testing.T) {
-	r := &Ref{Target: "x", ID: "api"}
+	r := &Ref{Ref: "x", ID: "api"}
 	if err := r.Validate(); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestRefValidateInvalidArgKey(t *testing.T) {
-	r := &Ref{Target: "x", Args: map[string]string{"Bad-Key": "v"}}
+	r := &Ref{Ref: "x", Args: map[string]string{"Bad-Key": "v"}}
 	err := r.Validate()
 	if !errors.Is(err, ErrInvalidArgKey) {
 		t.Fatalf("err = %v, want ErrInvalidArgKey", err)

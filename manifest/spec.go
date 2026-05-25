@@ -1,28 +1,18 @@
 package manifest
 
-import (
-	"slices"
-
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-)
-
-// Compiled runtime model for a container.
-//
-// Produced by the affordance builder during blueprint build. Encodes the full
-// enforcement state derived from all affordance grants: OCI runtime constraints,
-// file capabilities, MAC hook rules, and resource allocations. No grant
-// references remain; the spec is the terminal, static artifact placed in the
-// plan for use at deploy time.
-type Spec struct {
-	OCI       *specs.Spec    `codec:"oci"`                 // OCI runtime spec (capabilities, seccomp, namespaces, cgroup resources, etc.).
-	Fcap      *FcapSpec      `codec:"fcap,omitempty"`      // File capabilities per binary path.
-	MAC       *MACSpec       `codec:"mac,omitempty"`       // MAC (LSM) hook allow rules.
-	Provision *ProvisionSpec `codec:"provision,omitempty"` // Resource allocations the workload requires.
-}
+import "slices"
 
 // Accumulated file capability spec, keyed by binary path.
+//
+// Multiple affordances targeting the same binary path are merged into a single
+// entry so the resulting map holds the minimal set of grants needed by the
+// workload.
 type FcapSpec struct {
-	Entries map[string]*FcapCapabilities `codec:"entries"` // Per-binary file capabilities.
+
+	// Per-binary file capabilities.
+	//
+	// Keyed by absolute path in the container filesystem.
+	Entries map[string]*FcapCapabilities `codec:"entries"`
 }
 
 // File capabilities for a single binary path.
@@ -30,17 +20,41 @@ type FcapSpec struct {
 // The kernel uses these fields during execve to compute the new process's
 // effective capability set.
 type FcapCapabilities struct {
-	Permitted   []string `codec:"permitted"`   // Capabilities to grant as file-permitted.
-	Inheritable []string `codec:"inheritable"` // Capabilities to grant as file-inheritable.
-	Effective   bool     `codec:"effective"`   // If true, all granted file-permitted capabilities become immediately effective.
+
+	// Capabilities to grant as file-permitted.
+	Permitted []string `codec:"permitted"`
+
+	// Capabilities to grant as file-inheritable.
+	Inheritable []string `codec:"inheritable"`
+
+	// Immediately activates the file-permitted capabilities after execve.
+	//
+	// When true, the kernel sets the file effective bit so the new process does
+	// not need to raise the capabilities itself.
+	Effective bool `codec:"effective"`
 }
 
 // Selects how file capabilities are granted on a binary.
+//
+// Effective mode also sets the file effective bit, which causes the granted
+// capabilities to be active immediately after execve without the new process
+// having to raise them itself. Inheritable mode requires the calling process
+// to already hold the capabilities in its inheritable set.
 type FcapMode string
 
 const (
-	FcapModeEffective   FcapMode = "effective"   // File-permitted + effective bit. Caps are immediately effective after exec.
-	FcapModeInheritable FcapMode = "inheritable" // File-inheritable. Caps only effective if caller holds them in inheritable set.
+
+	// File-permitted plus effective bit.
+	//
+	// Capabilities are immediately active after execve without the process
+	// needing to raise them.
+	FcapModeEffective FcapMode = "effective"
+
+	// File-inheritable.
+	//
+	// Capabilities take effect only if the caller already holds them in its
+	// inheritable set.
+	FcapModeInheritable FcapMode = "inheritable"
 )
 
 // Whether m is a recognised mode value.
@@ -49,14 +63,27 @@ func (m FcapMode) IsValid() bool {
 }
 
 // Accumulated MAC grant spec.
+//
+// Built up by successive calls to Apply during affordance evaluation.
+// Duplicate rules are suppressed so the slice contains only the minimal set
+// of distinct hook allows required by the workload.
 type MACSpec struct {
-	Rules []*MACAllow `codec:"rules"` // Granted LSM hook allow rules.
+	// Granted LSM hook allow rules.
+	Rules []*MACAllow `codec:"rules"`
 }
 
-// Subsystem-specific rule expression for MAC grants.
+// Single LSM hook allow rule produced by a MAC grant.
+//
+// Hook names the kernel LSM callback point at which the rule is evaluated.
+// Where constrains the allow to invocations matching the predicate tree; a
+// nil Where makes the rule unconditional.
 type MACAllow struct {
-	Hook  string   `codec:"hook"`  // Kernel LSM hook name.
-	Where *MACExpr `codec:"where"` // Where-clause expression tree. Nil when the grant is unconditional.
+	// Kernel LSM hook name.
+	Hook string `codec:"hook"`
+	// Where-clause expression tree.
+	//
+	// A nil value makes the allow unconditional.
+	Where *MACExpr `codec:"where"`
 }
 
 // Normalised expression node in the MAC subsystem model.
@@ -66,33 +93,54 @@ type MACAllow struct {
 // unary ("not") only Operand; for comparisons ("cmp") Op, LHS, and RHS;
 // and so on for "in", "like", "between", and "bittest".
 type MACExpr struct {
-	Type    string      `codec:"type"`    // Expression type discriminator.
-	Left    *MACExpr    `codec:"left"`    // Left child for binary expressions.
-	Right   *MACExpr    `codec:"right"`   // Right child for binary expressions.
-	Operand *MACExpr    `codec:"operand"` // Operand for unary expressions.
-	Op      string      `codec:"op"`      // Operator for comparison expressions.
-	LHS     *MACValue   `codec:"lhs"`     // Left-hand side value for comparison expressions.
-	RHS     *MACValue   `codec:"rhs"`     // Right-hand side value for comparison expressions.
-	Field   *MACValue   `codec:"field"`   // Field value for field-based expressions.
-	Values  []*MACValue `codec:"values"`  // Slice of values for multi-value expressions.
-	Pattern string      `codec:"pattern"` // Pattern for pattern-matching expressions.
-	Low     *MACValue   `codec:"low"`     // Low value for between expressions.
-	High    *MACValue   `codec:"high"`    // High value for between expressions.
-	Mask    *MACValue   `codec:"mask"`    // Mask value for bit-test expressions.
+	// Expression type discriminator.
+	Type string `codec:"type"`
+	// Left child for binary expressions.
+	Left *MACExpr `codec:"left"`
+	// Right child for binary expressions.
+	Right *MACExpr `codec:"right"`
+	// Operand for unary expressions.
+	Operand *MACExpr `codec:"operand"`
+	// Comparison operator.
+	Op string `codec:"op"`
+	// Left-hand side value for comparison expressions.
+	LHS *MACValue `codec:"lhs"`
+	// Right-hand side value for comparison expressions.
+	RHS *MACValue `codec:"rhs"`
+	// Field reference for field-based expressions.
+	Field *MACValue `codec:"field"`
+	// Values for multi-value expressions such as "in".
+	Values []*MACValue `codec:"values"`
+	// Pattern for pattern-matching expressions.
+	Pattern string `codec:"pattern"`
+	// Lower bound for between expressions.
+	Low *MACValue `codec:"low"`
+	// Upper bound for between expressions.
+	High *MACValue `codec:"high"`
+	// Mask value for bit-test expressions.
+	Mask *MACValue `codec:"mask"`
 }
 
-// Typed value representing a field reference or literal.
+// Typed value representing either a kernel field reference or a literal.
+//
+// When IsField is true, Field holds the kernel field name and the integer and
+// string fields are unused. When IsField is false, either IntVal or StrVal
+// carries the literal depending on the expression context.
 type MACValue struct {
-	IsField bool   `codec:"is_field"` // Whether this value is a field reference (true) or a literal (false).
-	Field   string `codec:"field"`    // Field name when IsField is true.
-	IntVal  uint64 `codec:"int_val"`  // Integer literal value when IsField is false.
-	StrVal  string `codec:"str_val"`  // String literal value when IsField is false.
-}
-
-// Allocations the workload requires from the platform.
-type ProvisionSpec struct {
-	CPU    uint64 `codec:"cpu,omitempty"`    // Allocated CPU capacity in millicores.
-	Memory uint64 `codec:"memory,omitempty"` // Allocated memory in bytes.
+	// Marks this value as a field reference rather than a literal.
+	IsField bool `codec:"is_field"`
+	// Kernel field name.
+	//
+	// Meaningful only when IsField is true.
+	Field string `codec:"field"`
+	// Integer literal value.
+	//
+	// Meaningful only when IsField is false.
+	IntVal uint64 `codec:"int_val"`
+	// String literal value.
+	//
+	// Meaningful only when IsField is false.
+	StrVal string `codec:"str_val"`
 }
 
 // Grants file-permitted capabilities and sets the effective bit.

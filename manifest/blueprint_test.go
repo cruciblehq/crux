@@ -8,8 +8,8 @@ import (
 func TestBlueprintValidateOK(t *testing.T) {
 	b := &Blueprint{
 		Services: []Ref{
-			{ID: "api", Target: "ns/api"},
-			{ID: "auth", Target: "ns/auth"},
+			{ID: "api", Ref: "ns/api"},
+			{ID: "auth", Ref: "ns/auth"},
 		},
 		Gateway: Gateway{Routes: []Route{{Pattern: "/api", Service: "api"}}},
 		Environments: []Environment{
@@ -23,7 +23,7 @@ func TestBlueprintValidateOK(t *testing.T) {
 }
 
 func TestBlueprintValidateMissingServiceID(t *testing.T) {
-	b := &Blueprint{Services: []Ref{{Target: "ns/x"}}}
+	b := &Blueprint{Services: []Ref{{Ref: "ns/x"}}}
 	err := b.Validate()
 	if !errors.Is(err, ErrMissingServiceID) {
 		t.Fatalf("err = %v, want ErrMissingServiceID", err)
@@ -32,8 +32,8 @@ func TestBlueprintValidateMissingServiceID(t *testing.T) {
 
 func TestBlueprintValidateDuplicateServiceID(t *testing.T) {
 	b := &Blueprint{Services: []Ref{
-		{ID: "x", Target: "ns/a"},
-		{ID: "x", Target: "ns/b"},
+		{ID: "x", Ref: "ns/a"},
+		{ID: "x", Ref: "ns/b"},
 	}}
 	err := b.Validate()
 	if !errors.Is(err, ErrDuplicateServiceID) {
@@ -43,7 +43,7 @@ func TestBlueprintValidateDuplicateServiceID(t *testing.T) {
 
 func TestBlueprintValidateRouteUnknownService(t *testing.T) {
 	b := &Blueprint{
-		Services: []Ref{{ID: "api", Target: "ns/api"}},
+		Services: []Ref{{ID: "api", Ref: "ns/api"}},
 		Gateway:  Gateway{Routes: []Route{{Pattern: "/api", Service: "missing"}}},
 	}
 	err := b.Validate()
@@ -54,7 +54,7 @@ func TestBlueprintValidateRouteUnknownService(t *testing.T) {
 
 func TestBlueprintValidateDuplicateEnvironmentID(t *testing.T) {
 	b := &Blueprint{
-		Services:     []Ref{{ID: "api", Target: "ns/api"}},
+		Services:     []Ref{{ID: "api", Ref: "ns/api"}},
 		Environments: []Environment{{ID: "prod"}, {ID: "prod"}},
 	}
 	err := b.Validate()
@@ -72,7 +72,7 @@ func TestBlueprintValidateBadServiceRef(t *testing.T) {
 
 func TestBlueprintValidateBadGateway(t *testing.T) {
 	b := &Blueprint{
-		Services: []Ref{{ID: "x", Target: "ns/x"}},
+		Services: []Ref{{ID: "x", Ref: "ns/x"}},
 		Gateway:  Gateway{Routes: []Route{{Service: "x"}}},
 	}
 	if err := b.Validate(); err == nil {

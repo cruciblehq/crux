@@ -2,12 +2,12 @@ package manifest
 
 // A named set of environment variables.
 //
-// Environments provide concrete values for the config/env and config/secret
-// affordances declared by services. Which environment to use is selected a
-// build time, producing different plans from the same blueprint.
+// Environments provide concrete values for affordances declared by services.
+// The specific environment to use is selected at build time, impacting the
+// resulting deployment plan.
 type Environment struct {
 
-	// Unique identifier for this environment (e.g. "production", "staging").
+	// Unique identifier for this environment.
 	ID string `codec:"id"`
 
 	// Key-value pairs for this environment.
