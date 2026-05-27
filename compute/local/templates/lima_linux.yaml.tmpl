@@ -1,26 +1,57 @@
+# Setting the VM type to qemu targets QEMU with KVM acceleration, the standard
+# hypervisor on Linux hosts. Unlike Apple's Virtualization.framework (used in
+# the Darwin template), QEMU relies on the host's /dev/kvm device and does not
+# require a separate hypervisor daemon; Lima manages the QEMU invocation directly.
 vmType: qemu
+
+# The architecture is always one of aarch64 or x86_64; Lima translates these to
+# the corresponding QEMU machine type when selecting the image to boot.
 arch: {{ .Arch }}
+
+# These values are passed directly to the hypervisor without validation against
+# host resources. The Lima documentation recommends conservative overallocation
+# (e.g. 4 CPUs and 4GiB memory) to maintain good performance on a wide range of
+# host machines.
 cpus: {{ .CPUs }}
 memory: {{ .Memory }}
 disk: {{ .Disk }}
+
+# Lima's image management is very basic: it only supports copying a local file
+# into its internal storage directory and does not support downloading from an
+# external source or unpacking archives. The image must be prepared in advance
+# in the path provided here. Lima also does not validate the image content; if
+# the image is incompatible with the host architecture, provisioning will fail.
 images:
   - location: {{ .ImagePath }}
     arch: {{ .Arch }}
-# The machine image must include containerd and all required services
-# pre-configured.
+
+# Disable Lima's built-in containerd management. The machine image must ship
+# containerd as an OpenRC service; Lima must not launch a parallel instance,
+# we manage containerd ourselves.
 containerd:
   system: false
   user: false
+
+# 9p is used on Linux because QEMU on a Linux host does not support virtiofs
+# without a virtiofsd daemon running on the host side. The Darwin template uses
+# virtiofs because Apple's Virtualization.framework has built-in virtiofs
+# support and needs no additional host process. virtiofs offers lower latency
+# and better POSIX semantics than 9p, but it is not available here without
+# introducing an external host-side dependency.
 mountType: 9p
-mounts:
-  - location: {{ .Home }}
-    writable: true
+
+# On Darwin, we write Lima's UID into containerd's config.toml so the socket is
+# owned by the Lima user directly and group membership is not required. On Linux
+# we instead add the Lima user to the containerd group, transfer ownership of
+# /run/containerd to that group, and set the mode to 0775. 0775 is necessary
+# because the Lima user needs write permission on the directory to create the
+# FIFO files used for task exec IO; the 0711 mode is not sufficient here. We
+# stop containerd before applying these changes and restart it after, so
+# /run/containerd is correctly configured before containerd creates its socket
+# on every boot. This also sidesteps the first-boot race condition that the
+# Darwin template handles with a safety-net restart; since we stop and restart
+# unconditionally, the socket is always recreated under the correct ownership.
 provision:
-  # Add the Lima user to the containerd group so the SSH port-forward can
-  # relay traffic from the host. Fix /run/containerd group ownership before
-  # (re)starting containerd; without this, containerd creates the directory
-  # as root:root 0711 and the Lima user cannot create FIFO directories for
-  # task exec IO.
   - mode: system
     script: |
       #!/bin/sh
@@ -31,6 +62,34 @@ provision:
       chgrp containerd /run/containerd
       chmod 775 /run/containerd
       rc-service containerd start
+
+  # This script is generated only when kernel parameters or nftables rules are
+  # declared. We apply them on every boot because kernel parameters and nftables
+  # rules are not persisted across reboots in Alpine. sysctl -w applies each
+  # parameter to the running kernel. nft add rule inserts each rule into the
+  # named chain within its table. The referenced tables and chains must already
+  # exist in the guest's nftables configuration for the insertions to succeed.
+{{- if or .Sysctls .NftRules}}
+  - mode: system
+    script: |
+      #!/bin/sh
+{{- if .Sysctls}}
+      # Apply kernel parameter overrides.
+{{- range $k, $v := .Sysctls}}
+      sysctl -w '{{ $k }}={{ $v }}'
+{{- end}}
+{{- end}}
+{{- if .NftRules}}
+      # Add nftables rules to the declared tables and chains.
+{{- range .NftRules}}
+      nft add rule {{ .Table }} {{ .Chain }} {{ .Rule }}
+{{- end}}
+{{- end}}
+{{- end}}
+
+# Lima polls these after provisioning and marks the instance ready only once
+# all probes pass. This probe checks that containerd is running and the socket
+# is available for Lima to forward to the host.
 probes:
   - mode: readiness
     description: containerd to be running
@@ -38,7 +97,10 @@ probes:
       #!/bin/sh
       test -S /run/containerd/containerd.sock
     hint: containerd is not running
-# Forward the containerd Unix socket from the guest to the host over SSH.
+
+# Forward the containerd Unix socket from guest to host. 9p makes the guest
+# filesystem visible on the host but does not bridge socket connections; Lima
+# tunnels the connection over SSH so the host can dial its local path.
 portForwards:
   - guestSocket: "{{ .GuestSocket }}"
     hostSocket: "{{ .HostSocket }}"

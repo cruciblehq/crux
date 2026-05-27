@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-//go:embed templates/lima.yaml.tmpl
+//go:embed templates/lima_darwin.yaml.tmpl
 var limaConfigSource string
 
 func init() {

@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package local
 
@@ -14,11 +14,10 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		CPUs:        2,
 		Memory:      "2GiB",
 		Disk:        "10GiB",
-		Home:        "/Users/testuser",
 		User:        "testuser",
 		ImagePath:   "/tmp/vm/machine.qcow2",
 		GuestSocket: "/run/containerd/containerd.sock",
-		HostSocket:  "/Users/testuser/Library/Caches/crux/instances/local/containerd.sock",
+		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
 	}
 
 	var buf bytes.Buffer
@@ -28,20 +27,18 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 
 	output := buf.String()
 	required := []string{
-		"vmType: vz",
+		"vmType: qemu",
 		"arch: aarch64",
 		"cpus: 2",
 		"memory: 2GiB",
 		"disk: 10GiB",
-		"mountType: virtiofs",
-		"location: /Users/testuser",
-		"writable: true",
+		"mountType: 9p",
 		"containerd:",
 		"system: false",
 		"user: false",
 		"portForwards:",
 		`guestSocket: "/run/containerd/containerd.sock"`,
-		`hostSocket: "/Users/testuser/Library/Caches/crux/instances/local/containerd.sock"`,
+		`hostSocket: "/home/testuser/.cache/crux/instances/local/containerd.sock"`,
 	}
 	for _, s := range required {
 		if !strings.Contains(output, s) {

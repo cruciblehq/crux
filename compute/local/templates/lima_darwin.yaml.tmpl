@@ -1,0 +1,173 @@
+# Setting the VM type to vz targets Apple's Virtualization.framework, the
+# recommended hypervisor on Apple Silicon and Intel Macs.
+vmType: vz
+
+# The architecture is always one of aarch64 or x86_64; Lima translates these to
+# the corresponding Apple platform identifiers when selecting the image to boot.
+arch: {{ .Arch }}
+
+# These values are passed directly to the hypervisor without validation against
+# host resources. The Lima documentation recommends conservative overallocation
+# (e.g. 4 CPUs and 4GiB memory) to maintain good performance on a wide range of
+# host machines.
+cpus: {{ .CPUs }}
+memory: {{ .Memory }}
+disk: {{ .Disk }}
+
+# Lima's image management is very basic: it only supports copying a local file
+# into its internal storage directory and does not support downloading from an
+# external source or unpacking archives. The image must be prepared in advance
+# in the path provided here. Lima also does not validate the image content; if
+# the image is incompatible with the host architecture, provisioning will fail.
+images:
+  - location: {{ .ImagePath }}
+    arch: {{ .Arch }}
+
+# Disable Lima's built-in containerd management. The machine image must ship
+# containerd as an OpenRC service; Lima must not launch a parallel instance,
+# we manage containerd ourselves.
+containerd:
+  system: false
+  user: false
+
+# virtiofs is the native filesystem transport for vz VMs: lower latency and
+# better POSIX semantics than 9p, with no FUSE dependency in the guest. The
+# host directory is shared directly into the VM and visible on both sides,
+# but the kernel socket state does not cross the VM boundary; Lima tunnels
+# the containerd socket connection over SSH (see portForwards).
+mountType: virtiofs
+
+# This script runs inside the VM on every boot, before Lima marks the instance
+# as ready. This is where the containerd socket is configured so the Lima user
+# can reach it through SSH port-forwarding. The script creates the containerd
+# group to obtain its GID. However, Lima's SSH connection is established very
+# early (before this script runs), and the user groups for an SSH session are
+# fixed at login time. Even if the Lima user was added to the containerd group
+# later on, the SSH session wouldn't see it because changing group membership
+# has no effect on an session that has already been established. To work around
+# this, we write containerd's config.toml with a [grpc] section that sets uid =
+# <lima-uid>, making the socket owned by that UID. Since the SSH connection is
+# always established as that user, it is able to connect regardless of group
+# membership. However, on the first boot, containerd may have already started
+# and created the socket before config.toml existed, which means the socket may
+# be owned by root already. As a safety net, we check if the socket exists and
+# is owned by root; if so, we restart containerd so it picks up the new config
+# and recreates the socket with the correct owner. Subquent boots are ordered
+# with rc_after="tiny-cloud-main" to make sure the config is in place before
+# containerd starts, so the race condition doesn't occur again after the first
+# boot. Furthermore, we set the socket directory (/run/containerd) to mode 0711
+# so the Lima user can traverse to the socket even if the directory is owned by
+# root. With this setup, Lima can connect to the containerd socket through SSH
+# port-forwarding without needing to rely on group membership or restarting the
+# SSH session after group changes. We also take UserUID as a template parameter
+# to address another race condition: on the first boot, the provision script may
+# run before cloud-init has created the Lima user. By baking the Lima user UID
+# into the template at render time on the host, we avoid a lookup for the Lima
+# user in the guest at provision time, making the script safe to run even if the
+# user doesn't exist yet. We also pin the CRI plugin's sandbox_image to a known
+# value to avoid depending on the image's default and prevent breakage if the
+# default changes. This is defensive, since we talk to containerd through the
+# socket and don't actually use the plugin. However, this plugin is loaded by
+# default and logs error messages if the sandbox image is not pinned.
+provision:
+  - mode: system
+    script: |
+      #!/bin/sh
+
+      # Create containerd group (idempotent) and derive its GID.
+      addgroup containerd 2>/dev/null || true
+      CONTAINERD_GID=$(grep '^containerd:' /etc/group | cut -d: -f3)
+      CONTAINERD_GID="${CONTAINERD_GID:-1000}"
+
+      # The Lima user UID is baked in at template-render time on the host so we
+      # don't need to look it up in the guest. This makes the script safe to run
+      # even if the Lima user doesn't exist yet in the guest /etc/passwd when 
+      # first runs (e.g. before cloud-init has created the user).
+      LIMA_UID={{ .UserUID }}
+
+      # Write containerd config atomically. Using a temporary file in the same
+      # directory as the destination keeps the rename on one filesystem so mv
+      # is an atomic rename. printf per-line avoids heredoc indentation issues
+      # inside YAML.
+      mkdir -p /etc/containerd
+      TMPFILE=$(mktemp /etc/containerd/config.toml.XXXXXX)
+      {
+        printf 'version = 2\n\n'
+        printf '[grpc]\n'
+        printf '  address = "/run/containerd/containerd.sock"\n'
+        printf '  uid = %s\n' "${LIMA_UID}"
+        printf '  gid = %s\n\n' "${CONTAINERD_GID}"
+        printf '[plugins."io.containerd.grpc.v1.cri"]\n'
+        printf '  sandbox_image = "registry.k8s.io/pause:3.10"\n'
+      } > "${TMPFILE}"
+      mv "${TMPFILE}" /etc/containerd/config.toml
+
+      # With mode 0711 the Lima user can traverse to the socket path even if the
+      # directory is owned by root. connect() only requires the socket itself to
+      # be writable by the caller, which it will be since containerd creates it
+      # owned by LIMA_UID with mode 0660.
+      mkdir -p /run/containerd
+      chmod 711 /run/containerd
+
+      # We append rc_after="tiny-cloud-main" to /etc/conf.d/containerd so that
+      # on every subsequent boot OpenRC starts containerd only after this script
+      # has run. This constraint is not in place on the first boot, which is why
+      # the safety net below is needed.
+      if ! grep -q 'tiny-cloud-main' /etc/conf.d/containerd 2>/dev/null; then
+        printf 'rc_after="tiny-cloud-main"\n' >> /etc/conf.d/containerd
+      fi
+
+      # On the first boot, containerd may have started before this script ran
+      # and before config.toml existed, which means it created the socket owned
+      # by root. If that happened, we restart it here so it picks up config.toml
+      # and recreates the socket with the correct owner. Lima's readiness probe
+      # polls until the new socket appears.
+      if test -S /run/containerd/containerd.sock; then
+        SOCK_UID=$(stat -c '%u' /run/containerd/containerd.sock 2>/dev/null || echo 0)
+        if [ "${SOCK_UID}" != "${LIMA_UID}" ]; then
+          rc-service containerd restart >/dev/null 2>&1 || true
+        fi
+      fi
+
+  # This script is generated only when kernel parameters or nftables rules are
+  # declared. We apply them on every boot because kernel parameters and nftables
+  # rules are not persisted across reboots in Alpine. sysctl -w applies each
+  # parameter to the running kernel. nft add rule inserts each rule into the
+  # named chain within its table. The referenced tables and chains must already
+  # exist in the guest's nftables configuration for the insertions to succeed.
+{{- if or .Sysctls .NftRules}}
+  - mode: system
+    script: |
+      #!/bin/sh
+{{- if .Sysctls}}
+      # Apply kernel parameter overrides.
+{{- range $k, $v := .Sysctls}}
+      sysctl -w '{{ $k }}={{ $v }}'
+{{- end}}
+{{- end}}
+{{- if .NftRules}}
+      # Add nftables rules to the declared tables and chains.
+{{- range .NftRules}}
+      nft add rule {{ .Table }} {{ .Chain }} {{ .Rule }}
+{{- end}}
+{{- end}}
+{{- end}}
+
+# Lima polls these after provisioning and marks the instance ready only once
+# all probes pass. This probe checks that containerd is running and the socket
+# is available for Lima to forward to the host.
+probes:
+  - mode: readiness
+    description: containerd to be running
+    script: |
+      #!/bin/sh
+      test -S /run/containerd/containerd.sock
+    hint: containerd is not running
+
+# Forward the containerd Unix socket from guest to host. Unix domain sockets
+# on virtiofs are visible on both sides but kernel socket state does not cross
+# the VM boundary; Lima tunnels the connection over SSH so the host can dial
+# its local forwarded path transparently.
+portForwards:
+  - guestSocket: "{{ .GuestSocket }}"
+    hostSocket: "{{ .HostSocket }}"

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cruciblehq/crux/paths"
 )
 
 func TestExtractLima(t *testing.T) {
@@ -75,50 +77,71 @@ func TestExtractLima(t *testing.T) {
 	}
 }
 
-func TestConfigTemplate_x86(t *testing.T) {
-	data := limaConfig{
-		Arch:        "x86_64",
-		CPUs:        4,
-		Memory:      "4GiB",
-		Disk:        "20GiB",
-		Home:        "/home/testuser",
-		User:        "testuser",
-		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/containerd/containerd.sock",
-		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
-	}
+func TestLimaURL(t *testing.T) {
+	url := limaURL()
 
-	var buf bytes.Buffer
-	if err := limaConfigTemplate.Execute(&buf, data); err != nil {
-		t.Fatalf("template execution: %v", err)
+	for _, sub := range []string{limaVersion, limaOS(), limaDownloadArch()} {
+		if !strings.Contains(url, sub) {
+			t.Errorf("limaURL() missing %q; full URL: %s", sub, url)
+		}
 	}
-
-	output := buf.String()
-	if !strings.Contains(output, "arch: x86_64") {
-		t.Errorf("expected arch x86_64 in output:\n%s", output)
+	if !strings.HasPrefix(url, "https://") {
+		t.Errorf("limaURL() not https: %s", url)
+	}
+	if !strings.HasSuffix(url, ".tar.gz") {
+		t.Errorf("limaURL() missing .tar.gz suffix: %s", url)
 	}
 }
 
-func TestConfigTemplate_ImagePath(t *testing.T) {
-	data := limaConfig{
-		Arch:        "aarch64",
-		CPUs:        2,
-		Memory:      "2GiB",
-		Disk:        "10GiB",
-		Home:        "/home/testuser",
-		User:        "testuser",
-		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/containerd/containerd.sock",
-		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
+func TestLimaEnv_ContainsLimaHome(t *testing.T) {
+	env := limaEnv()
+	want := "LIMA_HOME=" + paths.VMDir()
+	for _, e := range env {
+		if e == want {
+			return
+		}
 	}
+	t.Errorf("limaEnv missing %q; got %v", want, env)
+}
 
-	var buf bytes.Buffer
-	if err := limaConfigTemplate.Execute(&buf, data); err != nil {
-		t.Fatalf("template execution: %v", err)
+func TestLimaEnv_IncludesSetVars(t *testing.T) {
+	t.Setenv("HOME", "/tmp/testhome")
+	t.Setenv("USER", "testuser")
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("TMPDIR", "/tmp")
+
+	env := limaEnv()
+	for _, want := range []string{
+		"HOME=/tmp/testhome",
+		"USER=testuser",
+		"PATH=/usr/bin",
+		"TMPDIR=/tmp",
+	} {
+		found := false
+		for _, e := range env {
+			if e == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("limaEnv missing %q; got %v", want, env)
+		}
 	}
+}
 
-	output := buf.String()
-	if !strings.Contains(output, "/tmp/vm/machine.qcow2") {
-		t.Errorf("expected image path in output:\n%s", output)
+func TestLimaEnv_ExcludesEmptyVars(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("USER", "")
+	t.Setenv("PATH", "")
+	t.Setenv("TMPDIR", "")
+
+	env := limaEnv()
+	for _, e := range env {
+		for _, key := range []string{"HOME", "USER", "PATH", "TMPDIR"} {
+			if strings.HasPrefix(e, key+"=") {
+				t.Errorf("limaEnv included %q when var was empty", e)
+			}
+		}
 	}
 }
