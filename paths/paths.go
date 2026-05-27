@@ -57,6 +57,9 @@ const (
 	// Subdirectory name for the registry cache within the cache directory.
 	RegistryDirName = "registry"
 
+	// Subdirectory name for extracted resource contents within the registry cache.
+	RegistryExtractedDirName = "extracted"
+
 	// Subdirectory name for the local blueprint within the application data directory.
 	LocalDirName = "local"
 
@@ -172,6 +175,14 @@ func VMDir() string {
 //	macOS:   ~/Library/Caches/crux/registry
 func RegistryCacheDir() string {
 	return filepath.Join(CacheDir(), RegistryDirName)
+}
+
+// Path to the directory for extracted contents of a cached registry resource.
+//
+// Locates the unpacked archive for the given namespace, resource, and version
+// under the registry cache extracted subtree.
+func RegistryExtractedVersionDir(namespace, resource, version string) string {
+	return filepath.Join(RegistryCacheDir(), RegistryExtractedDirName, namespace, resource, version)
 }
 
 // Path to the default local blueprint directory.
