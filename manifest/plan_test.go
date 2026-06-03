@@ -3,6 +3,8 @@ package manifest
 import (
 	"errors"
 	"testing"
+
+	afnet "github.com/cruciblehq/crux/security/net"
 )
 
 func TestPlanValidateOK(t *testing.T) {
@@ -72,5 +74,22 @@ func TestPlanValidatePropagatesEnvironmentError(t *testing.T) {
 	err := p.Validate()
 	if !errors.Is(err, ErrInvalidEnvironmentID) {
 		t.Fatalf("err = %v, want ErrInvalidEnvironmentID", err)
+	}
+}
+
+func TestPlanValidatePropagatesContainerError(t *testing.T) {
+	p := &Plan{
+		Version: PlanVersion,
+		Containers: map[string]Container{
+			"c1": {
+				Network: afnet.NetworkPolicy{
+					Ingress: []afnet.NetworkIngressRule{{Protocol: "invalid", Port: 80}},
+				},
+			},
+		},
+	}
+	err := p.Validate()
+	if !errors.Is(err, ErrInvalidPlan) {
+		t.Fatalf("err = %v, want ErrInvalidPlan", err)
 	}
 }

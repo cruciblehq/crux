@@ -27,6 +27,13 @@ type Compute struct {
 	// The concrete type depends on [Compute.Type]: [*ComputeAWS] for "aws",
 	// [*ComputeLocal] for "local".
 	Config any `codec:"-"`
+
+	// Compiled VM-level security model derived from service grants.
+	//
+	// Populated by the blueprint builder after bin-packing. Nil when the
+	// compute unit has not yet had a policy derived for it. The provider
+	// applies this policy at provisioning time.
+	Policy *ComputeSecurityModel `codec:"policy,omitempty"`
 }
 
 // Validates the compute entry.
@@ -35,7 +42,8 @@ type Compute struct {
 // supported types. The provider-specific configuration (Compute.Config) must
 // implement the Validatable interface and is validated by calling its Validate
 // method. The configuration must also be present (non-nil), since the provider
-// type implies required configuration fields.
+// type implies required configuration fields. If a policy is present it is
+// also validated.
 func (c *Compute) Validate() error {
 	if c.Config == nil {
 		return ErrMissingComputeProvider
@@ -44,13 +52,22 @@ func (c *Compute) Validate() error {
 	if !ok {
 		return crex.Wrapf(ErrInvalidComputeType, "config type %T is not validatable", c.Config)
 	}
-	return v.Validate()
+	if err := v.Validate(); err != nil {
+		return err
+	}
+	if c.Policy != nil {
+		if err := c.Policy.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Decodes a raw parsed map into the compute entry.
 //
 // Reads the provider type first, then decodes the remaining fields into the
-// concrete configuration type for that provider.
+// concrete configuration type for that provider. The optional "policy" key is
+// decoded into a [ComputeSecurityModel] if present.
 func (c *Compute) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
@@ -72,21 +89,42 @@ func (c *Compute) Decode(raw any) error {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 	c.Config = target
+	if rawPolicy, ok := src["policy"]; ok && rawPolicy != nil {
+		policyMap, ok := rawPolicy.(map[string]any)
+		if !ok {
+			return crex.Wrap(ErrDecodeFailed, ErrInvalidComputeSecurityModel)
+		}
+		p := &ComputeSecurityModel{}
+		if err := codec.Decode(policyMap, p); err != nil {
+			return crex.Wrap(ErrDecodeFailed, err)
+		}
+		c.Policy = p
+	}
 	return nil
 }
 
 // Encodes the compute entry to a serializable map.
 //
 // Merges the provider configuration fields with the provider type key into a
-// single flat map.
+// single flat map. The policy, if present, is encoded as a nested "policy" key.
 func (c *Compute) Encode() (any, error) {
+	var cfg map[string]any
 	if c.Config == nil {
-		return map[string]any{"type": c.Type}, nil
+		cfg = map[string]any{"type": c.Type}
+	} else {
+		var err error
+		cfg, err = encodeToMap(c.Config)
+		if err != nil {
+			return nil, err
+		}
+		cfg["type"] = c.Type
 	}
-	cfg, err := encodeToMap(c.Config)
-	if err != nil {
-		return nil, err
+	if c.Policy != nil {
+		raw, err := encodeToMap(c.Policy)
+		if err != nil {
+			return nil, err
+		}
+		cfg["policy"] = raw
 	}
-	cfg["type"] = c.Type
 	return cfg, nil
 }

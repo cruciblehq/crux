@@ -5,7 +5,7 @@ import (
 
 	"github.com/cruciblehq/crux/codec"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 )
 
 // Asserts the manifest config to T.
@@ -33,7 +33,7 @@ func Read(path string) (*Manifest, error) {
 
 // Reads and decodes the manifest from dir/crucible.yaml.
 func ReadAt(dir string) (*Manifest, error) {
-	return Read(paths.Manifest(dir))
+	return Read(files.Manifest(dir))
 }
 
 // Reads the manifest at path and asserts its config to T.
@@ -51,7 +51,7 @@ func ReadAs[T any](path string) (T, error) {
 
 // Reads the manifest from dir/crucible.yaml and asserts its config to T.
 func ReadAsAt[T any](dir string) (T, error) {
-	return ReadAs[T](paths.Manifest(dir))
+	return ReadAs[T](files.Manifest(dir))
 }
 
 // Encodes a manifest and writes it to the given path.
@@ -60,12 +60,30 @@ func Write(m *Manifest, path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, paths.DefaultFileMode)
+	return os.WriteFile(path, data, files.DefaultFileMode)
 }
 
 // Encodes a manifest and writes it to dir/crucible.yaml.
 func WriteAt(m *Manifest, dir string) error {
-	return Write(m, paths.Manifest(dir))
+	return Write(m, files.Manifest(dir))
+}
+
+// Reads and decodes the plan at the given path.
+func ReadPlan(path string) (*Plan, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var p Plan
+	if err := codec.Unmarshal(data, &p, codec.YAML); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// Reads and decodes the plan from dir/plan.yaml.
+func ReadPlanAt(dir string) (*Plan, error) {
+	return ReadPlan(files.Plan(dir))
 }
 
 // Encodes a plan and writes it to the given path.
@@ -74,10 +92,10 @@ func WritePlan(p *Plan, path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, paths.DefaultFileMode)
+	return os.WriteFile(path, data, files.DefaultFileMode)
 }
 
 // Encodes a plan and writes it to dir/plan.yaml.
 func WritePlanAt(p *Plan, dir string) error {
-	return WritePlan(p, paths.Plan(dir))
+	return WritePlan(p, files.Plan(dir))
 }

@@ -65,6 +65,12 @@ func (p *Plan) Validate() error {
 		}
 	}
 
+	for id, c := range p.Containers {
+		if err := c.Validate(); err != nil {
+			return crex.Wrapf(ErrInvalidPlan, "container %q: %w", id, err)
+		}
+	}
+
 	for i := range p.Deployments {
 		if err := p.validateDeployment(&p.Deployments[i]); err != nil {
 			return err

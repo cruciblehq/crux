@@ -62,6 +62,7 @@ var (
 	ErrInvalidEnvironmentID              = errors.New("invalid environment id")
 	ErrDuplicateEnvironmentID            = errors.New("duplicate environment id")
 	ErrInvalidPlan                       = errors.New("invalid plan")
+	ErrInvalidContainer                  = errors.New("invalid container spec")
 	ErrUnsupportedPlanVersion            = errors.New("unsupported plan version")
 	ErrInvalidProtocol                   = errors.New("invalid infrastructure protocol")
 	ErrInvalidTenancy                    = errors.New("invalid EC2 tenancy")
@@ -82,4 +83,5 @@ var (
 	ErrInvalidState                      = errors.New("invalid state")
 	ErrUnsupportedStateVersion           = errors.New("unsupported state version")
 	ErrMissingDeployedAt                 = errors.New("missing deployment timestamp")
+	ErrInvalidComputeSecurityModel       = errors.New("invalid compute security model")
 )
