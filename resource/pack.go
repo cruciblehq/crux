@@ -7,7 +7,7 @@ import (
 
 	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -38,7 +38,7 @@ func ensureOutputDir(outputPath string) error {
 	if outputDir == "." || outputDir == "" {
 		return nil
 	}
-	if err := os.MkdirAll(outputDir, paths.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(outputDir, files.DefaultDirMode); err != nil {
 		return crex.Wrap(source.ErrFileSystemOperation, err)
 	}
 	return nil

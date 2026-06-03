@@ -4,8 +4,7 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource/blueprint"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -38,7 +37,7 @@ func (bh *BlueprintHandler) Build(ctx context.Context, m manifest.Manifest, outp
 		return nil, err
 	}
 
-	if err := blueprint.Build(ctx, cfg, bh.environment, bh.src, output); err != nil {
+	if err := Build(ctx, cfg, bh.environment, bh.src, output); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +50,7 @@ func (bh *BlueprintHandler) Build(ctx context.Context, m manifest.Manifest, outp
 
 // Verifies that the build directory contains the expected blueprint artifacts.
 func (bh *BlueprintHandler) Verify(buildDir string) error {
-	return verify(buildDir, manifest.TypeBlueprint, paths.PlanFile)
+	return verify(buildDir, manifest.TypeBlueprint, files.PlanFile)
 }
 
 // Packages the blueprint's build output into a distributable archive.

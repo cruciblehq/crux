@@ -5,8 +5,7 @@ import (
 
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource/recipe"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -41,13 +40,17 @@ func (rh *RuntimeHandler) Build(ctx context.Context, m manifest.Manifest, output
 		return nil, err
 	}
 
-	backend, err := compute.NewLocalImageBuilder()
+	backend, err := compute.BackendFor(compute.Local)
 	if err != nil {
 		return nil, err
 	}
-	defer backend.Close()
+	sess, err := backend.Connect(ctx, compute.LocalInstance)
+	if err != nil {
+		return nil, err
+	}
+	defer sess.Close()
 
-	builder := recipe.NewBuilder(rh.src, rh.workdir, backend)
+	builder := NewBuilder(rh.src, rh.workdir, sess)
 	buildDir, err := builder.Run(ctx, m, &cfg.Recipe, output, nil)
 	if err != nil {
 		return nil, err
@@ -62,7 +65,7 @@ func (rh *RuntimeHandler) Build(ctx context.Context, m manifest.Manifest, output
 
 // Verifies that the build directory contains the expected runtime artifacts.
 func (rh *RuntimeHandler) Verify(buildDir string) error {
-	return verify(buildDir, manifest.TypeRuntime, paths.ImageFile)
+	return verify(buildDir, manifest.TypeRuntime, files.ImageFile)
 }
 
 // Packages the runtime's build output into a distributable archive.

@@ -5,8 +5,7 @@ import (
 
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource/recipe"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -41,13 +40,17 @@ func (sh *ServiceHandler) Build(ctx context.Context, m manifest.Manifest, output
 		return nil, err
 	}
 
-	backend, err := compute.NewLocalImageBuilder()
+	backend, err := compute.BackendFor(compute.Local)
 	if err != nil {
 		return nil, err
 	}
-	defer backend.Close()
+	sess, err := backend.Connect(ctx, compute.LocalInstance)
+	if err != nil {
+		return nil, err
+	}
+	defer sess.Close()
 
-	builder := recipe.NewBuilder(sh.src, sh.workdir, backend)
+	builder := NewBuilder(sh.src, sh.workdir, sess)
 	buildDir, err := builder.Run(ctx, m, &cfg.Recipe, output, cfg.Entrypoint)
 	if err != nil {
 		return nil, err
@@ -62,7 +65,7 @@ func (sh *ServiceHandler) Build(ctx context.Context, m manifest.Manifest, output
 
 // Verifies that the build directory contains the expected service artifacts.
 func (sh *ServiceHandler) Verify(buildDir string) error {
-	return verify(buildDir, manifest.TypeService, paths.ImageFile)
+	return verify(buildDir, manifest.TypeService, files.ImageFile)
 }
 
 // Packages the service's build output into a distributable archive.

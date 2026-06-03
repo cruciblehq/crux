@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/resource/affordance"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -34,7 +33,7 @@ func (ah *AffordanceHandler) Build(ctx context.Context, m manifest.Manifest, out
 		return nil, err
 	}
 
-	b := affordance.NewBuilder()
+	b := NewAffordanceBuilder()
 	for _, scope := range cfg.Scopes {
 		for _, g := range scope.Grants {
 			if err := b.Build(ctx, g, ah.src); err != nil {

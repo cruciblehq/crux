@@ -6,7 +6,7 @@ import (
 
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 )
 
 // Verifies that a build directory contains the expected artifacts.
@@ -37,7 +37,7 @@ func verify(buildDir string, resourceType manifest.ResourceType, artifactFile st
 // build directory is of the right resource type before checking type-specific
 // artifacts. Returns the manifest if its type matches the expected type.
 func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.Manifest, error) {
-	manifestPath := paths.Manifest(buildDir)
+	manifestPath := files.Manifest(buildDir)
 	if _, err := os.Stat(manifestPath); err != nil {
 		return nil, crex.Wrap(ErrManifestNotFound, err)
 	}

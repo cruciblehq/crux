@@ -4,8 +4,7 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/resource/widget"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/source"
 )
 
@@ -33,7 +32,7 @@ func (wh *WidgetHandler) Build(ctx context.Context, m manifest.Manifest, output 
 		return nil, err
 	}
 
-	if _, err := widget.Build(ctx, cfg, output); err != nil {
+	if _, err := BuildWidget(ctx, cfg, output); err != nil {
 		return nil, err
 	}
 
@@ -46,7 +45,7 @@ func (wh *WidgetHandler) Build(ctx context.Context, m manifest.Manifest, output 
 
 // Verifies that the build directory contains the expected widget artifacts.
 func (wh *WidgetHandler) Verify(buildDir string) error {
-	return verify(buildDir, manifest.TypeWidget, paths.WidgetMainFile)
+	return verify(buildDir, manifest.TypeWidget, files.WidgetMainFile)
 }
 
 // Packages the widget's build output into a distributable archive.
