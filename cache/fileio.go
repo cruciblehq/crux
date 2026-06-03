@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 )
 
 // Opens a file, returning ErrNotFound if it doesn't exist.
@@ -26,7 +26,7 @@ func openFile(path string) (*os.File, error) {
 // into place.
 func extractDirAtomic(r io.Reader, dir string) error {
 	parent := filepath.Dir(dir)
-	if err := os.MkdirAll(parent, paths.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(parent, files.DefaultDirMode); err != nil {
 		return err
 	}
 
@@ -80,7 +80,7 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(metPath, data, paths.DefaultFileMode); err != nil {
+	if err := os.WriteFile(metPath, data, files.DefaultFileMode); err != nil {
 		return nil, err
 	}
 	return ver, nil

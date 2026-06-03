@@ -4,7 +4,7 @@ package codec
 type Format int
 
 // The struct tag key used by all codec operations.
-const tag = "json"
+const tag = "codec"
 
 // The struct tag key used to declare a field default.
 const defaultTag = "default"

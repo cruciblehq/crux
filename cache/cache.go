@@ -10,8 +10,7 @@ import (
 	"sync"
 
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/fio"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 )
 
 const (
@@ -48,7 +47,7 @@ type Cache struct {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func Open() (*Cache, error) {
-	return OpenAt(paths.RegistryCacheDir())
+	return OpenAt(files.RegistryCacheDir())
 }
 
 // Opens a cache at the specified directory.
@@ -56,17 +55,17 @@ func Open() (*Cache, error) {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func OpenAt(root string) (*Cache, error) {
-	if err := os.MkdirAll(root, paths.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(root, files.DefaultDirMode); err != nil {
 		return nil, err
 	}
 
 	lockPath := filepath.Join(root, lockFilename)
-	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, paths.DefaultFileMode)
+	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, files.DefaultFileMode)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := fio.Lock(lf); err != nil {
+	if err := files.Lock(lf); err != nil {
 		lf.Close()
 		return nil, err
 	}
@@ -84,7 +83,7 @@ func (c *Cache) Close() error {
 
 	if c.lock != nil {
 		err := errors.Join(
-			fio.Unlock(c.lock),
+			files.Unlock(c.lock),
 			c.lock.Close(),
 		)
 		c.lock = nil
@@ -101,7 +100,7 @@ func (c *Cache) Has(namespace, resource, version string) (bool, error) {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return fio.PathExists(meta)
+	return files.PathExists(meta)
 }
 
 // Retrieves version metadata from the cache.
@@ -146,7 +145,7 @@ func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) 
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return fio.PathExists(dir)
+	return files.PathExists(dir)
 }
 
 // Returns the path to the extracted contents of a cached archive.
@@ -278,7 +277,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	}
 
 	// Already extracted.
-	exists, err := fio.PathExists(dir)
+	exists, err := files.PathExists(dir)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +311,7 @@ func (c *Cache) put(namespace, resource, version string, archive io.Reader) (*Ve
 func (c *Cache) list() ([]*Version, error) {
 	root := c.archivesRoot()
 
-	namespaces, err := fio.ListSubdirs(root)
+	namespaces, err := files.ListSubdirs(root)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -329,7 +328,7 @@ func (c *Cache) list() ([]*Version, error) {
 
 // Returns all versions within a single namespace directory.
 func listNamespace(root, ns string) []*Version {
-	resources, err := fio.ListSubdirs(filepath.Join(root, ns))
+	resources, err := files.ListSubdirs(filepath.Join(root, ns))
 	if err != nil {
 		slog.Error("failed to list resources", "namespace", ns, "error", err)
 		return nil
@@ -337,7 +336,7 @@ func listNamespace(root, ns string) []*Version {
 
 	var versions []*Version
 	for _, res := range resources {
-		versionDirs, err := fio.ListSubdirs(filepath.Join(root, ns, res))
+		versionDirs, err := files.ListSubdirs(filepath.Join(root, ns, res))
 		if err != nil {
 			slog.Error("failed to list versions", "namespace", ns, "resource", res, "error", err)
 			continue
@@ -369,12 +368,12 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, paths.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
 		return nil, err
 	}
 
 	archPath := filepath.Join(dir, archiveFilename)
-	digest, size, err := fio.WriteAtomic(r, dir, archPath)
+	digest, size, err := files.WriteAtomic(r, dir, archPath)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +406,7 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 		filepath.Dir(eDir),
 		filepath.Dir(filepath.Dir(eDir)),
 	} {
-		if pErr := fio.RemoveDirIfEmpty(dir); pErr != nil {
+		if pErr := files.RemoveDirIfEmpty(dir); pErr != nil {
 			slog.Error("failed to prune empty directory", "dir", dir, "error", pErr)
 		}
 	}
