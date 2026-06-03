@@ -3,46 +3,50 @@ package compute
 import (
 	"sync"
 
-	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/crux/compute/provider"
 	"github.com/cruciblehq/crux/crex"
 )
 
-// Identifies a compute backend.
-type Provider int
-
-const (
-	Local Provider = iota // Host machine (Lima on macOS, native cruxd on Linux).
-)
-
 var (
-	registryOnce sync.Once        // Ensures the backend registry is only initialised once.
-	registry     *backendRegistry // Lazily-initialised singleton backend registry.
+
+	// Ensures the backend registry is only initialised once.
+	registryOnce sync.Once
+
+	// Lazily-initialised singleton backend registry.
+	registry *backendRegistry
 )
 
-// Lazily-initialised backend registry.
+// Singleton that maps each [Provider] to its [provider.Backend].
+//
+// Populated on first call to [defaultRegistry]. Entries are not modified after
+// initialisation, so no locking is needed for reads after setup.
 type backendRegistry struct {
-	backends map[Provider]provider.Backend
+	backends map[Provider]Backend // Maps each provider to its backend implementation.
 }
 
-// Returns the lazily-initialised backend registry, creating it if necessary.
+// Returns the singleton backend registry, initialising it on the first call.
+//
+// Uses [sync.Once] so concurrent callers block until initialisation completes.
+// Subsequent calls return the same registry without acquiring any lock.
 func defaultRegistry() *backendRegistry {
 	registryOnce.Do(func() {
 		registry = &backendRegistry{
-			backends: map[Provider]provider.Backend{
-				Local: local.NewBackend(),
+			backends: map[Provider]Backend{
+				Local: newBackendLocal(),
 			},
 		}
 	})
 	return registry
 }
 
-// Returns the backend for the given provider.
+// Returns the [Backend] registered for p.
+//
+// Returns [ErrUnknownProvider] if no backend has been registered for
+// the given provider.
 func BackendFor(p Provider) (Backend, error) {
 	r := defaultRegistry()
 	b, ok := r.backends[p]
 	if !ok {
-		return nil, crex.Wrapf(ErrUnknownProvider, "provider %d", p)
+		return nil, crex.Wrapf(ErrUnknownProvider, "%s", p)
 	}
 	return b, nil
 }

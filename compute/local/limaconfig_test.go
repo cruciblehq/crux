@@ -10,9 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
-	"github.com/cruciblehq/crux/security"
+	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/security/vm"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -62,7 +61,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 }
 
 func TestBuildLimaConfig_Defaults(t *testing.T) {
-	cfg, err := buildLimaConfig("/tmp/test.qcow2", nil)
+	cfg, err := buildLimaConfig("/tmp/test.qcow2", vm.VM{})
 	if err != nil {
 		t.Fatalf("buildLimaConfig: %v", err)
 	}
@@ -93,7 +92,7 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	if cfg.GuestSocket != guestContainerdSocket {
 		t.Errorf("GuestSocket: got %q, want %q", cfg.GuestSocket, guestContainerdSocket)
 	}
-	if want := paths.ContainerdSocket(limaInstanceName); cfg.HostSocket != want {
+	if want := files.ContainerdSocket(limaInstanceName); cfg.HostSocket != want {
 		t.Errorf("HostSocket: got %q, want %q", cfg.HostSocket, want)
 	}
 	if len(cfg.Sysctls) != 0 {
@@ -105,16 +104,14 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 }
 
 func TestBuildLimaConfig_PropagatesPolicy(t *testing.T) {
-	policy := &manifest.ComputePolicy{
-		VM: security.VM{
-			Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
-			Nftables: []security.VMNftRule{
-				{Table: "inet filter", Chain: "input", Rule: "drop"},
-			},
+	vmSpec := vm.VM{
+		Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
+		Nftables: []vm.VMNftRule{
+			{Table: "inet filter", Chain: "input", Rule: "drop"},
 		},
 	}
 
-	cfg, err := buildLimaConfig("/tmp/test.qcow2", policy)
+	cfg, err := buildLimaConfig("/tmp/test.qcow2", vmSpec)
 	if err != nil {
 		t.Fatalf("buildLimaConfig: %v", err)
 	}

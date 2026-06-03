@@ -4,19 +4,18 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/compute/provider"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/security/vm"
 )
 
 // The local compute backend.
 //
 // All lifecycle methods call the platform-specific implementation defined in
 // the corresponding build-tagged source files.
-type backend struct{}
+type Backend struct{}
 
-// Returns a new local [provider.Backend].
-func NewBackend() provider.Backend {
-	return &backend{}
+// Returns a new local backend.
+func NewBackend() *Backend {
+	return &Backend{}
 }
 
 // Ensures the machine disk image is available locally and returns its path.
@@ -28,36 +27,51 @@ func EnsureMachineImage(ctx context.Context) (string, error) {
 }
 
 // Uploads a disk image to the local provider, validating it is accessible.
-func (b *backend) UploadImage(ctx context.Context, path string) (string, error) {
+func (b *Backend) UploadImage(ctx context.Context, path string) (string, error) {
 	return uploadImage(ctx, path)
 }
 
 // Provisions a compute host instance from a previously uploaded image.
-func (b *backend) Provision(ctx context.Context, name, imageID string, policy *manifest.ComputePolicy) error {
-	return provision(ctx, name, imageID, policy)
+func (b *Backend) Provision(ctx context.Context, name, imageID string, vmSpec vm.VM) error {
+	return provision(ctx, name, imageID, vmSpec)
 }
 
 // Tears down the instance and removes all state.
-func (b *backend) Deprovision(ctx context.Context, name string) error {
+func (b *Backend) Deprovision(ctx context.Context, name string) error {
 	return deprovision(ctx, name)
 }
 
 // Starts a previously provisioned instance.
-func (b *backend) Start(ctx context.Context, name string) error {
+func (b *Backend) Start(ctx context.Context, name string) error {
 	return start(ctx, name)
 }
 
 // Stops a running instance.
-func (b *backend) Stop(ctx context.Context, name string) error {
+func (b *Backend) Stop(ctx context.Context, name string) error {
 	return stop(ctx, name)
 }
 
 // Returns the current state of the given instance.
-func (b *backend) Status(ctx context.Context, name string) (provider.State, error) {
+func (b *Backend) Status(ctx context.Context, name string) (State, error) {
 	return status(ctx, name)
 }
 
+// Lists all instances managed by the local provider.
+func (b *Backend) List(ctx context.Context) ([]string, error) {
+	return list(ctx)
+}
+
+// Sends a tar archive to the named instance and applies it to the host filesystem.
+func (b *Backend) Copy(ctx context.Context, name string, r io.Reader) error {
+	return copyArchive(ctx, name, r)
+}
+
 // Runs a command on the given instance, streaming output to stdout and stderr.
-func (b *backend) Exec(ctx context.Context, name string, stdout, stderr io.Writer, command string, args ...string) (int, error) {
+func (b *Backend) Run(ctx context.Context, name string, stdout, stderr io.Writer, command string, args ...string) (int, error) {
 	return execute(ctx, name, stdout, stderr, command, args...)
+}
+
+// Returns the containerd socket path for the given instance.
+func (b *Backend) ContainerdSocket(ctx context.Context, name string) (string, error) {
+	return containerdSocket(ctx, name)
 }

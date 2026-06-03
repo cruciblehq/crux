@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 )
 
 func TestExtractLima(t *testing.T) {
@@ -95,7 +95,7 @@ func TestLimaURL(t *testing.T) {
 
 func TestLimaEnv_ContainsLimaHome(t *testing.T) {
 	env := limaEnv()
-	want := "LIMA_HOME=" + paths.VMDir()
+	want := "LIMA_HOME=" + files.VMDir()
 	for _, e := range env {
 		if e == want {
 			return

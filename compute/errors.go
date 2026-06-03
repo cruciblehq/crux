@@ -1,7 +1,11 @@
 package compute
 
-import "github.com/cruciblehq/crux/compute/provider"
+import "errors"
 
-// Re-exported so callers can match against [provider.ErrUnknownProvider]
-// without taking a direct dependency on the internal provider package.
-var ErrUnknownProvider = provider.ErrUnknownProvider
+var (
+	ErrUnknownProvider = errors.New("unknown provider")
+	ErrConnect         = errors.New("containerd connection failed")
+	ErrImport          = errors.New("image import failed")
+	ErrNoImages        = errors.New("no images in archive")
+	ErrContainer       = errors.New("container operation failed")
+)

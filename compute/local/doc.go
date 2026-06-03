@@ -17,7 +17,7 @@
 //
 //	state, _ := b.Status(ctx, "my-instance") // provider.StateRunning
 //
-//	exitCode, err := b.Exec(ctx, "my-instance", os.Stdout, os.Stderr, "uname", "-a")
+//	exitCode, err := b.Run(ctx, "my-instance", os.Stdout, os.Stderr, "uname", "-a")
 //
 //	b.Stop(ctx, "my-instance")
 //	b.Deprovision(ctx, "my-instance")

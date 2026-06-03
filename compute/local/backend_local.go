@@ -16,26 +16,22 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/cruciblehq/crux/compute/provider"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crux/security/vm"
 	"github.com/cruciblehq/crux/source"
 )
 
 const (
-
-	// Registry details for the machine image.
-	//
-	// The image is built and published by the Crucible team. It's an Alpine
-	// image with containerd installed. The local provider downloads the image
-	// and uses it as the base image for provisioning the VM.
 	machineNamespace   = "crucible"                       // Registry namespace for the machine image.
 	machineName        = "machine"                        // Registry resource name for the machine image.
 	machineVersion     = "0.1.8"                          // Pinned machine image version.
 	machineRegistryURL = "http://hub.cruciblehq.xyz:8080" // Registry URL for the machine image.
 	machineExtension   = ".qcow2"                         // Disk image file extension.
+
+	containerdReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd to start.
+	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
 )
 
 // Ensures the machine disk image is available in the local cache.
@@ -45,6 +41,11 @@ const (
 func ensureMachineImage(ctx context.Context) (string, error) {
 	path, err := cachedMachineImagePath()
 	if errors.Is(err, ErrMachineImageMissing) {
+		slog.Info("machine image not in cache, downloading...",
+			"namespace", machineNamespace,
+			"name", machineName,
+			"version", machineVersion,
+		)
 		if err := fetchMachineImage(ctx); err != nil {
 			return "", err
 		}
@@ -73,12 +74,16 @@ func uploadImage(_ context.Context, path string) (string, error) {
 // Provisions a compute instance from the given disk image.
 //
 // imageID is the local filesystem path to a QCOW2 disk image, as returned by
-// [uploadImage]. The VM is created and started if it does not already exist.
-// containerd runs as a system service inside the VM and starts automatically
-// during boot. policy is applied to the VM configuration when creating a new
-// instance; nil means no additional policy.
-func provision(ctx context.Context, _, imageID string, policy *manifest.ComputePolicy) error {
-	return ensureHostRunning(ctx, imageID, policy)
+// [uploadImage]. Returns [ErrHostAlreadyProvisioned] if an instance already
+// exists. The VM is created and started.
+func provision(ctx context.Context, _, imageID string, vmSpec vm.VM) error {
+	if err := ensureLima(ctx); err != nil {
+		return err
+	}
+	if hostStatus(ctx) != StateNotProvisioned {
+		return ErrHostAlreadyProvisioned
+	}
+	return createAndStartHost(ctx, imageID, vmSpec)
 }
 
 // Starts the VM.
@@ -88,10 +93,10 @@ func provision(ctx context.Context, _, imageID string, policy *manifest.ComputeP
 // the VM has not been provisioned.
 func start(ctx context.Context, _ string) error {
 	state := hostStatus(ctx)
-	if state == provider.StateRunning {
+	if state == StateRunning {
 		return nil
 	}
-	if state == provider.StateNotProvisioned {
+	if state == StateNotProvisioned {
 		return ErrHostNotCreated
 	}
 
@@ -108,7 +113,7 @@ func start(ctx context.Context, _ string) error {
 // clean up before the VM halts.
 func stop(ctx context.Context, _ string) error {
 	state := hostStatus(ctx)
-	if state != provider.StateRunning {
+	if state != StateRunning {
 		return ErrHostNotRunning
 	}
 
@@ -120,9 +125,9 @@ func stop(ctx context.Context, _ string) error {
 
 // Tears down the instance and destroys the VM.
 //
-// Returns nil if the VM does not exist (idempotent). If the VM exists, it is
-// terminated and deleted along with its disk image. After this returns, the
-// VM no longer appears in limactl list and all resources it consumed are freed.
+// After this, the VM no longer appears in limactl list and all resources it
+// consumed are freed. If the VM exists, it is terminated and deleted along
+// with its disk image. Returns nil if the VM does not exist.
 func deprovision(ctx context.Context, _ string) error {
 	err := destroyHost(ctx)
 	if errors.Is(err, ErrHostNotCreated) {
@@ -135,20 +140,20 @@ func deprovision(ctx context.Context, _ string) error {
 //
 // The state is determined by probing the Lima VM and the containerd socket
 // inside it, the returned state being the least-healthy of the two.
-func status(ctx context.Context, _ string) (provider.State, error) {
+func status(ctx context.Context, _ string) (State, error) {
 	rtState := hostStatus(ctx)
 
-	if rtState == provider.StateNotProvisioned {
-		return provider.StateNotProvisioned, nil
+	if rtState == StateNotProvisioned {
+		return StateNotProvisioned, nil
 	}
-	if rtState != provider.StateRunning {
-		return provider.StateStopped, nil
+	if rtState != StateRunning {
+		return StateStopped, nil
 	}
 
 	if !isContainerdReady(ctx) {
-		return provider.StateStopped, nil
+		return StateStopped, nil
 	}
-	return provider.StateRunning, nil
+	return StateRunning, nil
 }
 
 // Runs a command inside the host VM.
@@ -162,12 +167,22 @@ func execute(ctx context.Context, _ string, stdout, stderr io.Writer, command st
 	return hostExec(ctx, stdout, stderr, command, args...)
 }
 
+// Lists all instances managed by the local provider.
+func list(ctx context.Context) ([]string, error) {
+	return limaList(ctx)
+}
+
+// Sends a tar archive to the named instance and applies it to the host filesystem.
+func copyArchive(ctx context.Context, name string, r io.Reader) error {
+	return limaCopyArchive(ctx, name, r)
+}
+
 // Blocks until containerd is accepting connections.
 //
 // Polls via gRPC Health.Check every two seconds. Returns an error if the
 // context is cancelled or the fifteen-minute deadline is exceeded.
 func waitForContainerd(ctx context.Context) error {
-	deadline := time.Now().Add(15 * time.Minute)
+	deadline := time.Now().Add(containerdReadyTimeout)
 	for {
 		if isContainerdReady(ctx) {
 			return nil
@@ -178,7 +193,7 @@ func waitForContainerd(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(containerdPollInterval):
 		}
 	}
 }
@@ -192,7 +207,7 @@ func isContainerdReady(ctx context.Context) bool {
 	defer cancel()
 
 	conn, err := grpc.NewClient(
-		"unix://"+paths.ContainerdSocket(limaInstanceName),
+		"unix://"+files.ContainerdSocket(limaInstanceName),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -204,49 +219,13 @@ func isContainerdReady(ctx context.Context) bool {
 	return err == nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING
 }
 
-// Ensures the host VM is running, provisioning it if necessary.
-//
-// If the VM does not exist, it is created from imagePath and started. If the
-// VM exists but is stopped, it is resumed. If already running, this is a
-// no-op. policy is applied when creating a new VM and ignored when resuming
-// an existing one.
-func ensureHostRunning(ctx context.Context, imagePath string, policy *manifest.ComputePolicy) error {
-	if err := ensureLima(ctx); err != nil {
-		return err
-	}
-
-	status := hostStatus(ctx)
-
-	switch status {
-	case provider.StateRunning:
-		return nil
-
-	case provider.StateStopped:
-		if err := removeInstanceSocket(); err != nil {
-			return err
-		}
-		if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-		if err := waitForContainerd(ctx); err != nil {
-			return crex.Wrap(ErrHostStart, err)
-		}
-		return nil
-
-	case provider.StateNotProvisioned:
-		return createAndStartHost(ctx, imagePath, policy)
-
-	default:
-		return crex.Wrapf(ErrHostStart, "unexpected VM state: %s", status)
-	}
-}
-
 // Creates the Lima instance from the given disk image and starts it.
 //
 // Lima 2.x create does not auto-start; an explicit start call is required.
-// policy configures VM-level security; nil applies no additional policy.
-func createAndStartHost(ctx context.Context, imagePath string, policy *manifest.ComputePolicy) error {
-	configPath, err := generateLimaConfig(imagePath, policy)
+// imagePath is the local filesystem path to a QCOW2 disk image. vmSpec
+// configures VM-level security; a zero value applies no additional policy.
+func createAndStartHost(ctx context.Context, imagePath string, vmSpec vm.VM) error {
+	configPath, err := generateLimaConfig(imagePath, vmSpec)
 	if err != nil {
 		return crex.Wrap(ErrHostCreate, err)
 	}
@@ -272,16 +251,11 @@ func createAndStartHost(ctx context.Context, imagePath string, policy *manifest.
 
 // Downloads and caches the machine disk image from the Crucible registry.
 //
-// Pulls the pinned machine version from the registry and extracts it into
-// the local registry cache. After this returns, [cachedMachineImagePath]
-// should resolve successfully.
+// Pulls the pinned machine version and extracts it into the local registry
+// cache. After this returns, [cachedMachineImagePath] should resolve. The
+// image is built and published by the Crucible team. It's an Alpine image
+// with containerd installed and used as the base for provisioning the VM.
 func fetchMachineImage(ctx context.Context) error {
-	slog.Info("machine image not in cache, downloading...",
-		"namespace", machineNamespace,
-		"name", machineName,
-		"version", machineVersion,
-	)
-
 	src, err := source.NewSource(machineRegistryURL, machineNamespace)
 	if err != nil {
 		return err
@@ -307,7 +281,7 @@ func fetchMachineImage(ctx context.Context) error {
 func cachedMachineImagePath() (string, error) {
 	arch := machineArch()
 	path := filepath.Join(
-		paths.RegistryExtractedVersionDir(machineNamespace, machineName, machineVersion),
+		files.RegistryExtractedVersionDir(machineNamespace, machineName, machineVersion),
 		arch+machineExtension,
 	)
 	if _, err := os.Stat(path); err != nil {
@@ -334,7 +308,7 @@ func machineArch() string {
 // start fails with "address already in use". Removing the directory before
 // start ensures Lima can always bind a fresh listener.
 func removeInstanceSocket() error {
-	socketDir := filepath.Dir(paths.ContainerdSocket(limaInstanceName))
+	socketDir := filepath.Dir(files.ContainerdSocket(limaInstanceName))
 	if err := os.RemoveAll(socketDir); err != nil {
 		return crex.Wrap(ErrHostStart, err)
 	}
@@ -347,7 +321,7 @@ func removeInstanceSocket() error {
 // does not exist.
 func destroyHost(ctx context.Context) error {
 	status := hostStatus(ctx)
-	if status == provider.StateNotProvisioned {
+	if status == StateNotProvisioned {
 		return ErrHostNotCreated
 	}
 
@@ -373,17 +347,22 @@ func hostExec(ctx context.Context, stdout, stderr io.Writer, command string, arg
 	return limaGuestExec(ctx, stdout, stderr, command, args...)
 }
 
+// Returns the containerd socket path for the named instance.
+func containerdSocket(_ context.Context, name string) (string, error) {
+	return files.ContainerdSocket(name), nil
+}
+
 // Queries the current state of the host VM.
 //
-// Maps the Lima instance status string to a provider state. If the instance
-// does not exist or cannot be reached, returns [provider.StateNotProvisioned].
-func hostStatus(ctx context.Context) provider.State {
+// Maps the Lima instance status string to a local state. If the instance
+// does not exist or cannot be reached, returns [StateNotProvisioned].
+func hostStatus(ctx context.Context) State {
 	switch limaInstanceStatus(ctx) {
 	case limaStatusRunning:
-		return provider.StateRunning
+		return StateRunning
 	case limaStatusStopped:
-		return provider.StateStopped
+		return StateStopped
 	default:
-		return provider.StateNotProvisioned
+		return StateNotProvisioned
 	}
 }
