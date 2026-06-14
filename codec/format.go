@@ -3,8 +3,8 @@ package codec
 // Serialization format supported by the codec.
 type Format int
 
-// The struct tag key used by all codec operations.
-const tag = "codec"
+// The default struct tag key read by codec operations.
+const defaultCodecTag = "codec"
 
 // The struct tag key used to declare a field default.
 const defaultTag = "default"

@@ -4,21 +4,21 @@ import "testing"
 
 // Test fixture with fields that declare default values.
 type withDefaults struct {
-	Name   string `json:"name"`                 // Name with no declared default.
-	Weight uint16 `json:"weight" default:"100"` // Defaults to 100.
-	Mode   string `json:"mode" default:"auto"`  // Defaults to "auto".
+	Name   string `codec:"name"`                 // Name with no declared default.
+	Weight uint16 `codec:"weight" default:"100"` // Defaults to 100.
+	Mode   string `codec:"mode" default:"auto"`  // Defaults to "auto".
 }
 
 // Test fixture with a nested struct that carries defaults.
 type nestedDefaults struct {
-	Inner withDefaults `json:"inner"` // Nested struct with its own defaults.
+	Inner withDefaults `codec:"inner"` // Nested struct with its own defaults.
 }
 
 // Test fixture covering bool, int64, and float64 defaults.
 type allDefaults struct {
-	B bool    `json:"b" default:"true"` // Defaults to true.
-	I int64   `json:"i" default:"-42"`  // Defaults to -42.
-	F float64 `json:"f" default:"3.14"` // Defaults to 3.14.
+	B bool    `codec:"b" default:"true"` // Defaults to true.
+	I int64   `codec:"i" default:"-42"`  // Defaults to -42.
+	F float64 `codec:"f" default:"3.14"` // Defaults to 3.14.
 }
 
 func TestDecode_Defaults(t *testing.T) {
@@ -112,7 +112,7 @@ func TestDecode_DefaultFloat(t *testing.T) {
 
 func TestDecode_DefaultUnsupportedType(t *testing.T) {
 	type unsupported struct {
-		Sl []int `json:"sl" default:"nope"`
+		Sl []int `codec:"sl" default:"nope"`
 	}
 	var s unsupported
 	err := Decode(map[string]any{}, &s)

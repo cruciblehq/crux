@@ -4,7 +4,7 @@ import "testing"
 
 // Test fixture that validates the Name field is non-empty.
 type validatable struct {
-	Name string `json:"name"` // Must be non-empty to pass validation.
+	Name string `codec:"name"` // Must be non-empty to pass validation.
 }
 
 // Returns an error if Name is empty.

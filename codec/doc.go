@@ -1,6 +1,6 @@
 // Package codec provides format-neutral encoding and decoding.
 //
-// All types in the project carry a single json:"name" struct tag. The codec
+// All types in the project carry a single codec:"name" struct tag. The codec
 // package converts between Go values and byte representations in JSON or YAML
 // using mapstructure as the struct-to-map bridge and standard library encoders
 // for the final byte format.
@@ -20,23 +20,24 @@
 //	err := codec.Unmarshal(data, &v, codec.YAML)
 //
 // Types that need custom decoding logic implement [Decodable]. When [Decode]
-// encounters such a type at any depth, it calls Decode with the raw value
-// instead of mapping fields automatically. The raw value is typically a
-// map[string]any but may be a string or other scalar. Implementations
-// use [Field] to decode individual fields one at a time, retaining coercion
-// and defaults, and call [Decode] on nested structs of different types.
+// encounters such a type at any depth, it calls Decode with the active codec
+// and the raw value instead of mapping fields automatically. The raw value is
+// typically a map[string]any but may be a string or other scalar. Use the
+// passed codec's [Codec.Field] to decode individual fields one at a time,
+// retaining coercion and defaults, and [Codec.Decode] on nested structs of
+// different types.
 //
-//	func (m *MyType) Decode(raw any) error {
+//	func (m *MyType) Decode(c *codec.Codec, raw any) error {
 //	    src := raw.(map[string]any)
-//	    codec.Field(src, m, "Name")
-//	    codec.Field(src, m, "Version")
+//	    c.Field(src, m, "Name")
+//	    c.Field(src, m, "Version")
 //	    // custom dispatch or iteration for remaining fields
 //	    return nil
 //	}
 //
 // Struct fields may declare a default value in their tag:
 //
-//	Weight uint16 `json:"weight" default:"100"`
+//	Weight uint16 `codec:"weight" default:"100"`
 //
 // Defaults are applied only when the field's key is absent from the source
 // map. Explicitly provided values, including zero, are never overwritten.

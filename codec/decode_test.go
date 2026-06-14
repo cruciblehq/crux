@@ -174,7 +174,7 @@ func TestField_BadFieldName(t *testing.T) {
 
 func TestField_Decodable(t *testing.T) {
 	type wrapper struct {
-		C custom `json:"c"`
+		C custom `codec:"c"`
 	}
 	src := map[string]any{"c": map[string]any{"custom": "hooked"}}
 	var w wrapper
