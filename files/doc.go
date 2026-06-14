@@ -12,7 +12,7 @@
 //	fmt.Println(files.Manifest("."))      // crucible.yaml
 //	fmt.Println(files.BuildDir("."))      // build
 //	fmt.Println(files.DataDir())          // ~/Library/Application Support/crux
-//	fmt.Println(files.TempDir())          // /tmp/crux
+//	fmt.Println(files.TempDir())          // /tmp/crux-<uid>
 //
 // File helpers: atomic writes with SHA-256 digest tracking, existence checks,
 // empty-directory pruning, subdirectory enumeration, and managed temporary

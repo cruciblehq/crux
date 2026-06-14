@@ -3,8 +3,10 @@ package files
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/adrg/xdg"
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Default permission modes.
@@ -87,6 +89,9 @@ const (
 
 // Name of the limactl binary.
 const LimactlBinName = "limactl"
+
+// Permission mode for the temp directory, reachable only by the current user.
+const tempDirMode os.FileMode = 0700
 
 // Path to the build output directory for a resource project.
 //
@@ -207,23 +212,51 @@ func LocalDir() string {
 
 // Path to the directory for temporary Crucible files.
 //
-// All crux-owned temporary files land here so they are visible,
-// consistently namespaced, and cleanable in one sweep.
+// Each user gets their own directory, reachable only by them, so files placed
+// in the shared OS temp dir cannot be read or hijacked by anyone else. On Unix
+// the user id is added to the name so paths do not collide between users.
 //
-//	Linux/macOS:  /tmp/crux
+//	Linux/macOS:  /tmp/crux-<uid>
 //	Windows:      %TEMP%\crux
 func TempDir() string {
-	return filepath.Join(os.TempDir(), DefaultClientName)
+	name := DefaultClientName
+	if uid := os.Getuid(); uid >= 0 {
+		name += "-" + strconv.Itoa(uid)
+	}
+	return filepath.Join(os.TempDir(), name)
 }
 
 // Creates a new temporary file in the Crucible temp directory.
 //
-// The pattern follows the same convention as [os.CreateTemp]: a * in the
-// pattern is replaced with a random string. Callers are responsible for
-// closing and removing the file when done.
+// The directory is created if missing, reachable only by the current user. The
+// pattern follows [os.CreateTemp]: a * is replaced with a random string.
+// Callers must close and remove the file when done.
 func CreateTemp(pattern string) (*os.File, error) {
-	if err := os.MkdirAll(TempDir(), DefaultDirMode); err != nil {
+	dir := TempDir()
+	if err := os.MkdirAll(dir, tempDirMode); err != nil {
 		return nil, err
 	}
-	return os.CreateTemp(TempDir(), pattern)
+	if err := verifyTempDir(dir); err != nil {
+		return nil, err
+	}
+	return os.CreateTemp(dir, pattern)
+}
+
+// Verifies that dir is a real directory rather than a symlink.
+//
+// Guards against hijacking in the shared OS temp dir by rejecting anything
+// that is a symlink or not a directory, and tightening permissions when the
+// directory already existed with looser access.
+func verifyTempDir(dir string) error {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return crex.Wrapf(ErrUnsafeTempDir, "%q is a symlink or not a directory", dir)
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return os.Chmod(dir, tempDirMode)
+	}
+	return nil
 }
