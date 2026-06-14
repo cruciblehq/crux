@@ -7,6 +7,7 @@ import (
 	"github.com/adrg/xdg"
 )
 
+// Default permission modes.
 const (
 
 	// Default permission mode used when creating directories.
@@ -23,9 +24,13 @@ const (
 
 	// Default permission mode for executable files.
 	DefaultExecMode os.FileMode = 0755
+)
 
-	// Default name for the Crucible client.
-	DefaultClientName = "crux"
+// Default name for the Crucible client.
+const DefaultClientName = "crux"
+
+// Standard filenames.
+const (
 
 	// Standard filename for Crucible manifests.
 	ManifestFile = "crucible.yaml"
@@ -44,6 +49,16 @@ const (
 
 	// Standard filename for the providers configuration file.
 	ProvidersFile = "providers.yaml"
+
+	// Standard filename for the Lima VM configuration.
+	LimaConfigFile = "lima.yaml"
+
+	// Standard filename for the containerd Unix socket.
+	ContainerdSocketFile = "containerd.sock"
+)
+
+// Subdirectory names.
+const (
 
 	// Subdirectory name for build artifacts within a project directory.
 	BuildDirName = "build"
@@ -66,18 +81,12 @@ const (
 	// Subdirectory name for the Lima installation within the application data directory.
 	LimaDirName = "lima"
 
-	// Name of the limactl binary.
-	LimactlBinName = "limactl"
-
-	// Standard filename for the Lima VM configuration.
-	LimaConfigFile = "lima.yaml"
-
 	// Subdirectory name for instance sockets within the cache directory.
 	InstancesDirName = "instances"
-
-	// Standard filename for the containerd Unix socket.
-	ContainerdSocketFile = "containerd.sock"
 )
+
+// Name of the limactl binary.
+const LimactlBinName = "limactl"
 
 // Path to the build output directory for a resource project.
 //

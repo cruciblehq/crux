@@ -6,6 +6,8 @@
 // cache, config, and project locations. All path functions are pure string
 // operations with no side effects. Project-relative functions accept a base
 // directory; system-level functions derive their roots from XDG or OS defaults.
+// ValidateAbsPath validates slash-separated absolute paths such as those that
+// target locations inside a sandbox.
 //
 //	fmt.Println(files.Manifest("."))      // crucible.yaml
 //	fmt.Println(files.BuildDir("."))      // build
