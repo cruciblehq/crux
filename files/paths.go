@@ -49,9 +49,6 @@ const (
 	// Standard filename for the packaged resource archive.
 	PackageFile = "package.tar.zst"
 
-	// Standard filename for the providers configuration file.
-	ProvidersFile = "providers.yaml"
-
 	// Standard filename for the Lima VM configuration.
 	LimaConfigFile = "lima.yaml"
 
@@ -114,11 +111,6 @@ func Package(base string) string {
 	return filepath.Join(DistDir(base), PackageFile)
 }
 
-// Path to the OCI image tarball in a resource project's build output.
-func BuildImage(base string) string {
-	return filepath.Join(BuildDir(base), ImageFile)
-}
-
 // Path to the manifest file for a resource project.
 func Manifest(base string) string {
 	return filepath.Join(base, ManifestFile)
@@ -141,24 +133,6 @@ func WidgetMain(base string) string {
 //	Windows: %LOCALAPPDATA%\crux
 func DataDir() string {
 	return filepath.Join(xdg.DataHome, DefaultClientName)
-}
-
-// Path to the directory for user configuration files.
-//
-//	Linux:   $XDG_CONFIG_HOME/crux or ~/.config/crux
-//	macOS:   ~/Library/Application Support/crux
-//	Windows: %APPDATA%\crux
-func ConfigDir() string {
-	return filepath.Join(xdg.ConfigHome, DefaultClientName)
-}
-
-// Path to the providers configuration file.
-//
-//	Linux:   $XDG_CONFIG_HOME/crux/providers.yaml
-//	macOS:   ~/Library/Application Support/crux/providers.yaml
-//	Windows: %APPDATA%\crux\providers.yaml
-func ProvidersConfig() string {
-	return filepath.Join(ConfigDir(), ProvidersFile)
 }
 
 // Path to the directory for non-essential cached data.
