@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/security/vm"
+	"github.com/cruciblehq/crux/affordance/kernel"
 )
 
 // The local compute backend.
@@ -32,8 +32,8 @@ func (b *Backend) UploadImage(ctx context.Context, path string) (string, error) 
 }
 
 // Provisions a compute host instance from a previously uploaded image.
-func (b *Backend) Provision(ctx context.Context, name, imageID string, vmSpec vm.VM) error {
-	return provision(ctx, name, imageID, vmSpec)
+func (b *Backend) Provision(ctx context.Context, name, imageID string, kernelSpec kernel.Spec) error {
+	return provision(ctx, name, imageID, kernelSpec)
 }
 
 // Tears down the instance and removes all state.

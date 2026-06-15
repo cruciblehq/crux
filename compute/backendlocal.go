@@ -49,7 +49,7 @@ func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error)
 
 // Provisions a new host from a previously uploaded image.
 func (bl *BackendLocal) Provision(ctx context.Context, img, name string, opts Options) error {
-	return bl.local.Provision(ctx, name, img, opts.VM)
+	return bl.local.Provision(ctx, name, img, opts.Kernel)
 }
 
 // Tears down the named host and removes all associated persistent state.

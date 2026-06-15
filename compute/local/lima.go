@@ -21,40 +21,48 @@ import (
 	"github.com/cruciblehq/crux/files"
 )
 
+// Lima configuration.
 const (
-
-	// Lima configuration.
 	limaVersion      = "2.0.3" // Lima version to use for the crux VM.
 	limaInstanceName = "crux"  // Lima instance name used for the crux VM.
+)
 
-	// Download URL template for Lima releases. Uses placeholders for version,
-	// OS, and architecture.
-	limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
+// Download URL template for Lima releases. Uses placeholders for version,
+// OS, and architecture.
+const limaDownloadURL = "https://github.com/lima-vm/lima/releases/download/v%s/lima-%s-%s-%s.tar.gz"
 
-	// OS names used in Lima release asset URLs.
+// OS names used in Lima release asset URLs.
+const (
 	limaOSDarwin = "Darwin" // macOS release asset name.
 	limaOSLinux  = "Linux"  // Linux release asset name.
+)
 
-	// Go GOARCH values.
+// Go GOARCH values.
+const (
 	goarchARM64 = "arm64" // 64-bit ARM.
 	goarchAMD64 = "amd64" // 64-bit x86.
+)
 
-	// Architecture identifiers used in Lima YAML configuration.
+// Architecture identifiers used in Lima YAML configuration.
+const (
 	limaArchARM64 = "aarch64" // ARM64 (Lima uses aarch64).
 	limaArchAMD64 = "x86_64"  // AMD64 (Lima uses x86_64).
+)
 
-	// Maximum time to wait for child process I/O pipes to drain after context
-	// cancellation kills the process.
-	commandWaitDelay = 5 * time.Second
+// Maximum time to wait for child process I/O pipes to drain after context
+// cancellation kills the process.
+const commandWaitDelay = 5 * time.Second
 
-	// Status strings returned by limactl list.
+// Status strings returned by limactl list.
+const (
 	limaStatusRunning = "Running" // Lima instance is running.
 	limaStatusStopped = "Stopped" // Lima instance is stopped.
+)
 
-	// Process exit codes returned by limaExec.
+// Process exit codes returned by limaExec.
+const (
 	exitCodeSuccess = 0  // Command exited cleanly.
 	exitCodeError   = -1 // Command could not be started or its exit code is unavailable.
-
 )
 
 // OS name used in Lima release asset URLs (e.g. "Darwin", "Linux").

@@ -3,7 +3,7 @@ package compute
 import (
 	"io"
 
-	"github.com/cruciblehq/crux/security/vm"
+	"github.com/cruciblehq/crux/affordance/kernel"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -12,10 +12,10 @@ import (
 // Each backend maps these requirements to its native compute class. The local
 // backend uses fixed resource allocation and ignores the sizing fields.
 type Options struct {
-	CPUs   int   // Minimum virtual CPUs required; zero means no minimum.
-	Memory int   // Minimum memory in GiB required; zero means no minimum.
-	Disk   int   // Minimum disk size in GiB required; zero means no minimum.
-	VM     vm.VM // VM-level security requirements applied at provisioning time.
+	CPUs   int         // Minimum virtual CPUs required; zero means no minimum.
+	Memory int         // Minimum memory in GiB required; zero means no minimum.
+	Disk   int         // Minimum disk size in GiB required; zero means no minimum.
+	Kernel kernel.Spec // Kernel requirements applied at provisioning time.
 }
 
 // Controls how a container process is executed.

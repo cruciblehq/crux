@@ -27,6 +27,7 @@ import (
 	"github.com/cruciblehq/crux/crypto"
 )
 
+// Container runtime limits and defaults.
 const (
 
 	// Shell used by default.
@@ -35,15 +36,23 @@ const (
 	// Maximum UID or GID accepted by runc. Runc requires values to fit in
 	// int32 even though the OCI spec field type is uint32.
 	runcMaxID = 1<<31 - 1
+)
+
+// Suffixes appended to step IDs when naming container records and processes.
+const (
 
 	// Suffix appended to step IDs when naming container records.
 	containerIDSuffix = "container"
 
 	// Suffix appended to step IDs when naming exec processes.
 	execIDSuffix = "exec"
+)
 
-	// Grace period for SIGTERM before SIGKILL is sent during Stop.
-	stopGraceTimeout = 10 * time.Second
+// Grace period for SIGTERM before SIGKILL is sent during Stop.
+const stopGraceTimeout = 10 * time.Second
+
+// Overlay filesystem layout.
+const (
 
 	// Path of the rootfs directory within a containerd snapshot mount.
 	rootfsPath = "rootfs"
@@ -428,7 +437,7 @@ func parseID(s string) (uint32, error) {
 		return 0, err
 	}
 	if v > runcMaxID {
-		return 0, errors.New("exceeds runc maximum of 2147483647")
+		return 0, errors.New("exceeds runc maximum")
 	}
 	return uint32(v), nil
 }
@@ -458,7 +467,7 @@ func applyOCISpec(src specs.Spec) oci.SpecOpts {
 	}
 }
 
-// Sets the two fields the security package leaves empty because only the
+// Sets the two fields the affordance package leaves empty because only the
 // container runtime knows them: the rootfs path (always "rootfs" under
 // containerd's overlayfs snapshotter) and the cgroup path.
 func withComputeFields(ns, id string) oci.SpecOpts {

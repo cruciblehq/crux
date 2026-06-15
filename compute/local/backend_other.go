@@ -6,7 +6,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/security/vm"
+	"github.com/cruciblehq/crux/affordance/kernel"
 )
 
 func ensureMachineImage(_ context.Context) (string, error) {
@@ -17,7 +17,7 @@ func uploadImage(_ context.Context, _ string) (string, error) {
 	return "", ErrUnsupportedPlatform
 }
 
-func provision(_ context.Context, _, _ string, _ vm.VM) error {
+func provision(_ context.Context, _, _ string, _ kernel.Spec) error {
 	return ErrUnsupportedPlatform
 }
 

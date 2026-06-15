@@ -26,10 +26,11 @@ import (
 	"github.com/cruciblehq/crux/crypto"
 )
 
-const (
+// Number of random bytes in generated step, snapshot, and exec identifiers.
+const idLen = 8
 
-	// Number of random bytes in generated step, snapshot, and exec identifiers.
-	idLen = 8
+// Containerd runtime configuration.
+const (
 
 	// OCI runtime used for containers.
 	runcV2Runtime = "io.containerd.runc.v2"
@@ -39,9 +40,13 @@ const (
 
 	// Snapshotter used for all container and image operations.
 	overlayfsSnapshotter = "overlayfs"
+)
 
-	// Suffix appended to step IDs when naming writable snapshots.
-	snapshotIDSuffix = "snapshot"
+// Suffix appended to step IDs when naming writable snapshots.
+const snapshotIDSuffix = "snapshot"
+
+// Content store and image reference keys.
+const (
 
 	// Content store ref key prefix for image config blobs.
 	configBlobRefPrefix = "config"
@@ -54,6 +59,10 @@ const (
 
 	// Containerd GC label key that links a manifest to its config blob.
 	gcLabelConfig = "containerd.io/gc.ref.content.config"
+)
+
+// OCI whiteout markers.
+const (
 
 	// Prefix used by OCI whiteout tar entries to mark deleted paths.
 	whiteoutPrefix = ".wh."

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/cruciblehq/crux/affordance/kernel"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/security/vm"
 )
 
 const (
@@ -42,24 +42,20 @@ var limaConfigTemplate *template.Template
 // does not derive VM sizing from grants. These values are passed directly to
 // the hypervisor without being validated against host resources, so these they
 // constitute minimum requirements (defaultLimaCPUs, defaultLimaMemoryGiB, and
-// defaultLimaDiskGiB). Sysctls and nftables rules are injected from the compute
-// policy, allowing the executor to configure VM-level security for services
-// running inside the local VM. ImagePath is the local path to the machine disk
+// defaultLimaDiskGiB). ImagePath is the local path to the machine disk
 // image, which is downloaded from the Crucible registry and cached locally if
 // not already cached. The guest and host socket paths are used to set up Lima
 // port forwarding so crux can dial containerd inside the VM.
 type limaConfig struct {
-	Arch        string            // Lima architecture identifier ("aarch64" or "x86_64").
-	CPUs        int               // Number of virtual CPUs (defaultLimaCPUs).
-	Memory      string            // Memory allocation (defaultLimaMemoryGiB with "GiB" suffix).
-	Disk        string            // Disk size (defaultLimaDiskGiB with "GiB" suffix).
-	User        string            // Host username (Lima creates a matching guest user).
-	UserUID     int               // Host user's numeric UID.
-	ImagePath   string            // Local path to the cached machine disk image.
-	GuestSocket string            // containerd socket path inside the VM (guest-local, under /run).
-	HostSocket  string            // containerd socket path on the host (Lima forwards guest to host).
-	Sysctls     map[string]string // Boot-time sysctl values from the compute policy.
-	NftRules    []vm.VMNftRule    // VM-level nftables rules from the compute policy.
+	Arch        string // Lima architecture identifier ("aarch64" or "x86_64").
+	CPUs        int    // Number of virtual CPUs (defaultLimaCPUs).
+	Memory      string // Memory allocation (defaultLimaMemoryGiB with "GiB" suffix).
+	Disk        string // Disk size (defaultLimaDiskGiB with "GiB" suffix).
+	User        string // Host username (Lima creates a matching guest user).
+	UserUID     int    // Host user's numeric UID.
+	ImagePath   string // Local path to the cached machine disk image.
+	GuestSocket string // containerd socket path inside the VM (guest-local, under /run).
+	HostSocket  string // containerd socket path on the host (Lima forwards guest to host).
 }
 
 // Builds the Lima YAML configuration template data.
@@ -69,9 +65,10 @@ type limaConfig struct {
 // which Lima uses to create a matching guest user. The VM boots from the
 // machine disk image at imagePath. containerd runs as a system service inside
 // the VM; Lima's portForwards section tunnels the guest socket to the host so
-// crux can dial it. Sysctls and nftables rules from vmSpec are injected into
-// the config when non-empty. Does not touch the filesystem.
-func buildLimaConfig(imagePath string, vmSpec vm.VM) (limaConfig, error) {
+// crux can dial it. The kernel spec carries the kernel requirements, but the
+// local backend does not apply boot-time configuration from it, so the
+// parameter is intentionally ignored. Does not touch the filesystem.
+func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
 	u, err := user.Current()
 	if err != nil {
 		return limaConfig{}, crex.Wrap(ErrHostConfig, err)
@@ -89,9 +86,6 @@ func buildLimaConfig(imagePath string, vmSpec vm.VM) (limaConfig, error) {
 		HostSocket:  files.ContainerdSocket(limaInstanceName),
 	}
 
-	data.Sysctls = vmSpec.Sysctls
-	data.NftRules = vmSpec.Nftables
-
 	return data, nil
 }
 
@@ -101,8 +95,8 @@ func buildLimaConfig(imagePath string, vmSpec vm.VM) (limaConfig, error) {
 // [limaConfigTemplate]. The file is written to disk so it can be read by
 // limactl when provisioning the VM. If the file already exists it will be
 // overwritten. Returns the path to the file that was generated.
-func generateLimaConfig(imagePath string, vmSpec vm.VM) (string, error) {
-	data, err := buildLimaConfig(imagePath, vmSpec)
+func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error) {
+	data, err := buildLimaConfig(imagePath, kernelSpec)
 	if err != nil {
 		return "", err
 	}

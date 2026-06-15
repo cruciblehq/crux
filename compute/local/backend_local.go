@@ -16,20 +16,24 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/cruciblehq/crux/affordance/kernel"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/security/vm"
 	"github.com/cruciblehq/crux/source"
 )
 
+// Machine image coordinates.
 const (
 	machineNamespace   = "crucible"                       // Registry namespace for the machine image.
 	machineName        = "machine"                        // Registry resource name for the machine image.
 	machineVersion     = "0.1.8"                          // Pinned machine image version.
 	machineRegistryURL = "http://hub.cruciblehq.xyz:8080" // Registry URL for the machine image.
 	machineExtension   = ".qcow2"                         // Disk image file extension.
+)
 
+// Containerd readiness polling.
+const (
 	containerdReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd to start.
 	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
 )
@@ -76,14 +80,14 @@ func uploadImage(_ context.Context, path string) (string, error) {
 // imageID is the local filesystem path to a QCOW2 disk image, as returned by
 // [uploadImage]. Returns [ErrHostAlreadyProvisioned] if an instance already
 // exists. The VM is created and started.
-func provision(ctx context.Context, _, imageID string, vmSpec vm.VM) error {
+func provision(ctx context.Context, _, imageID string, kernelSpec kernel.Spec) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
 	if hostStatus(ctx) != StateNotProvisioned {
 		return ErrHostAlreadyProvisioned
 	}
-	return createAndStartHost(ctx, imageID, vmSpec)
+	return createAndStartHost(ctx, imageID, kernelSpec)
 }
 
 // Starts the VM.
@@ -222,10 +226,11 @@ func isContainerdReady(ctx context.Context) bool {
 // Creates the Lima instance from the given disk image and starts it.
 //
 // Lima 2.x create does not auto-start; an explicit start call is required.
-// imagePath is the local filesystem path to a QCOW2 disk image. vmSpec
-// configures VM-level security; a zero value applies no additional policy.
-func createAndStartHost(ctx context.Context, imagePath string, vmSpec vm.VM) error {
-	configPath, err := generateLimaConfig(imagePath, vmSpec)
+// imagePath is the local filesystem path to a QCOW2 disk image. kernelSpec
+// configures kernel-level requirements; a zero value applies no additional
+// requirements.
+func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel.Spec) error {
+	configPath, err := generateLimaConfig(imagePath, kernelSpec)
 	if err != nil {
 		return crex.Wrap(ErrHostCreate, err)
 	}

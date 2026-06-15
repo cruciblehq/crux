@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cruciblehq/crux/affordance/kernel"
 	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/security/vm"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -61,7 +61,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 }
 
 func TestBuildLimaConfig_Defaults(t *testing.T) {
-	cfg, err := buildLimaConfig("/tmp/test.qcow2", vm.VM{})
+	cfg, err := buildLimaConfig("/tmp/test.qcow2", kernel.Spec{})
 	if err != nil {
 		t.Fatalf("buildLimaConfig: %v", err)
 	}
@@ -94,36 +94,5 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	}
 	if want := files.ContainerdSocket(limaInstanceName); cfg.HostSocket != want {
 		t.Errorf("HostSocket: got %q, want %q", cfg.HostSocket, want)
-	}
-	if len(cfg.Sysctls) != 0 {
-		t.Errorf("Sysctls: expected empty, got %v", cfg.Sysctls)
-	}
-	if len(cfg.NftRules) != 0 {
-		t.Errorf("NftRules: expected empty, got %v", cfg.NftRules)
-	}
-}
-
-func TestBuildLimaConfig_PropagatesPolicy(t *testing.T) {
-	vmSpec := vm.VM{
-		Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
-		Nftables: []vm.VMNftRule{
-			{Table: "inet filter", Chain: "input", Rule: "drop"},
-		},
-	}
-
-	cfg, err := buildLimaConfig("/tmp/test.qcow2", vmSpec)
-	if err != nil {
-		t.Fatalf("buildLimaConfig: %v", err)
-	}
-
-	if got := cfg.Sysctls["net.ipv4.ip_forward"]; got != "1" {
-		t.Errorf("Sysctls[net.ipv4.ip_forward]: got %q, want %q", got, "1")
-	}
-	if len(cfg.NftRules) != 1 {
-		t.Fatalf("NftRules: got %d entries, want 1", len(cfg.NftRules))
-	}
-	r := cfg.NftRules[0]
-	if r.Table != "inet filter" || r.Chain != "input" || r.Rule != "drop" {
-		t.Errorf("NftRules[0]: got %+v", r)
 	}
 }

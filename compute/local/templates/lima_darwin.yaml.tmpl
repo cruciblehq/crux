@@ -129,30 +129,6 @@ provision:
         fi
       fi
 
-  # This script is generated only when kernel parameters or nftables rules are
-  # declared. We apply them on every boot because kernel parameters and nftables
-  # rules are not persisted across reboots in Alpine. sysctl -w applies each
-  # parameter to the running kernel. nft add rule inserts each rule into the
-  # named chain within its table. The referenced tables and chains must already
-  # exist in the guest's nftables configuration for the insertions to succeed.
-{{- if or .Sysctls .NftRules}}
-  - mode: system
-    script: |
-      #!/bin/sh
-{{- if .Sysctls}}
-      # Apply kernel parameter overrides.
-{{- range $k, $v := .Sysctls}}
-      sysctl -w '{{ $k }}={{ $v }}'
-{{- end}}
-{{- end}}
-{{- if .NftRules}}
-      # Add nftables rules to the declared tables and chains.
-{{- range .NftRules}}
-      nft add rule {{ .Table }} {{ .Chain }} {{ .Rule }}
-{{- end}}
-{{- end}}
-{{- end}}
-
 # Lima polls these after provisioning and marks the instance ready only once
 # all probes pass. This probe checks that containerd is running and the socket
 # is available for Lima to forward to the host.
