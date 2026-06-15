@@ -3,6 +3,8 @@ package manifest
 import (
 	"errors"
 	"testing"
+
+	"github.com/cruciblehq/crux/codec"
 )
 
 func TestServiceValidateOK(t *testing.T) {
@@ -48,7 +50,7 @@ func TestServiceEncodeWithSchema(t *testing.T) {
 		Entrypoint: []string{"/bin/run"},
 		Recipe:     Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +68,7 @@ func TestServiceEncodeWithEntrypoint(t *testing.T) {
 		Entrypoint: []string{"/bin/run", "--verbose"},
 		Recipe:     Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +87,7 @@ func TestServiceEncodeWithoutSchema(t *testing.T) {
 		Entrypoint: []string{"/bin/run"},
 		Recipe:     Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ type Resource struct {
 	//
 	// Must be set before any other field is read. The namespace portion of the
 	// type string determines which registry is consulted; the name portion
-	// selects the resource kind within that registry.
+	// selects the resource type within that registry.
 	Type ResourceType `codec:"type"`
 
 	// Identifier for the resource.

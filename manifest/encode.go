@@ -10,11 +10,11 @@ import (
 // Converts v to a map[string]any.
 //
 // If v implements [codec.Encodable], its Encode method is called and the
-// result is asserted as a map[string]any. Otherwise [codec.ToMap] is used.
-// Returns [ErrEncodeFailed] if the encoded value is not a map.
-func encodeToMap(v any) (map[string]any, error) {
+// result is asserted as a map[string]any. Otherwise [codec.Codec.ToMap] is
+// used. Returns [ErrEncodeFailed] if the encoded value is not a map.
+func encodeToMap(c *codec.Codec, v any) (map[string]any, error) {
 	if enc, ok := v.(codec.Encodable); ok {
-		raw, err := enc.Encode()
+		raw, err := enc.Encode(c)
 		if err != nil {
 			return nil, err
 		}
@@ -24,7 +24,7 @@ func encodeToMap(v any) (map[string]any, error) {
 		}
 		return m, nil
 	}
-	return codec.ToMap(v)
+	return c.ToMap(v)
 }
 
 // Merges src into dst, returning an error if any key appears in both.

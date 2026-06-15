@@ -80,9 +80,8 @@ func (g *Grant) Validate() error {
 
 // Encodes the grant to its canonical serialized form.
 //
-// Implements [codec.Encodable]. A grant with no args encodes to its source
-// string. A grant with [Grant.Args] set encodes to a single-key map of source
-// to a string-keyed map of arg values.
+// A grant with no args encodes to its source string. A grant with [Grant.Args]
+// set encodes to a single-key map of source to a string-keyed map of arg values.
 func (g *Grant) Encode() (any, error) {
 	if len(g.Args) > 0 {
 		args := make(map[string]any, len(g.Args))
@@ -96,10 +95,9 @@ func (g *Grant) Encode() (any, error) {
 
 // Decodes a raw grant element into the receiver.
 //
-// Implements [codec.Decodable]. Strings are stored verbatim as [Grant.Source].
-// Maps must contain exactly one key. For domain grants (key starts with "."),
-// the value must be nil. For reference grants, a nil value means no args; a
-// string-keyed map sets [Grant.Args].
+// Strings are stored verbatim as [Grant.Source]. Maps must contain exactly one
+// key. For domain grants, the value must be nil. For reference grants, a nil
+// value means no args; a string-keyed map sets [Grant.Args].
 func (g *Grant) Decode(raw any) error {
 	switch v := raw.(type) {
 	case string:

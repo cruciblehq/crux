@@ -3,15 +3,27 @@ package manifest
 import (
 	"errors"
 	"testing"
+
+	"github.com/cruciblehq/crux/codec"
 )
 
+// Test struct with a single codec-tagged field.
 type encodeTestStruct struct {
 	Value string `codec:"value"`
 }
 
+// Implements [codec.Encodable] but returns a non-map value, exercising the
+// error branch of [encodeToMap].
+type encodableNonMap struct{}
+
+// Encodes to a scalar string rather than a map.
+func (encodableNonMap) Encode(_ *codec.Codec) (any, error) {
+	return "scalar", nil
+}
+
 func TestEncodeToMapWithEncodable(t *testing.T) {
 	a := &Affordance{}
-	m, err := encodeToMap(a)
+	m, err := encodeToMap(codec.Default(), a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,8 +33,7 @@ func TestEncodeToMapWithEncodable(t *testing.T) {
 }
 
 func TestEncodeToMapEncodableReturnsNonMap(t *testing.T) {
-	g := &Grant{Source: ".cap effective net_admin"}
-	_, err := encodeToMap(g)
+	_, err := encodeToMap(codec.Default(), encodableNonMap{})
 	if !errors.Is(err, ErrEncodeFailed) {
 		t.Fatalf("err = %v, want ErrEncodeFailed", err)
 	}
@@ -30,7 +41,7 @@ func TestEncodeToMapEncodableReturnsNonMap(t *testing.T) {
 
 func TestEncodeToMapNonEncodable(t *testing.T) {
 	v := encodeTestStruct{Value: "hello"}
-	m, err := encodeToMap(v)
+	m, err := encodeToMap(codec.Default(), v)
 	if err != nil {
 		t.Fatal(err)
 	}

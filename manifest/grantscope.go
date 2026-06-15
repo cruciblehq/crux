@@ -47,9 +47,9 @@ func (gs *GrantScope) Validate() error {
 
 // Encodes the grant scope into one or more list entries.
 //
-// Implements [codec.Encodable]. Platform-scoped grants produce a single map
-// with platform and grants keys. Universal grants (empty Platform) produce
-// one map per grant, suitable for flattening into the parent list.
+// Platform-scoped grants produce a single map with platform and grants keys.
+// Universal grants (empty Platform) produce one map per grant, suitable for
+// flattening into the parent list.
 func (gs *GrantScope) Encode() (any, error) {
 	if gs.Platform != "" {
 		entries := make([]any, 0, len(gs.Grants))
@@ -78,9 +78,8 @@ func (gs *GrantScope) Encode() (any, error) {
 
 // Decodes a platform group map into the scope.
 //
-// Implements [codec.Decodable]. The map must contain a "grants" key with a
-// list of grant elements. Inner grants are decoded via [decodeGrant].
-// Platform groups cannot be nested.
+// The map must contain a "grants" key with a list of grant elements. Inner
+// grants are decoded via [decodeGrant]. Platform groups cannot be nested.
 func (gs *GrantScope) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {

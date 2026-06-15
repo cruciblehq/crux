@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	afnet "github.com/cruciblehq/crux/security/net"
+	afnet "github.com/cruciblehq/crux/affordance/net"
 )
 
 func TestPlanValidateOK(t *testing.T) {
@@ -82,8 +82,8 @@ func TestPlanValidatePropagatesContainerError(t *testing.T) {
 		Version: PlanVersion,
 		Containers: map[string]Container{
 			"c1": {
-				Network: afnet.NetworkPolicy{
-					Ingress: []afnet.NetworkIngressRule{{Protocol: "invalid", Port: 80}},
+				Network: afnet.Spec{
+					Ingress: []afnet.IngressRule{{Protocol: "invalid", Port: 80}},
 				},
 			},
 		},

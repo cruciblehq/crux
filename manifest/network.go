@@ -1,6 +1,9 @@
 package manifest
 
-import "github.com/cruciblehq/crux/crex"
+import (
+	"github.com/cruciblehq/crux/affordance/net"
+	"github.com/cruciblehq/crux/crex"
+)
 
 // Cloud network perimeter configuration.
 //
@@ -37,7 +40,8 @@ type IngressRule struct {
 
 	// Network protocol.
 	//
-	// One of "tcp" or "udp".
+	// A protocol keyword, the "ip" wildcard for any protocol, or a decimal IP
+	// protocol number, following the IANA Protocol Numbers registry.
 	Protocol string `codec:"protocol"`
 
 	// Destination port on the service.
@@ -63,7 +67,8 @@ type EgressRule struct {
 
 	// Network protocol.
 	//
-	// One of "tcp" or "udp".
+	// A protocol keyword, the "ip" wildcard for any protocol, or a decimal IP
+	// protocol number, following the IANA Protocol Numbers registry.
 	Protocol string `codec:"protocol"`
 
 	// Destination port.
@@ -83,11 +88,12 @@ func (r *EgressRule) Validate() error {
 }
 
 // Checks that p is a recognised network protocol name.
+//
+// Accepts the protocol keywords, the "ip" wildcard for any protocol, and a
+// decimal IP protocol number in the range 0–255.
 func validateProtocol(p string) error {
-	switch p {
-	case "tcp", "udp":
+	if net.IsValidProtocol(p) {
 		return nil
-	default:
-		return crex.Wrapf(ErrInvalidProtocol, "unknown protocol %q", p)
 	}
+	return crex.Wrapf(ErrInvalidProtocol, "unknown protocol %q", p)
 }

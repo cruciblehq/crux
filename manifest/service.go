@@ -31,9 +31,9 @@ type Service struct {
 //
 // The schema, entrypoint, and recipe stages are encoded in the flat grant
 // format so that grants serialize correctly.
-func (s *Service) Encode() (any, error) {
+func (s *Service) Encode(c *codec.Codec) (any, error) {
 	m := make(map[string]any)
-	stages, err := s.Recipe.encodeStages()
+	stages, err := s.Recipe.encodeStages(c)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (s *Service) Encode() (any, error) {
 		m["stages"] = stages
 	}
 	if s.Schema != nil {
-		schema, err := codec.ToMap(s.Schema)
+		schema, err := c.ToMap(s.Schema)
 		if err != nil {
 			return nil, err
 		}

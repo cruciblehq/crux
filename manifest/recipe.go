@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 
+	"github.com/cruciblehq/crux/codec"
 	"github.com/cruciblehq/crux/crex"
 )
 
@@ -58,13 +59,13 @@ func (r *Recipe) Validate() error {
 // Each stage is encoded using [Stage.Encode], which produces a map with the
 // stage fields and grants in the flat grant format. The resulting list of maps
 // is returned for inclusion in the parent resource's encoded configuration.
-func (r *Recipe) encodeStages() ([]any, error) {
+func (r *Recipe) encodeStages(c *codec.Codec) ([]any, error) {
 	if len(r.Stages) == 0 {
 		return nil, nil
 	}
 	stages := make([]any, len(r.Stages))
 	for i := range r.Stages {
-		enc, err := r.Stages[i].Encode()
+		enc, err := r.Stages[i].Encode(c)
 		if err != nil {
 			return nil, err
 		}

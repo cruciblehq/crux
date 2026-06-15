@@ -3,6 +3,8 @@ package manifest
 import (
 	"errors"
 	"testing"
+
+	"github.com/cruciblehq/crux/codec"
 )
 
 func TestAffordanceValidateOK(t *testing.T) {
@@ -35,7 +37,7 @@ func TestAffordanceValidatePropagatesSchemaError(t *testing.T) {
 
 func TestAffordanceEncodeWithSchema(t *testing.T) {
 	a := &Affordance{Schema: &Schema{Params: []Param{{Name: "arg"}}}}
-	got, err := a.Encode()
+	got, err := a.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +51,7 @@ func TestAffordanceEncodeFlattensUniversal(t *testing.T) {
 	a := &Affordance{Scopes: []GrantScope{
 		{Grants: []Grant{{Source: ".cap effective net_admin"}, {Source: "ref-affordance"}}},
 	}}
-	got, err := a.Encode()
+	got, err := a.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +69,7 @@ func TestAffordanceEncodePlatformAsGroup(t *testing.T) {
 	a := &Affordance{Scopes: []GrantScope{
 		{Platform: "linux/amd64", Grants: []Grant{{Source: ".cap effective net_admin"}}},
 	}}
-	got, err := a.Encode()
+	got, err := a.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +96,7 @@ func TestAffordanceDecodeUniversalAndPlatform(t *testing.T) {
 		},
 	}
 	var a Affordance
-	if err := a.Decode(raw); err != nil {
+	if err := a.Decode(codec.Default(), raw); err != nil {
 		t.Fatal(err)
 	}
 	if len(a.Scopes) != 2 {
@@ -109,7 +111,7 @@ func TestAffordanceDecodeUniversalAndPlatform(t *testing.T) {
 }
 
 func TestAffordanceDecodeRejectsNonMap(t *testing.T) {
-	err := (&Affordance{}).Decode("string")
+	err := (&Affordance{}).Decode(codec.Default(), "string")
 	if !errors.Is(err, ErrInvalidAffordance) {
 		t.Fatalf("err = %v, want ErrInvalidAffordance", err)
 	}
@@ -117,7 +119,7 @@ func TestAffordanceDecodeRejectsNonMap(t *testing.T) {
 
 func TestAffordanceDecodeEmptyGrants(t *testing.T) {
 	var a Affordance
-	if err := a.Decode(map[string]any{}); err != nil {
+	if err := a.Decode(codec.Default(), map[string]any{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(a.Scopes) != 0 {

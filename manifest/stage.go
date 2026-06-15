@@ -147,7 +147,7 @@ func (s *Stage) validateGrantScope(i int) error {
 // Grants are serialized in the same flat format used by [Affordance.Scopes]:
 // universal grants as plain strings, platform-scoped groups as objects with
 // a platform key and a nested grants list.
-func (s *Stage) Encode() (any, error) {
+func (s *Stage) Encode(c *codec.Codec) (any, error) {
 	m := make(map[string]any)
 	if s.Name != "" {
 		m["name"] = s.Name
@@ -171,7 +171,7 @@ func (s *Stage) Encode() (any, error) {
 	if len(s.Steps) > 0 {
 		steps := make([]any, len(s.Steps))
 		for i := range s.Steps {
-			sm, err := codec.ToMap(&s.Steps[i])
+			sm, err := c.ToMap(&s.Steps[i])
 			if err != nil {
 				return nil, err
 			}
@@ -186,24 +186,24 @@ func (s *Stage) Encode() (any, error) {
 //
 // Grants are decoded from the flat format: plain strings for universal grants
 // and objects with a platform key for platform-scoped groups.
-func (s *Stage) Decode(raw any) error {
+func (s *Stage) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
 		return crex.Wrapf(ErrInvalidStage, "unexpected type %T", raw)
 	}
-	if err := codec.Field(src, s, "Name"); err != nil {
+	if err := c.Field(src, s, "Name"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)
 	}
-	if err := codec.Field(src, s, "Platform"); err != nil {
+	if err := c.Field(src, s, "Platform"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)
 	}
-	if err := codec.Field(src, s, "From"); err != nil {
+	if err := c.Field(src, s, "From"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)
 	}
-	if err := codec.Field(src, s, "Args"); err != nil {
+	if err := c.Field(src, s, "Args"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)
 	}
-	if err := codec.Field(src, s, "Steps"); err != nil {
+	if err := c.Field(src, s, "Steps"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)
 	}
 	list, _ := src["grants"].([]any)

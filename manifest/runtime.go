@@ -26,9 +26,9 @@ type Runtime struct {
 //
 // The schema and recipe stages are encoded in the flat grant format so that
 // grants serialize correctly.
-func (r *Runtime) Encode() (any, error) {
+func (r *Runtime) Encode(c *codec.Codec) (any, error) {
 	m := make(map[string]any)
-	stages, err := r.Recipe.encodeStages()
+	stages, err := r.Recipe.encodeStages(c)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (r *Runtime) Encode() (any, error) {
 		m["stages"] = stages
 	}
 	if r.Schema != nil {
-		sm, err := codec.ToMap(r.Schema)
+		sm, err := c.ToMap(r.Schema)
 		if err != nil {
 			return nil, err
 		}

@@ -92,13 +92,13 @@ func (m *Manifest) validateConfig() error {
 //
 // Implements [codec.Encodable]. [Manifest.Config] is merged into the base
 // fields so that the output matches the flat canonical manifest format.
-func (m *Manifest) Encode() (any, error) {
-	base, err := codec.ToMap(m)
+func (m *Manifest) Encode(c *codec.Codec) (any, error) {
+	base, err := c.ToMap(m)
 	if err != nil {
 		return nil, crex.Wrap(ErrEncodeFailed, err)
 	}
 
-	cfg, err := encodeToMap(m.Config)
+	cfg, err := encodeToMap(c, m.Config)
 	if err != nil {
 		return nil, crex.Wrap(ErrEncodeFailed, err)
 	}
@@ -111,15 +111,15 @@ func (m *Manifest) Encode() (any, error) {
 // Implements [codec.Decodable]. The common fields are decoded first to
 // determine [Resource.Type]. The raw map is then decoded into the concrete
 // configuration type for that resource.
-func (m *Manifest) Decode(raw any) error {
+func (m *Manifest) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
 		return crex.Wrapf(ErrDecodeFailed, "unexpected type %T", raw)
 	}
-	if err := codec.Field(src, m, "Version"); err != nil {
+	if err := c.Field(src, m, "Version"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
-	if err := codec.Field(src, m, "Resource"); err != nil {
+	if err := c.Field(src, m, "Resource"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 
@@ -141,7 +141,7 @@ func (m *Manifest) Decode(raw any) error {
 		return crex.Wrap(ErrDecodeFailed, ErrInvalidResourceType)
 	}
 
-	if err := codec.Decode(src, target); err != nil {
+	if err := c.Decode(src, target); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 

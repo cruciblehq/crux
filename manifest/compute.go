@@ -31,9 +31,9 @@ type Compute struct {
 	// Compiled VM-level security model derived from service grants.
 	//
 	// Populated by the blueprint builder after bin-packing. Nil when the
-	// compute unit has not yet had a policy derived for it. The provider
-	// applies this policy at provisioning time.
-	Policy *ComputeSecurityModel `codec:"policy,omitempty"`
+	// compute unit has not yet had a security model derived for it. The provider
+	// applies this model at provisioning time.
+	Security *ComputeSecurityModel `codec:"security,omitempty"`
 }
 
 // Validates the compute entry.
@@ -42,8 +42,8 @@ type Compute struct {
 // supported types. The provider-specific configuration (Compute.Config) must
 // implement the Validatable interface and is validated by calling its Validate
 // method. The configuration must also be present (non-nil), since the provider
-// type implies required configuration fields. If a policy is present it is
-// also validated.
+// type implies required configuration fields. If a security model is present
+// it is also validated.
 func (c *Compute) Validate() error {
 	if c.Config == nil {
 		return ErrMissingComputeProvider
@@ -55,8 +55,8 @@ func (c *Compute) Validate() error {
 	if err := v.Validate(); err != nil {
 		return err
 	}
-	if c.Policy != nil {
-		if err := c.Policy.Validate(); err != nil {
+	if c.Security != nil {
+		if err := c.Security.Validate(); err != nil {
 			return err
 		}
 	}
@@ -66,14 +66,14 @@ func (c *Compute) Validate() error {
 // Decodes a raw parsed map into the compute entry.
 //
 // Reads the provider type first, then decodes the remaining fields into the
-// concrete configuration type for that provider. The optional "policy" key is
-// decoded into a [ComputeSecurityModel] if present.
-func (c *Compute) Decode(raw any) error {
+// concrete configuration type for that provider. The optional "security" key
+// is decoded into a [ComputeSecurityModel] if present.
+func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
 		return crex.Wrapf(ErrDecodeFailed, "compute: unexpected type %T", raw)
 	}
-	if err := codec.Field(src, c, "Type"); err != nil {
+	if err := cd.Field(src, c, "Type"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 	var target any
@@ -85,20 +85,20 @@ func (c *Compute) Decode(raw any) error {
 	default:
 		return crex.Wrapf(ErrInvalidComputeType, "unknown provider %q", c.Type)
 	}
-	if err := codec.Decode(src, target); err != nil {
+	if err := cd.Decode(src, target); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 	c.Config = target
-	if rawPolicy, ok := src["policy"]; ok && rawPolicy != nil {
-		policyMap, ok := rawPolicy.(map[string]any)
+	if rawSecurity, ok := src["security"]; ok && rawSecurity != nil {
+		securityMap, ok := rawSecurity.(map[string]any)
 		if !ok {
 			return crex.Wrap(ErrDecodeFailed, ErrInvalidComputeSecurityModel)
 		}
 		p := &ComputeSecurityModel{}
-		if err := codec.Decode(policyMap, p); err != nil {
+		if err := cd.Decode(securityMap, p); err != nil {
 			return crex.Wrap(ErrDecodeFailed, err)
 		}
-		c.Policy = p
+		c.Security = p
 	}
 	return nil
 }
@@ -106,25 +106,26 @@ func (c *Compute) Decode(raw any) error {
 // Encodes the compute entry to a serializable map.
 //
 // Merges the provider configuration fields with the provider type key into a
-// single flat map. The policy, if present, is encoded as a nested "policy" key.
-func (c *Compute) Encode() (any, error) {
+// single flat map. The security model, if present, is encoded as a nested
+// "security" key.
+func (c *Compute) Encode(cd *codec.Codec) (any, error) {
 	var cfg map[string]any
 	if c.Config == nil {
 		cfg = map[string]any{"type": c.Type}
 	} else {
 		var err error
-		cfg, err = encodeToMap(c.Config)
+		cfg, err = encodeToMap(cd, c.Config)
 		if err != nil {
 			return nil, err
 		}
 		cfg["type"] = c.Type
 	}
-	if c.Policy != nil {
-		raw, err := encodeToMap(c.Policy)
+	if c.Security != nil {
+		raw, err := encodeToMap(cd, c.Security)
 		if err != nil {
 			return nil, err
 		}
-		cfg["policy"] = raw
+		cfg["security"] = raw
 	}
 	return cfg, nil
 }

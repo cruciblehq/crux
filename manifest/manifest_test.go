@@ -4,6 +4,8 @@ import (
 	"errors"
 	"maps"
 	"testing"
+
+	"github.com/cruciblehq/crux/codec"
 )
 
 func TestManifestValidateOK(t *testing.T) {
@@ -103,7 +105,7 @@ func TestManifestEncodeFlatten(t *testing.T) {
 		Resource: Resource{Type: TypeWidget, Name: "ns/w", Version: "1.0.0"},
 		Config:   &Widget{Main: "index.js"},
 	}
-	out, err := m.Encode()
+	out, err := m.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +129,7 @@ func TestManifestDecode(t *testing.T) {
 		"main": "index.js",
 	}
 	var m Manifest
-	if err := m.Decode(raw); err != nil {
+	if err := m.Decode(codec.Default(), raw); err != nil {
 		t.Fatal(err)
 	}
 	w, ok := m.Config.(*Widget)
@@ -140,7 +142,7 @@ func TestManifestDecode(t *testing.T) {
 }
 
 func TestManifestDecodeRejectsNonMap(t *testing.T) {
-	err := (&Manifest{}).Decode("nope")
+	err := (&Manifest{}).Decode(codec.Default(), "nope")
 	if !errors.Is(err, ErrDecodeFailed) {
 		t.Fatalf("err = %v, want ErrDecodeFailed", err)
 	}
@@ -155,7 +157,7 @@ func TestManifestDecodeUnknownResourceType(t *testing.T) {
 			"version": "1.0.0",
 		},
 	}
-	err := (&Manifest{}).Decode(raw)
+	err := (&Manifest{}).Decode(codec.Default(), raw)
 	if !errors.Is(err, ErrInvalidResourceType) {
 		t.Fatalf("err = %v, want ErrInvalidResourceType", err)
 	}
@@ -175,7 +177,7 @@ func decodeManifest(t *testing.T, typ ResourceType, extra map[string]any) *Manif
 	}
 	maps.Copy(raw, extra)
 	var m Manifest
-	if err := m.Decode(raw); err != nil {
+	if err := m.Decode(codec.Default(), raw); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	return &m
@@ -246,7 +248,7 @@ func TestManifestEncodeAllResourceTypes(t *testing.T) {
 			Resource: Resource{Type: tc.typ, Name: "ns/x", Version: "1.0.0"},
 			Config:   tc.cfg,
 		}
-		out, err := m.Encode()
+		out, err := m.Encode(codec.Default())
 		if err != nil {
 			t.Errorf("type %s: %v", tc.typ, err)
 			continue
@@ -267,12 +269,12 @@ func TestManifestEncodeRoundTrip(t *testing.T) {
 		Resource: Resource{Type: TypeWidget, Name: "ns/w", Version: "1.0.0"},
 		Config:   &Widget{Main: "index.js"},
 	}
-	out, err := original.Encode()
+	out, err := original.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 	var m Manifest
-	if err := m.Decode(out); err != nil {
+	if err := m.Decode(codec.Default(), out); err != nil {
 		t.Fatal(err)
 	}
 	if m.Resource.Type != TypeWidget || m.Resource.Name != "ns/w" {

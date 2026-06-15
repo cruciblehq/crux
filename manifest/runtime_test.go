@@ -1,6 +1,10 @@
 package manifest
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/cruciblehq/crux/codec"
+)
 
 func TestRuntimeValidateOK(t *testing.T) {
 	r := &Runtime{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}}
@@ -27,7 +31,7 @@ func TestRuntimeEncodeWithSchema(t *testing.T) {
 		Schema: &Schema{Params: []Param{{Name: "version"}}},
 		Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}},
 	}
-	raw, err := r.Encode()
+	raw, err := r.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +46,7 @@ func TestRuntimeEncodeWithSchema(t *testing.T) {
 
 func TestRuntimeEncodeWithoutSchema(t *testing.T) {
 	r := &Runtime{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}}
-	raw, err := r.Encode()
+	raw, err := r.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}

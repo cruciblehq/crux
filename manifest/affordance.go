@@ -54,11 +54,11 @@ func (a *Affordance) Validate() error {
 // Implements [codec.Encodable]. Universal grants (scopes with empty Platform)
 // are flattened into the top-level grants list. Platform-scoped grants are
 // written as platform group entries with their own inner grants list.
-func (a *Affordance) Encode() (any, error) {
+func (a *Affordance) Encode(c *codec.Codec) (any, error) {
 	m := make(map[string]any)
 
 	if a.Schema != nil {
-		sm, err := codec.ToMap(a.Schema)
+		sm, err := c.ToMap(a.Schema)
 		if err != nil {
 			return nil, err
 		}
@@ -104,13 +104,13 @@ func encodeScopes(scopes []GrantScope) ([]any, error) {
 // [decodeGrant], which handles both source format (compact syntax strings and
 // dot-prefixed domain maps) and resolved format (maps with subsystem/expr/args
 // keys). Platform groups are decoded recursively.
-func (a *Affordance) Decode(raw any) error {
+func (a *Affordance) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
 		return crex.Wrapf(ErrInvalidAffordance, "unexpected type %T", raw)
 	}
 
-	if err := codec.Field(src, a, "Schema"); err != nil {
+	if err := c.Field(src, a, "Schema"); err != nil {
 		return crex.Wrap(ErrInvalidAffordance, err)
 	}
 

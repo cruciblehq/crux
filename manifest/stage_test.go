@@ -3,6 +3,8 @@ package manifest
 import (
 	"errors"
 	"testing"
+
+	"github.com/cruciblehq/crux/codec"
 )
 
 func TestStageValidateScratch(t *testing.T) {
@@ -121,7 +123,7 @@ func TestStageEncodeUniversalGrants(t *testing.T) {
 		Steps:  []Step{{Run: "x"}},
 		Grants: []GrantScope{{Grants: []Grant{{Source: ".seccomp openat"}}}},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +150,7 @@ func TestStageEncodePlatformScopedGrants(t *testing.T) {
 			{Platform: "linux/amd64", Grants: []Grant{{Source: ".cap net_admin"}}},
 		},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +174,7 @@ func TestStageDecodeGrants(t *testing.T) {
 		"grants": []any{".seccomp openat", map[string]any{"platform": "linux/amd64", "grants": []any{".cap net_admin"}}},
 	}
 	var s Stage
-	if err := s.Decode(src); err != nil {
+	if err := s.Decode(codec.Default(), src); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.Grants) != 2 {
@@ -195,12 +197,12 @@ func TestStageEncodeDecodeRoundTrip(t *testing.T) {
 			{Grants: []Grant{{Source: ".seccomp openat"}}},
 		},
 	}
-	enc, err := original.Encode()
+	enc, err := original.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 	var decoded Stage
-	if err := decoded.Decode(enc); err != nil {
+	if err := decoded.Decode(codec.Default(), enc); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Name != original.Name {
@@ -222,7 +224,7 @@ func TestStageEncodeWithFrom(t *testing.T) {
 		From:  "ns/base",
 		Steps: []Step{{Run: "x"}},
 	}
-	raw, err := s.Encode()
+	raw, err := s.Encode(codec.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +239,7 @@ func TestStageEncodeWithFrom(t *testing.T) {
 
 func TestStageDecodeInvalidType(t *testing.T) {
 	var s Stage
-	if err := s.Decode("not a map"); err == nil {
+	if err := s.Decode(codec.Default(), "not a map"); err == nil {
 		t.Fatal("expected error for non-map input")
 	}
 }
@@ -248,7 +250,7 @@ func TestStageDecodeWithFrom(t *testing.T) {
 		"steps": []any{map[string]any{"run": "x"}},
 	}
 	var s Stage
-	if err := s.Decode(src); err != nil {
+	if err := s.Decode(codec.Default(), src); err != nil {
 		t.Fatal(err)
 	}
 	if s.From != "ns/base" {
