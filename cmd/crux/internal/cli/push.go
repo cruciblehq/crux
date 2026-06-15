@@ -5,8 +5,10 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/crux/source"
 )
 
 // Represents the 'crux push' command.
@@ -23,17 +25,17 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	slog.Info("pushing package...", "registry", registry)
 
-	opts, err := resource.NewOptions(registry, internal.DefaultNamespace)
+	src, err := source.NewSource(registry, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
 
-	man, b, err := resource.ResolveHandler(ctx, paths.Manifest(RootCmd.Context), opts)
+	man, err := manifest.ReadAt(RootCmd.Context)
 	if err != nil {
 		return err
 	}
 
-	if err := b.Push(ctx, *man, paths.Package(RootCmd.Context)); err != nil {
+	if err := resource.Push(ctx, src, *man, files.Package(RootCmd.Context)); err != nil {
 		return err
 	}
 

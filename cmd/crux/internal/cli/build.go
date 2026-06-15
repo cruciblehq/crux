@@ -7,8 +7,10 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/internal/resource"
-	"github.com/cruciblehq/crux/paths"
+	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/crux/source"
 	"github.com/cruciblehq/crux/watch"
 )
 
@@ -84,22 +86,20 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 // Resolves the builder, creates the output directory, and builds the resource.
 func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildResult, error) {
-	opts, err := resource.NewOptions(registry, internal.DefaultNamespace)
-	if err != nil {
-		return nil, err
-	}
-	opts.Environment = c.Environment
-
-	manPath := paths.Manifest(RootCmd.Context)
-	man, b, err := resource.ResolveHandler(ctx, manPath, opts)
+	src, err := source.NewSource(registry, internal.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	output := paths.BuildDir(RootCmd.Context)
-	if err := os.MkdirAll(output, paths.DefaultDirMode); err != nil {
-		return nil, crex.Wrap(resource.ErrFileSystemOperation, err)
+	man, err := manifest.ReadAt(RootCmd.Context)
+	if err != nil {
+		return nil, err
 	}
 
-	return b.Build(ctx, *man, output)
+	output := files.BuildDir(RootCmd.Context)
+	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
+		return nil, crex.Wrap(source.ErrFileSystemOperation, err)
+	}
+
+	return resource.Build(ctx, *man, src, RootCmd.Context, c.Environment, output)
 }

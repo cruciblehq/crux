@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	goruntime "runtime"
@@ -13,8 +12,6 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
-
-var errImport = errors.New("import failed")
 
 // Represents the 'crux import' command.
 type ImportCmd struct {
@@ -32,23 +29,23 @@ func (c *ImportCmd) Run(ctx context.Context) error {
 
 	p, err := v1.ParsePlatform(platform)
 	if err != nil {
-		return crex.Wrap(errImport, err)
+		return crex.Wrap(ErrImport, err)
 	}
 
 	parsed, err := name.ParseReference(c.Image)
 	if err != nil {
-		return crex.Wrap(errImport, err)
+		return crex.Wrap(ErrImport, err)
 	}
 
 	slog.Info("pulling image...", "image", parsed.String(), "platform", platform)
 
 	img, err := remote.Image(parsed, remote.WithContext(ctx), remote.WithPlatform(*p))
 	if err != nil {
-		return crex.Wrap(errImport, err)
+		return crex.Wrap(ErrImport, err)
 	}
 
 	if err := crane.Save(img, parsed.String(), c.Output); err != nil {
-		return crex.Wrap(errImport, err)
+		return crex.Wrap(ErrImport, err)
 	}
 
 	slog.Info("image imported", "image", parsed.String(), "output", c.Output)

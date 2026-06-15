@@ -8,9 +8,9 @@ import (
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/reference"
+	"github.com/cruciblehq/crux/source"
 )
 
 // Represents the 'crux cache remove' command.
@@ -30,7 +30,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 			Err()
 	}
 
-	source, err := resource.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	src, err := source.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 	defer localCache.Close()
 
 	for _, refStr := range c.References {
-		if err := removeReference(localCache, source, resType, refStr); err != nil {
+		if err := removeReference(localCache, src, resType, refStr); err != nil {
 			return err
 		}
 	}
@@ -53,8 +53,8 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 }
 
 // Removes cache entries matching a reference.
-func removeReference(c *cache.Cache, source resource.Source, resType manifest.ResourceType, refStr string) error {
-	ref, err := source.Parse(resType, refStr)
+func removeReference(c *cache.Cache, source source.Source, resType manifest.ResourceType, refStr string) error {
+	ref, err := source.Parse(string(resType), refStr)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).
 			Fallback("Use the format 'namespace/resource version'.").

@@ -24,7 +24,7 @@ var RootCmd struct {
 	Pull    PullCmd    `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
 	Import  ImportCmd  `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
-	Host    HostCmd    `cmd:"" help:"Manage the Crucible host environment."`
+	Local   LocalCmd   `cmd:"" help:"Manage the local environment."`
 	Version VersionCmd `cmd:"" help:"Show version information."`
 }
 

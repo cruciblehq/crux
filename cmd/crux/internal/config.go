@@ -26,12 +26,12 @@ func init() {
 	}
 }
 
-// Returns true if quiet mode is enabled.
+// Whether quiet mode is enabled.
 func IsQuiet() bool {
 	return quietMode.Load()
 }
 
-// Returns true if debug mode is enabled.
+// Whether debug mode is enabled.
 func IsDebug() bool {
 	return debugMode.Load()
 }

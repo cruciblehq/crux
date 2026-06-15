@@ -7,8 +7,8 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/internal/resource"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/source"
 )
 
 // Represents the 'crux pull' command.
@@ -32,7 +32,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	source, err := resource.NewSource(registry, internal.DefaultNamespace)
+	src, err := source.NewSource(registry, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -44,12 +44,12 @@ func (c *PullCmd) Run(ctx context.Context) error {
 		"registry", registry,
 	)
 
-	ref, err := source.Parse(resType, raw)
+	ref, err := src.Parse(string(resType), raw)
 	if err != nil {
 		return err
 	}
 
-	result, err := source.Pull(ctx, ref)
+	result, err := src.Pull(ctx, ref)
 	if err != nil {
 		return err
 	}

@@ -68,7 +68,7 @@ func Arch() string {
 	return runtime.GOARCH
 }
 
-// Returns true if this is a local (non-pipeline) build.
+// Whether this is a local (non-pipeline) build.
 //
 // A build is considered local if any of the version, git commit, or stage
 // variables are unset. Pipeline builds should set all three variables via

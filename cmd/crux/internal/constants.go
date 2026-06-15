@@ -1,9 +1,10 @@
 package internal
 
-const (
+// Application name, used as the slog group name.
+const Name = "crux"
 
-	// Application name, used as the slog group name.
-	Name = "crux"
+// Defaults for compute host, registry, and namespace.
+const (
 
 	// Default compute host name.
 	DefaultInstanceName = "local"

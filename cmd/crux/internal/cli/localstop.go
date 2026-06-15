@@ -5,15 +5,15 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/compute"
+	"github.com/cruciblehq/crux/compute"
 )
 
-// Represents the 'crux host stop' command.
-type HostStopCmd struct{}
+// Represents the 'crux local stop' command.
+type LocalStopCmd struct{}
 
-// Stops the compute host.
-func (c *HostStopCmd) Run(ctx context.Context) error {
-	slog.Info("stopping host...")
+// Stops the local environment.
+func (c *LocalStopCmd) Run(ctx context.Context) error {
+	slog.Info("stopping local environment...")
 
 	b, err := compute.BackendFor(compute.Local)
 	if err != nil {
@@ -25,6 +25,6 @@ func (c *HostStopCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("host stopped")
+	slog.Info("local environment stopped")
 	return nil
 }

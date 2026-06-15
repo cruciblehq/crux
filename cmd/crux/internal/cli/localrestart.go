@@ -5,15 +5,15 @@ import (
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/compute"
+	"github.com/cruciblehq/crux/compute"
 )
 
-// Represents the 'crux host restart' command.
-type HostRestartCmd struct{}
+// Represents the 'crux local restart' command.
+type LocalRestartCmd struct{}
 
-// Stops and restarts the compute host, preserving state.
-func (c *HostRestartCmd) Run(ctx context.Context) error {
-	slog.Info("restarting host...")
+// Stops and restarts the local environment, preserving state.
+func (c *LocalRestartCmd) Run(ctx context.Context) error {
+	slog.Info("restarting local environment...")
 
 	b, err := compute.BackendFor(compute.Local)
 	if err != nil {
@@ -29,6 +29,6 @@ func (c *HostRestartCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("host restarted")
+	slog.Info("local environment restarted")
 	return nil
 }

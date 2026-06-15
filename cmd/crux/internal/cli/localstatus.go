@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/internal/compute"
+	"github.com/cruciblehq/crux/compute"
 )
 
-// Represents the 'crux host status' command.
-type HostStatusCmd struct{}
+// Represents the 'crux local status' command.
+type LocalStatusCmd struct{}
 
-// Shows the current state of the compute host.
-func (c *HostStatusCmd) Run(ctx context.Context) error {
+// Shows the current state of the local environment.
+func (c *LocalStatusCmd) Run(ctx context.Context) error {
 	b, err := compute.BackendFor(compute.Local)
 	if err != nil {
 		return err
