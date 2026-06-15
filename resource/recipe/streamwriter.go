@@ -1,4 +1,4 @@
-package resource
+package recipe
 
 import (
 	"bytes"
@@ -7,6 +7,10 @@ import (
 	"log/slog"
 	"sync"
 )
+
+// slog attribute key identifying which standard stream a build log line
+// originated from.
+const logStreamKey = "stream"
 
 // Returns an [io.Writer] that routes each newline-delimited line from written
 // bytes to the default slog logger at level.
@@ -46,5 +50,5 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 
 // Emits a single log record. Caller must hold w.mu.
 func (w *streamWriter) emit(line string) {
-	slog.Log(w.ctx, w.level, line, "stream", w.stream)
+	slog.Log(w.ctx, w.level, line, logStreamKey, w.stream)
 }

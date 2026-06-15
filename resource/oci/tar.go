@@ -1,4 +1,4 @@
-package resource
+package oci
 
 import (
 	"archive/tar"
@@ -21,7 +21,7 @@ import (
 // The archive contains an OCI layout marker, a minimal config blob with no
 // layers, a manifest referencing the config, and an index referencing the
 // manifest.
-func writeScratchTar(w io.Writer) error {
+func WriteScratchTar(w io.Writer) error {
 	tw := tar.NewWriter(w)
 	defer tw.Close()
 
@@ -120,7 +120,7 @@ func writeTarEntry(tw *tar.Writer, name string, data []byte) error {
 // Directories are walked recursively; symlinks are followed by Lstat and
 // written as regular files. The destination paths inside the tar are formed by
 // joining destDir with the relative path from srcPath.
-func writeCopyTar(w io.Writer, srcPath, destDir string) error {
+func WriteCopyTar(w io.Writer, srcPath, destDir string) error {
 	tw := tar.NewWriter(w)
 	defer tw.Close()
 
@@ -186,7 +186,7 @@ func copyFileToTar(tw *tar.Writer, hostPath, tarPath string) error {
 // srcPath names a directory, the srcPath prefix in every entry name is replaced
 // by destPath. Both paths must use forward slashes. Leading slashes in srcPath
 // and destPath are stripped before comparison and output.
-func rewriteTarPaths(w io.Writer, r io.Reader, srcPath, destPath string) error {
+func RewriteTarPaths(w io.Writer, r io.Reader, srcPath, destPath string) error {
 	srcClean := strings.Trim(srcPath, "/")
 	destClean := strings.Trim(destPath, "/")
 

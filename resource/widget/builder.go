@@ -1,4 +1,4 @@
-package resource
+package widget
 
 import (
 	"context"
@@ -9,13 +9,22 @@ import (
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
-// Compiles the widget described by options into the dist directory.
+// Builds a Crucible widget resource from its configuration.
 //
-// The compilation is performed by esbuild. Context cancellation is checked
-// before invoking esbuild (which does not support cancellation itself).
-// Returns the esbuild metafile JSON on success.
-func BuildWidget(ctx context.Context, options *manifest.Widget, dist string) (string, error) {
-	esOptions, err := buildOptions(options, dist)
+// Bundling is performed by esbuild.
+type Builder struct{}
+
+// Returns a new widget [Builder].
+func NewBuilder() *Builder {
+	return &Builder{}
+}
+
+// Builds the widget described by cfg into the dist directory.
+//
+// Context cancellation is checked before invoking esbuild (which does not
+// support cancellation itself). Returns the esbuild metafile JSON on success.
+func (b *Builder) Build(ctx context.Context, cfg *manifest.Widget, dist string) (string, error) {
+	esOptions, err := buildOptions(cfg, dist)
 	if err != nil {
 		return "", err
 	}

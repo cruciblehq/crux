@@ -1,57 +1,54 @@
-package resource
+package affordance
 
 import (
 	"context"
 	"strings"
 
+	aff "github.com/cruciblehq/crux/affordance"
+	"github.com/cruciblehq/crux/affordance/agl"
+	"github.com/cruciblehq/crux/affordance/cap"
+	"github.com/cruciblehq/crux/affordance/cgroup"
+	"github.com/cruciblehq/crux/affordance/device"
+	"github.com/cruciblehq/crux/affordance/fcap"
+	"github.com/cruciblehq/crux/affordance/kernel"
+	"github.com/cruciblehq/crux/affordance/mac"
+	"github.com/cruciblehq/crux/affordance/mount"
+	"github.com/cruciblehq/crux/affordance/net"
+	"github.com/cruciblehq/crux/affordance/provision"
+	"github.com/cruciblehq/crux/affordance/rlimit"
+	"github.com/cruciblehq/crux/affordance/seccomp"
+	"github.com/cruciblehq/crux/affordance/subsystem"
+	"github.com/cruciblehq/crux/affordance/volume"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/security"
-	"github.com/cruciblehq/crux/security/agl"
-	"github.com/cruciblehq/crux/security/cap"
-	"github.com/cruciblehq/crux/security/cgroup"
-	"github.com/cruciblehq/crux/security/fcap"
-	afkernel "github.com/cruciblehq/crux/security/kernel"
-	"github.com/cruciblehq/crux/security/mac"
-	"github.com/cruciblehq/crux/security/mount"
-	"github.com/cruciblehq/crux/security/net"
-	"github.com/cruciblehq/crux/security/nft"
-	"github.com/cruciblehq/crux/security/provision"
-	"github.com/cruciblehq/crux/security/rlimit"
-	"github.com/cruciblehq/crux/security/seccomp"
-	"github.com/cruciblehq/crux/security/subsystem"
-	"github.com/cruciblehq/crux/security/sysctl"
-	"github.com/cruciblehq/crux/security/vm"
-	"github.com/cruciblehq/crux/security/volume"
 	"github.com/cruciblehq/crux/source"
 )
 
-// Accumulates a runtime spec from affordance grants.
+// Compiles an [aff.Spec] from affordance grants.
 //
-// Accumulates state across [AffordanceBuilder.Build] calls. Use [NewAffordanceBuilder] for each
-// independent context to avoid state bleed, and [AffordanceBuilder.Spec] to return the
-// final accumulated spec.
-type AffordanceBuilder struct {
-	spec      *security.Spec                         // Accumulated state across all subsystems.
+// Accumulates state for [Builder.Build]. Use [NewBuilder] for each build to
+// avoid state bleed, and [Builder.Spec] to return the final accumulated spec.
+type Builder struct {
+	spec      *aff.Spec                              // Accumulated state across all subsystems.
 	provision *provision.Spec                        // Accumulated provision state.
-	network   *net.NetworkPolicy                     // Accumulated network policy state.
+	network   *net.Spec                              // Accumulated network spec state.
 	volume    *volume.Spec                           // Accumulated volume declarations.
-	vm        *vm.VM                                 // Accumulated VM-level requirements.
+	kernel    *kernel.Spec                           // Accumulated kernel requirements.
 	subs      []subsystem.Subsystem                  // All subsystem implementations in fixed order.
 	index     map[subsystem.Name]subsystem.Subsystem // Name-indexed dispatch map.
 	seen      map[subsystem.Name]map[string]struct{} // Per-subsystem set of observed grant keys for conflict detection.
 }
 
-// Returns a [Builder] with all subsystems wired to a new [shared.Spec].
+// Returns a [Builder].
 //
 // The OCI section of the spec starts with a deny-all baseline; subsystems can
 // only loosen it. Non-OCI sections start in their zero-grant state.
-func NewAffordanceBuilder() *AffordanceBuilder {
-	s := security.NewSpec()
+func NewBuilder() *Builder {
+	s := aff.NewSpec()
 	prov := &provision.Spec{}
 	netw := s.Net
 	volm := s.Volume
-	vm := s.VM
+	kspec := s.Kernel
 
 	subs := []subsystem.Subsystem{
 		cap.New(s.OCI.Process.Capabilities),
@@ -64,9 +61,8 @@ func NewAffordanceBuilder() *AffordanceBuilder {
 		net.New(netw),
 		mount.New(&s.OCI.Mounts),
 		volume.New(volm),
-		sysctl.New(vm, s.OCI.Linux),
-		nft.New(vm),
-		afkernel.New(vm),
+		device.New(&s.OCI.Linux.Devices),
+		kernel.New(kspec),
 	}
 
 	idx := make(map[subsystem.Name]subsystem.Subsystem, len(subs))
@@ -76,32 +72,32 @@ func NewAffordanceBuilder() *AffordanceBuilder {
 		seen[sub.Name()] = make(map[string]struct{})
 	}
 
-	return &AffordanceBuilder{spec: s, provision: prov, network: netw, volume: volm, vm: vm, subs: subs, index: idx, seen: seen}
+	return &Builder{spec: s, provision: prov, network: netw, volume: volm, kernel: kspec, subs: subs, index: idx, seen: seen}
 }
 
 // Returns the accumulated runtime spec produced by all processed grants.
-func (b *AffordanceBuilder) Spec() *security.Spec {
+func (b *Builder) Spec() *aff.Spec {
 	return b.spec
 }
 
 // Returns the compute resource requirements accumulated from .provision grants.
-func (b *AffordanceBuilder) Provision() *provision.Spec {
+func (b *Builder) Provision() *provision.Spec {
 	return b.provision
 }
 
-// Returns the container network policy accumulated from .net grants.
-func (b *AffordanceBuilder) Network() *net.NetworkPolicy {
+// Returns the container network spec accumulated from .net grants.
+func (b *Builder) Network() *net.Spec {
 	return b.network
 }
 
 // Returns the persistent storage volumes accumulated from .volume grants.
-func (b *AffordanceBuilder) Volumes() *volume.Spec {
+func (b *Builder) Volumes() *volume.Spec {
 	return b.volume
 }
 
-// Returns the VM-level requirements accumulated from .sysctl and similar grants.
-func (b *AffordanceBuilder) VM() *vm.VM {
-	return b.vm
+// Returns the kernel requirements accumulated from .kernel grants.
+func (b *Builder) Kernel() *kernel.Spec {
+	return b.kernel
 }
 
 // Processes a single grant, updating the accumulated spec.
@@ -111,13 +107,13 @@ func (b *AffordanceBuilder) VM() *vm.VM {
 // they are substituted into the pulled grants before recursing. Domain grants
 // are dispatched to the matching subsystem. Returns [ErrResolution] for pull
 // failures, parse errors, or unknown subsystem names.
-func (b *AffordanceBuilder) Build(ctx context.Context, g manifest.Grant, src source.Source) error {
+func (b *Builder) Build(ctx context.Context, g manifest.Grant, src source.Source) error {
 	if g.IsRef() {
-		aff, _, err := pull(ctx, src, g.RefTarget())
+		a, _, err := pull(ctx, src, g.RefTarget())
 		if err != nil {
 			return crex.Wrapf(ErrResolution, "pull %s: %w", g.RefTarget(), err)
 		}
-		for _, scope := range aff.Scopes {
+		for _, scope := range a.Scopes {
 			for _, sg := range scope.Grants {
 				if err := b.Build(ctx, substituteGrant(sg, g.Args), src); err != nil {
 					return err
@@ -139,7 +135,7 @@ func (b *AffordanceBuilder) Build(ctx context.Context, g manifest.Grant, src sou
 // string and rejects the grant with ErrConflict if an identical key has already
 // been processed. Subsystems that return an empty key handle their own conflict
 // detection internally.
-func (b *AffordanceBuilder) dispatch(p *agl.Model) error {
+func (b *Builder) dispatch(p *agl.Model) error {
 	name := subsystem.Name(p.Subsystem)
 	sub, ok := b.index[name]
 	if !ok {
@@ -158,12 +154,6 @@ func (b *AffordanceBuilder) dispatch(p *agl.Model) error {
 	return sub.Build(p)
 }
 
-// Resolves grant args into a substitution map keyed by parameter name.
-//
-// When args is non-empty it is returned as-is. When value is set the
-// affordance schema must declare a default parameter; the returned map
-// contains a single entry mapping the default parameter name to value.
-// Returns nil when both are zero.
 // Returns a copy of g with all $param references in Source replaced by the
 // corresponding value from params.
 //
@@ -182,7 +172,7 @@ func substituteGrant(g manifest.Grant, params map[string]string) manifest.Grant 
 
 // Fetches an affordance resource and returns its config and content digest.
 //
-// Uses [Source.Pull) to fetch the resource
+// Resolves target as an affordance reference and pulls it via [source.Source.Pull].
 func pull(ctx context.Context, src source.Source, target string) (*manifest.Affordance, string, error) {
 	ref, err := src.Parse(string(manifest.TypeAffordance), target)
 	if err != nil {
@@ -192,9 +182,9 @@ func pull(ctx context.Context, src source.Source, target string) (*manifest.Affo
 	if err != nil {
 		return nil, "", err
 	}
-	aff, err := manifest.ReadAsAt[*manifest.Affordance](result.Extracted)
+	a, err := manifest.ReadAsAt[*manifest.Affordance](result.Extracted)
 	if err != nil {
 		return nil, "", crex.Wrapf(ErrResolution, "%s: %v", target, err)
 	}
-	return aff, result.Digest, nil
+	return a, result.Digest, nil
 }

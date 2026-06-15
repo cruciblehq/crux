@@ -1,140 +1,29 @@
-package resource
+package recipe
 
 import (
 	"context"
 	"io"
 	"log/slog"
 	"maps"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/resource/oci"
 )
 
-// Persistent mutable build state within a single stage.
-//
-// Tracks the cumulative effect of standalone modifier steps (shell, workdir,
-// user, env) that persist across subsequent steps in the same stage.
-type stageState struct {
-	shell   string            // Current shell executable, empty means /bin/sh.
-	workdir string            // Current working directory override, empty uses image default.
-	user    string            // Current user override in uid:gid format, empty uses image default.
-	env     map[string]string // Accumulated environment overrides for subsequent steps.
-}
+// Shell used to execute a Run step when neither the step nor the stage
+// specifies one.
+const defaultShell = "/bin/sh"
 
-// Runs a single stage: compiles affordances into a security policy, imports
-// the base image with that policy, and executes each step in order.
-//
-// stageImages is updated with the final committed image ref under the stage
-// name when the stage has a name, making it available as a copy source for
-// later stages. The caller is responsible for closing the returned container.
-func (r *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, stageImages map[string]string) (*compute.Container, error) {
-	security, err := r.applyGrants(ctx, stage.Grants)
-	if err != nil {
-		return nil, crex.Wrapf(ErrBuild, "stage %d: compile grants: %w", num, err)
-	}
+// slog attribute value marking a build log line as standard output.
+const logStreamStdout = "stdout"
 
-	ctr, err := r.importBase(ctx, stage, compute.RuntimeOptions{OCI: *security})
-	if err != nil {
-		return nil, crex.Wrapf(ErrBuild, "stage %d: import base: %w", num, err)
-	}
-
-	state := &stageState{}
-	for j := range stage.Steps {
-		if err := r.executeStep(ctx, ctr, &stage.Steps[j], state, stageImages); err != nil {
-			ctr.Destroy(ctx)
-			return nil, crex.Wrapf(ErrBuild, "stage %d step %d: %w", num, j+1, err)
-		}
-	}
-
-	if stage.Name != "" {
-		img, err := ctr.Commit(ctx, stage.Name)
-		if err != nil {
-			ctr.Destroy(ctx)
-			return nil, crex.Wrapf(ErrBuild, "stage %d: commit: %w", num, err)
-		}
-		stageImages[stage.Name] = img
-	}
-
-	return ctr, nil
-}
-
-// Resolves and imports the base image for a stage.
-//
-// When stage.From is nil the stage starts from scratch and a minimal empty
-// OCI image is imported. When From is set, the referenced runtime is pulled
-// and its image.tar is imported into the compute backend.
-func (r *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts compute.RuntimeOptions) (*compute.Container, error) {
-	if stage.From == "" {
-		return r.importScratch(ctx, opts)
-	}
-
-	ref, err := r.src.Parse(string(manifest.TypeRuntime), stage.From)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := r.src.Pull(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	imgPath := filepath.Join(result.Extracted, files.ImageFile)
-	f, err := os.Open(imgPath)
-	if err != nil {
-		return nil, crex.Wrap(ErrFileSystemOperation, err)
-	}
-	defer f.Close()
-
-	imgRef, err := r.sess.Import(ctx, f)
-	if err != nil {
-		return nil, err
-	}
-	return r.sess.Load(ctx, imgRef, opts)
-}
-
-// Creates and imports a minimal empty (scratch) OCI image.
-//
-// The image has no layers and an empty configuration. It is imported into the
-// compute backend and a container is opened from it.
-func (r *Builder) importScratch(ctx context.Context, opts compute.RuntimeOptions) (*compute.Container, error) {
-	pr, pw := io.Pipe()
-	go func() {
-		pw.CloseWithError(writeScratchTar(pw))
-	}()
-	ref, err := r.sess.Import(ctx, pr)
-	if err != nil {
-		return nil, err
-	}
-	return r.sess.Load(ctx, ref, opts)
-}
-
-// Compiles grants for this stage into an OCI runtime spec.
-//
-// A fresh [AffordanceBuilder] is created per stage so grant state does not
-// bleed across stages. Reference grants are resolved and inlined recursively;
-// domain grants are dispatched to the matching subsystem.
-func (r *Builder) applyGrants(ctx context.Context, scopes []manifest.GrantScope) (*specs.Spec, error) {
-	b := NewAffordanceBuilder()
-	for _, scope := range scopes {
-		if scope.Platform != "" && !matchesBuildPlatform(scope.Platform) {
-			continue
-		}
-		for _, g := range scope.Grants {
-			if err := b.Build(ctx, g, r.src); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return b.Spec().OCI, nil
-}
+// slog attribute value marking a build log line as standard error.
+const logStreamStderr = "stderr"
 
 // Executes a single step, dispatching to the appropriate handler.
 //
@@ -194,7 +83,7 @@ func (b *Builder) runStep(ctx context.Context, ctr *compute.Container, step *man
 		shell = step.Shell
 	}
 	if shell == "" {
-		shell = "/bin/sh"
+		shell = defaultShell
 	}
 
 	workdir := state.workdir
@@ -219,8 +108,8 @@ func (b *Builder) runStep(ctx context.Context, ctr *compute.Container, step *man
 		Env:     env,
 		Workdir: workdir,
 		User:    user,
-		Stdout:  newStreamWriter(ctx, slog.LevelInfo, "stdout"),
-		Stderr:  newStreamWriter(ctx, slog.LevelInfo, "stderr"),
+		Stdout:  newStreamWriter(ctx, slog.LevelInfo, logStreamStdout),
+		Stderr:  newStreamWriter(ctx, slog.LevelInfo, logStreamStderr),
 	})
 }
 
@@ -254,7 +143,7 @@ func (b *Builder) copyStep(ctx context.Context, ctr *compute.Container, step *ma
 
 	pr, pw := io.Pipe()
 	go func() {
-		pw.CloseWithError(writeCopyTar(pw, filepath.Join(b.workdir, src), dest))
+		pw.CloseWithError(oci.WriteCopyTar(pw, filepath.Join(b.workdir, src), dest))
 	}()
 
 	return ctr.Copy(ctx, pr)
@@ -271,7 +160,7 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr *compute.Container, st
 	}
 
 	if !path.IsAbs(srcPath) {
-		cfg, err := b.sess.Inspect(ctx, stageRef)
+		cfg, err := b.client.Inspect(ctx, stageRef)
 		if err != nil {
 			return crex.Wrapf(ErrBuild, "get config of stage %q: %w", stageName, err)
 		}
@@ -282,14 +171,14 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr *compute.Container, st
 		srcPath = path.Join(workdir, srcPath)
 	}
 
-	rc, err := b.sess.Extract(ctx, stageRef, srcPath)
+	rc, err := b.client.Extract(ctx, stageRef, srcPath)
 	if err != nil {
 		return crex.Wrapf(ErrBuild, "extract %q from stage %q: %w", srcPath, stageName, err)
 	}
 
 	pr, pw := io.Pipe()
 	go func() {
-		err := rewriteTarPaths(pw, rc, srcPath, destPath)
+		err := oci.RewriteTarPaths(pw, rc, srcPath, destPath)
 		rc.Close()
 		pw.CloseWithError(err)
 	}()

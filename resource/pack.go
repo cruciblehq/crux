@@ -11,7 +11,7 @@ import (
 	"github.com/cruciblehq/crux/source"
 )
 
-// Holds the output of a successful [Handler.Pack] call.
+// Holds the output of a successful [Pack] call.
 type PackResult struct {
 	Output string // Path where the package archive was written.
 }
@@ -19,8 +19,9 @@ type PackResult struct {
 // Packages a built resource into a distributable archive.
 //
 // Reads the manifest from the build directory and creates a zstd-compressed
-// tar archive containing the manifest and build artifacts.
-func pack(_ context.Context, buildDir, output string) (*PackResult, error) {
+// tar archive containing the manifest and build artifacts. The output
+// extension must be .tar.zst.
+func Pack(_ context.Context, buildDir, output string) (*PackResult, error) {
 	if err := ensureOutputDir(output); err != nil {
 		return nil, err
 	}

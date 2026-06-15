@@ -1,4 +1,4 @@
-package resource
+package blueprint
 
 import "github.com/cruciblehq/crux/crex"
 

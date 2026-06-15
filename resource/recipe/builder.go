@@ -1,4 +1,4 @@
-package resource
+package recipe
 
 import (
 	"context"
@@ -9,40 +9,45 @@ import (
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/resource/oci"
 	"github.com/cruciblehq/crux/source"
 )
+
+// Author label recorded in the OCI history of the final exported image.
+const commitAuthorExport = "export"
 
 // Orchestrates a recipe build pipeline against a compute backend.
 //
 // Drives the stage pipeline: imports base images, compiles stage affordances
-// into a security policy, and executes each step in order. The final image is
+// into a security spec, and executes each step in order. The final image is
 // exported as an OCI tar archive.
 type Builder struct {
 	src     source.Source   // Registry access for pulling base images and resolving affordances.
 	workdir string          // Manifest directory.
-	sess    *compute.Client // Live client connection to the container runtime on the build host.
+	client  *compute.Client // Live client connection to the container runtime on the build host.
 }
 
 // Returns a new Builder.
 //
 // source provides registry access for pulling base images and resolving
 // affordance references. workdir is the directory containing the manifest
-// and is the root for resolving copy step sources. sess is the open client
+// and is the root for resolving copy step sources. client is the open
 // connection to the container runtime on the build host.
-func NewBuilder(src source.Source, workdir string, sess *compute.Client) *Builder {
+func NewBuilder(src source.Source, workdir string, client *compute.Client) *Builder {
 	return &Builder{
 		src:     src,
 		workdir: workdir,
-		sess:    sess,
+		client:  client,
 	}
 }
 
 // Executes a recipe and writes the output image as an OCI tar archive.
 //
 // Each stage resolves its base image, then compiles its grants into a security
-// policy and executes its steps in order. The image produced by the last stage
-// is exported to [files.BuildImage]. Returns the build directory on success.
-func (b *Builder) Run(ctx context.Context, m manifest.Manifest, recipe *manifest.Recipe, output string, entrypoint []string) (string, error) {
+// spec and executes its steps in order. The image produced by the last stage
+// is exported to [files.BuildImage]. entrypoint, when set, becomes the image
+// entrypoint. Returns the build directory on success.
+func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, output string) (string, error) {
 	stageImages := make(map[string]string)
 	var currentCtr *compute.Container
 
@@ -90,21 +95,21 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr *compute.Container, ent
 // Returns the output directory path on success.
 func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, output string) (string, error) {
 	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
-		return "", crex.Wrap(ErrFileSystemOperation, err)
+		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
 	}
 
 	image := filepath.Join(output, files.ImageFile)
 	f, err := os.OpenFile(image, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, files.DefaultFileMode)
 	if err != nil {
-		return "", crex.Wrap(ErrFileSystemOperation, err)
+		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
 	}
 	defer f.Close()
 
-	ref, err := ctr.Commit(ctx, "export")
+	ref, err := ctr.Commit(ctx, commitAuthorExport)
 	if err != nil {
 		return "", crex.Wrap(ErrBuild, err)
 	}
-	if err := b.sess.Export(ctx, ref, f); err != nil {
+	if err := b.client.Export(ctx, ref, f); err != nil {
 		return "", crex.Wrap(ErrBuild, err)
 	}
 

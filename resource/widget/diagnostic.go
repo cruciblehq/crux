@@ -1,4 +1,4 @@
-package resource
+package widget
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
-// Severity levels for esbuild messages.
+// Severity levels for esbuild messages from a widget build.
 type severity int
 
 const (
@@ -18,8 +18,11 @@ const (
 	severityError                   // Error severity.
 )
 
-// Helper struct for sorting esbuild results.
-type resultHelper struct {
+// A normalized esbuild diagnostic from a widget build.
+//
+// Holds a single error or warning with its location, used to sort and report
+// the messages produced by a widget build.
+type diagnostic struct {
 	severity severity // The severity of the message.
 	message  string   // The error or warning message.
 	line     int      // The line number for sorting.
@@ -35,13 +38,13 @@ func processResult(result es.BuildResult) error {
 		return nil
 	}
 
-	helpers := normalizeAndSort(result)
+	diags := normalizeAndSort(result)
 
-	for _, h := range helpers {
-		if h.severity == severityWarning {
-			slog.Warn(h.message)
+	for _, d := range diags {
+		if d.severity == severityWarning {
+			slog.Warn(d.message)
 		} else {
-			slog.Error(h.message)
+			slog.Error(d.message)
 		}
 	}
 
@@ -50,52 +53,52 @@ func processResult(result es.BuildResult) error {
 		return nil
 	}
 
-	return crex.Wrapf(ErrBuildWidget, "%d error(s) encountered during the build process", len(result.Errors))
+	return crex.Wrapf(ErrBuild, "%d error(s) encountered during the build process", len(result.Errors))
 }
 
-// Normalizes and sorts esbuild results into [resultHelper] structs.
+// Normalizes and sorts esbuild results into [diagnostic] structs.
 //
 // It processes both errors and warnings, normalizing their messages and
-// location information. The resulting helpers are sorted by line and column
+// location information. The resulting diagnostics are sorted by line and column
 // number to provide a coherent order for reporting.
-func normalizeAndSort(result es.BuildResult) []resultHelper {
-	var helpers []resultHelper
+func normalizeAndSort(result es.BuildResult) []diagnostic {
+	var diags []diagnostic
 
 	for _, err := range result.Errors {
-		helpers = append(helpers, normalizeMessage(err, severityError))
+		diags = append(diags, normalizeMessage(err, severityError))
 	}
 	for _, warn := range result.Warnings {
-		helpers = append(helpers, normalizeMessage(warn, severityWarning))
+		diags = append(diags, normalizeMessage(warn, severityWarning))
 	}
 
-	sort.SliceStable(helpers, func(i, j int) bool {
-		if helpers[i].line == helpers[j].line {
-			return helpers[i].column < helpers[j].column
+	sort.SliceStable(diags, func(i, j int) bool {
+		if diags[i].line == diags[j].line {
+			return diags[i].column < diags[j].column
 		}
-		return helpers[i].line < helpers[j].line
+		return diags[i].line < diags[j].line
 	})
 
-	return helpers
+	return diags
 }
 
-// Converts an esbuild message into a [resultHelper].
+// Converts an esbuild message into a [diagnostic].
 //
 // It uses the provided severity level to create either error or warning
-// messages. If location information is available, it includes it in the helper
+// messages. If location information is available, it includes it in the result
 // and keeps track of line and column for sorting purposes.
-func normalizeMessage(msg es.Message, sev severity) resultHelper {
-	h := resultHelper{
+func normalizeMessage(msg es.Message, sev severity) diagnostic {
+	d := diagnostic{
 		severity: sev,
 		message:  lowerFirst(msg.Text),
 	}
 
 	if msg.Location != nil {
-		h.message = fmt.Sprintf("%s: %s", formatLocation(*msg.Location), lowerFirst(msg.Text))
-		h.line = msg.Location.Line
-		h.column = msg.Location.Column
+		d.message = fmt.Sprintf("%s: %s", formatLocation(*msg.Location), lowerFirst(msg.Text))
+		d.line = msg.Location.Line
+		d.column = msg.Location.Column
 	}
 
-	return h
+	return d
 }
 
 // Formats an esbuild location as "file:line:column".

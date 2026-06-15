@@ -5,9 +5,32 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/manifest"
 )
+
+// Verifies that a build directory contains the expected artifacts.
+//
+// Every resource type requires a valid manifest matching t. Types that emit a
+// signature artifact also require that file: runtimes and services produce an
+// image, widgets a main bundle, and blueprints a plan. Affordances have no
+// additional artifact.
+func Verify(buildDir string, t manifest.ResourceType) error {
+	switch t {
+	case manifest.TypeRuntime:
+		return verify(buildDir, t, files.ImageFile)
+	case manifest.TypeService:
+		return verify(buildDir, t, files.ImageFile)
+	case manifest.TypeWidget:
+		return verify(buildDir, t, files.WidgetMainFile)
+	case manifest.TypeAffordance:
+		return verify(buildDir, t, "")
+	case manifest.TypeBlueprint:
+		return verify(buildDir, t, files.PlanFile)
+	default:
+		return crex.Wrapf(ErrUnsupportedType, "resource type %q is not supported", t)
+	}
+}
 
 // Verifies that a build directory contains the expected artifacts.
 //
@@ -33,9 +56,9 @@ func verify(buildDir string, resourceType manifest.ResourceType, artifactFile st
 
 // Reads the manifest from a build directory and verifies its resource type.
 //
-// This should be called as the first step in [Handler.Verify] to ensure the
-// build directory is of the right resource type before checking type-specific
-// artifacts. Returns the manifest if its type matches the expected type.
+// This is the first step in [Verify], ensuring the build directory is of the
+// right resource type before checking type-specific artifacts. Returns the
+// manifest if its type matches the expected type.
 func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.Manifest, error) {
 	manifestPath := files.Manifest(buildDir)
 	if _, err := os.Stat(manifestPath); err != nil {
