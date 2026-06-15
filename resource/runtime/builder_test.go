@@ -3,11 +3,11 @@ package runtime
 import (
 	"testing"
 
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 func TestNewBuilder(t *testing.T) {
-	src, err := source.NewSource("http://reg", "ns")
+	src, err := registry.NewSource("http://reg", "ns")
 	if err != nil {
 		t.Fatal(err)
 	}

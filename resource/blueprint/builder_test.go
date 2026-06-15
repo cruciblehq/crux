@@ -6,11 +6,11 @@ import (
 
 	"github.com/cruciblehq/crux/affordance/kernel"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 func TestNewBuilder(t *testing.T) {
-	src, err := source.NewSource("http://reg", "ns")
+	src, err := registry.NewSource("http://reg", "ns")
 	if err != nil {
 		t.Fatal(err)
 	}

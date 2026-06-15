@@ -17,7 +17,7 @@
 //
 // Callers read the manifest themselves and pass it to each operation:
 //
-//	src := source.New("http://hub.cruciblehq.xyz:8080")
+//	src, err := registry.NewSource("http://hub.cruciblehq.xyz:8080", "acme")
 //	man, err := manifest.Read("crucible.yaml")
 //
 //	result, err := resource.Build(ctx, *man, src, filepath.Dir("crucible.yaml"), "", "build")

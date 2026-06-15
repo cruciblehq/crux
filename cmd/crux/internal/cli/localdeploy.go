@@ -7,8 +7,8 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource/blueprint"
-	"github.com/cruciblehq/crux/source"
 )
 
 // Represents the 'crux local deploy' command.
@@ -30,11 +30,11 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	registry := c.Registry
-	if registry == "" {
-		registry = internal.DefaultRegistryURL
+	registryURL := c.Registry
+	if registryURL == "" {
+		registryURL = internal.DefaultRegistryURL
 	}
-	src, err := source.NewSource(registry, internal.DefaultNamespace)
+	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}

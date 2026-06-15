@@ -9,8 +9,8 @@ import (
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/source"
 	"github.com/cruciblehq/crux/watch"
 )
 
@@ -28,13 +28,13 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	slog.Info("building resource...", "watch", c.Watch)
 
-	registry := c.Registry
-	if registry == "" {
-		registry = internal.DefaultRegistryURL
+	registryURL := c.Registry
+	if registryURL == "" {
+		registryURL = internal.DefaultRegistryURL
 	}
 
 	// Build first (don't wait for changes)
-	result, err := c.build(ctx, registry)
+	result, err := c.build(ctx, registryURL)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	// Watch mode
 	if c.Watch {
 		slog.Info("watching for changes (CTRL+C to exit)...")
-		return c.watchAndRebuild(ctx, registry)
+		return c.watchAndRebuild(ctx, registryURL)
 	}
 
 	return nil
@@ -55,7 +55,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 // Sets up a recursive file watcher on the current directory, listening for any
 // changes. When a file change is detected, it triggers a rebuild. The function
 // continues to watch for changes until the provided context is canceled.
-func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
+func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) error {
 	callback := func(we *watch.Event) error {
 
 		// Check for cancellation
@@ -65,7 +65,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
-		if _, err := c.build(ctx, registry); err != nil {
+		if _, err := c.build(ctx, registryURL); err != nil {
 			slog.Error(err.Error())
 			return nil
 		}
@@ -85,8 +85,8 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registry string) error {
 }
 
 // Resolves the builder, creates the output directory, and builds the resource.
-func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildResult, error) {
-	src, err := source.NewSource(registry, internal.DefaultNamespace)
+func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.BuildResult, error) {
+	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (c *BuildCmd) build(ctx context.Context, registry string) (*resource.BuildR
 
 	output := files.BuildDir(RootCmd.Context)
 	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
-		return nil, crex.Wrap(source.ErrFileSystemOperation, err)
+		return nil, crex.Wrap(registry.ErrFileSystemOperation, err)
 	}
 
 	return resource.Build(ctx, *man, src, RootCmd.Context, c.Environment, output)

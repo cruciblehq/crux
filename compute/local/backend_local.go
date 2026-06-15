@@ -20,7 +20,7 @@ import (
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 // Machine image coordinates.
@@ -261,7 +261,7 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 // image is built and published by the Crucible team. It's an Alpine image
 // with containerd installed and used as the base for provisioning the VM.
 func fetchMachineImage(ctx context.Context) error {
-	src, err := source.NewSource(machineRegistryURL, machineNamespace)
+	src, err := registry.NewSource(machineRegistryURL, machineNamespace)
 	if err != nil {
 		return err
 	}

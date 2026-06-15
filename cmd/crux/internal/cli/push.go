@@ -7,8 +7,8 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/source"
 )
 
 // Represents the 'crux push' command.
@@ -18,14 +18,14 @@ type PushCmd struct {
 
 // Executes the push command.
 func (c *PushCmd) Run(ctx context.Context) error {
-	registry := c.Registry
-	if registry == "" {
-		registry = internal.DefaultRegistryURL
+	registryURL := c.Registry
+	if registryURL == "" {
+		registryURL = internal.DefaultRegistryURL
 	}
 
-	slog.Info("pushing package...", "registry", registry)
+	slog.Info("pushing package...", "registry", registryURL)
 
-	src, err := source.NewSource(registry, internal.DefaultNamespace)
+	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}

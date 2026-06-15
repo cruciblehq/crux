@@ -8,7 +8,7 @@ import (
 	"github.com/cruciblehq/crux/archive"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 // Holds the output of a successful [Pack] call.
@@ -40,7 +40,7 @@ func ensureOutputDir(outputPath string) error {
 		return nil
 	}
 	if err := os.MkdirAll(outputDir, files.DefaultDirMode); err != nil {
-		return crex.Wrap(source.ErrFileSystemOperation, err)
+		return crex.Wrap(registry.ErrFileSystemOperation, err)
 	}
 	return nil
 }

@@ -5,8 +5,8 @@ import (
 
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource/recipe"
-	"github.com/cruciblehq/crux/source"
 )
 
 // Builds a Crucible service resource from its configuration.
@@ -14,8 +14,8 @@ import (
 // Drives the shared recipe pipeline against the local compute backend, wiring
 // the configured entrypoint into the produced image.
 type Builder struct {
-	src     source.Source // Registry access for pulling base images and resolving affordances.
-	workdir string        // Manifest directory, used as the root for resolving copy step sources.
+	src     registry.Source // Registry access for pulling base images and resolving affordances.
+	workdir string          // Manifest directory, used as the root for resolving copy step sources.
 }
 
 // Returns a new Builder.
@@ -23,7 +23,7 @@ type Builder struct {
 // source provides registry access for pulling base images and resolving
 // affordance references. workdir is the directory containing the manifest and
 // is the root for resolving copy step sources.
-func NewBuilder(src source.Source, workdir string) *Builder {
+func NewBuilder(src registry.Source, workdir string) *Builder {
 	return &Builder{src: src, workdir: workdir}
 }
 

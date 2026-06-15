@@ -8,7 +8,7 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 // Represents the 'crux pull' command.
@@ -20,9 +20,9 @@ type PullCmd struct {
 
 // Executes the pull command.
 func (c *PullCmd) Run(ctx context.Context) error {
-	registry := c.Registry
-	if registry == "" {
-		registry = internal.DefaultRegistryURL
+	registryURL := c.Registry
+	if registryURL == "" {
+		registryURL = internal.DefaultRegistryURL
 	}
 
 	resType, err := manifest.ParseResourceType(c.Type)
@@ -32,7 +32,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	src, err := source.NewSource(registry, internal.DefaultNamespace)
+	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	slog.Info("pulling resource...",
 		"reference", raw,
-		"registry", registry,
+		"registry", registryURL,
 	)
 
 	ref, err := src.Parse(string(resType), raw)

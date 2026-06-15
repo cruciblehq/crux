@@ -21,7 +21,7 @@ import (
 	"github.com/cruciblehq/crux/affordance/volume"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 // Compiles an [aff.Spec] from affordance grants.
@@ -107,7 +107,7 @@ func (b *Builder) Kernel() *kernel.Spec {
 // they are substituted into the pulled grants before recursing. Domain grants
 // are dispatched to the matching subsystem. Returns [ErrResolution] for pull
 // failures, parse errors, or unknown subsystem names.
-func (b *Builder) Build(ctx context.Context, g manifest.Grant, src source.Source) error {
+func (b *Builder) Build(ctx context.Context, g manifest.Grant, src registry.Source) error {
 	if g.IsRef() {
 		a, _, err := pull(ctx, src, g.RefTarget())
 		if err != nil {
@@ -172,8 +172,8 @@ func substituteGrant(g manifest.Grant, params map[string]string) manifest.Grant 
 
 // Fetches an affordance resource and returns its config and content digest.
 //
-// Resolves target as an affordance reference and pulls it via [source.Source.Pull].
-func pull(ctx context.Context, src source.Source, target string) (*manifest.Affordance, string, error) {
+// Resolves target as an affordance reference and pulls it via [registry.Source.Pull].
+func pull(ctx context.Context, src registry.Source, target string) (*manifest.Affordance, string, error) {
 	ref, err := src.Parse(string(manifest.TypeAffordance), target)
 	if err != nil {
 		return nil, "", err

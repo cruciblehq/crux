@@ -26,6 +26,16 @@
 // entity types, including archive upload and download. Both the HTTP client in
 // crux and the SQL store in hub implement this interface.
 //
+// A [Source] pulls and pushes resources between a registry and the local cache.
+// It holds the default registry URL and namespace applied to reference strings
+// that omit those components. [Source.Parse] resolves a reference string into a
+// [reference.Reference], filling in the defaults. [Source.Pull] downloads and
+// extracts a resource, consulting the local cache first and verifying the
+// artifact digest before use. [Source.Push] uploads a package, creating the
+// resource and version in the registry when they do not yet exist. A [PullResult]
+// reports the local extraction directory along with the digest
+// and version metadata of the pulled artifact.
+//
 // All types implement a Validate method that checks field constraints: name
 // format, version string format, timestamp ordering, resource type, archive
 // field consistency, digest format, and count bounds. The [Encode] and [Decode]

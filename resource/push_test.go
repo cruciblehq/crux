@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/source"
+	"github.com/cruciblehq/crux/registry"
 )
 
 func TestPushMissingPackage(t *testing.T) {
-	src, err := source.NewSource("http://reg", "ns")
+	src, err := registry.NewSource("http://reg", "ns")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestPushMissingPackage(t *testing.T) {
 	}
 
 	err = Push(context.Background(), src, m, "/nonexistent/pkg.tar.zst")
-	if !errors.Is(err, source.ErrFileSystemOperation) {
-		t.Fatalf("Push missing package = %v, want source.ErrFileSystemOperation", err)
+	if !errors.Is(err, registry.ErrFileSystemOperation) {
+		t.Fatalf("Push missing package = %v, want registry.ErrFileSystemOperation", err)
 	}
 }

@@ -1,4 +1,4 @@
-package source
+package registry
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/registry"
 )
 
 // Pushes a resource package to the Hub registry.
@@ -24,10 +23,10 @@ func push(ctx context.Context, registryURL, name, resourceType, version, package
 
 	id, err := reference.ParseIdentifier(name, resourceType)
 	if err != nil {
-		return crex.Wrap(ErrInvalidResource, err)
+		return crex.Wrap(ErrInvalidIdentifier, err)
 	}
 
-	client := registry.NewClient(registryURL, nil)
+	client := NewClient(registryURL, nil)
 
 	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err
@@ -48,14 +47,14 @@ func push(ctx context.Context, registryURL, name, resourceType, version, package
 //
 // Returns [ErrNamespaceNotFound] on a 404 response, or [ErrRegistryOperation]
 // for other failures.
-func verifyNamespace(ctx context.Context, client *registry.Client, namespace string) error {
+func verifyNamespace(ctx context.Context, client *Client, namespace string) error {
 	_, err := client.ReadNamespace(ctx, namespace)
 	if err == nil {
 		return nil
 	}
 
-	var regErr *registry.Error
-	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
+	var regErr *Error
+	if errors.As(err, &regErr) && regErr.Code == ErrorCodeNotFound {
 		return crex.Wrap(ErrNamespaceNotFound, err)
 	}
 
@@ -66,18 +65,18 @@ func verifyNamespace(ctx context.Context, client *registry.Client, namespace str
 //
 // Looks up the resource and creates it with the given type if it does not
 // yet exist.
-func ensureResource(ctx context.Context, client *registry.Client, namespace, resource, resourceType string) error {
+func ensureResource(ctx context.Context, client *Client, namespace, resource, resourceType string) error {
 	_, err := client.ReadResource(ctx, namespace, resource)
 	if err == nil {
 		return nil
 	}
 
-	var regErr *registry.Error
-	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
+	var regErr *Error
+	if !errors.As(err, &regErr) || regErr.Code != ErrorCodeNotFound {
 		return crex.Wrap(ErrRegistryOperation, err)
 	}
 
-	resInfo := registry.ResourceInfo{
+	resInfo := ResourceInfo{
 		Name: resource,
 		Type: resourceType,
 	}
@@ -93,15 +92,15 @@ func ensureResource(ctx context.Context, client *registry.Client, namespace, res
 //
 // Attempts to create the specified version for the resource. Returns
 // [ErrVersionExists] if the version already exists.
-func createVersion(ctx context.Context, client *registry.Client, namespace, resource, version string) error {
-	versionInfo := registry.VersionInfo{
+func createVersion(ctx context.Context, client *Client, namespace, resource, version string) error {
+	versionInfo := VersionInfo{
 		String: version,
 	}
 
 	_, err := client.CreateVersion(ctx, namespace, resource, versionInfo)
 	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists {
+		var regErr *Error
+		if errors.As(err, &regErr) && regErr.Code == ErrorCodeVersionExists {
 			return crex.Wrap(ErrVersionExists, err)
 		}
 		return crex.Wrap(ErrRegistryOperation, err)
@@ -114,7 +113,7 @@ func createVersion(ctx context.Context, client *registry.Client, namespace, reso
 //
 // Opens the package file and uploads it to the specified resource version in
 // the registry. After a successful upload, updates the local cache.
-func uploadPackage(ctx context.Context, client *registry.Client, namespace, resource, version, packageOutput string) error {
+func uploadPackage(ctx context.Context, client *Client, namespace, resource, version, packageOutput string) error {
 	archive, err := os.Open(packageOutput)
 	if err != nil {
 		return crex.Wrap(ErrFileSystemOperation, err)

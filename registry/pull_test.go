@@ -1,4 +1,4 @@
-package source
+package registry
 
 import (
 	"strings"
@@ -6,14 +6,13 @@ import (
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/registry"
 )
 
 func TestCheckCache_Miss_NoEntry(t *testing.T) {
 	c := openTestCache(t)
 
 	ref := mustParseRef(t, "acme/myruntime 1.0.0")
-	ver := &registry.Version{String: "1.0.0"}
+	ver := &Version{String: "1.0.0"}
 
 	result, ok := checkCache(c, ref, ver, "sha256:doesnotexist")
 	if ok {
@@ -27,7 +26,7 @@ func TestCheckCache_Miss_NoEntry(t *testing.T) {
 func TestCheckCache_Miss_DigestMismatch(t *testing.T) {
 	c := openTestCache(t)
 	ref := mustParseRef(t, "acme/myruntime 1.0.0")
-	ver := &registry.Version{String: "1.0.0"}
+	ver := &Version{String: "1.0.0"}
 
 	// Store an entry (Put computes and stores its real digest).
 	if _, err := c.Put("acme", "myruntime", "1.0.0", strings.NewReader("data")); err != nil {
@@ -47,7 +46,7 @@ func TestCheckCache_Miss_DigestMismatch(t *testing.T) {
 func TestCheckCache_Hit(t *testing.T) {
 	c := openTestCache(t)
 	ref := mustParseRef(t, "acme/myruntime 1.0.0")
-	ver := &registry.Version{String: "1.0.0"}
+	ver := &Version{String: "1.0.0"}
 
 	// Store an entry and capture the computed digest.
 	stored, err := c.Put("acme", "myruntime", "1.0.0", strings.NewReader("archive data"))

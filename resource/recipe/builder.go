@@ -9,8 +9,8 @@ import (
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource/oci"
-	"github.com/cruciblehq/crux/source"
 )
 
 // Author label recorded in the OCI history of the final exported image.
@@ -22,7 +22,7 @@ const commitAuthorExport = "export"
 // into a security spec, and executes each step in order. The final image is
 // exported as an OCI tar archive.
 type Builder struct {
-	src     source.Source   // Registry access for pulling base images and resolving affordances.
+	src     registry.Source // Registry access for pulling base images and resolving affordances.
 	workdir string          // Manifest directory.
 	client  *compute.Client // Live client connection to the container runtime on the build host.
 }
@@ -33,7 +33,7 @@ type Builder struct {
 // affordance references. workdir is the directory containing the manifest
 // and is the root for resolving copy step sources. client is the open
 // connection to the container runtime on the build host.
-func NewBuilder(src source.Source, workdir string, client *compute.Client) *Builder {
+func NewBuilder(src registry.Source, workdir string, client *compute.Client) *Builder {
 	return &Builder{
 		src:     src,
 		workdir: workdir,
