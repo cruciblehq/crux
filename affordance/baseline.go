@@ -4,6 +4,9 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+// Unprivileged "nobody" user and group the baseline process runs as.
+const nobodyID = 65534
+
 // Constructs the deny-all OCI runtime spec baseline.
 //
 // Every field that the model can grant against is initialised to its most
@@ -23,8 +26,8 @@ func newOCIBaseline() *specs.Spec {
 		Root:    &specs.Root{},
 		Process: &specs.Process{
 			User: specs.User{
-				UID:   65534,
-				GID:   65534,
+				UID:   nobodyID,
+				GID:   nobodyID,
 				Umask: &umask,
 			},
 			Cwd:             "/",
