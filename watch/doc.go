@@ -2,7 +2,7 @@
 //
 // A [Watcher] observes one or more paths for changes and invokes a callback on
 // every event. The callback receives an [Event] that wraps the underlying
-// fsnotify event with convenience methods for inspecting the operation kind.
+// fsnotify event with convenience methods for inspecting the operation type.
 // If the callback returns an error, the watcher shuts down and the error is
 // surfaced through [Watcher.Wait] and [Watcher.Err].
 //

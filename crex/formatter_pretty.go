@@ -141,7 +141,7 @@ func (f *PrettyFormatter) writeCrexError(sb *strings.Builder, errMap map[string]
 	}
 }
 
-// Checks whether a value is a crex error group by looking for the sentinel marker.
+// Whether a value is a crex error group by looking for the sentinel marker.
 func asCrexError(val slog.Value) (map[string]slog.Value, bool) {
 	if val.Kind() != slog.KindGroup {
 		return nil, false

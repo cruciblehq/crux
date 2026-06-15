@@ -29,7 +29,7 @@ Each tier increases their **revenue share**, up to **75%** at the highest tier. 
 
 Our **Pre-Alpha Developer Program** is designed to test Crucible’s early developer experience. We’re focusing on feedback — not full functionality — to refine Crucible's foundations.
 
-This program will run for a duration of two months, until the end of 2025.
+This program will run for a duration of two months, until the end of 2026.
 
 ## What We Expect From You
 
@@ -82,11 +82,9 @@ A **widget** is a Crucible resource that operates on the frontend. It combines l
 
 To scaffold a widget, open a terminal and type:
 
-<pre>
 ```sh
 crux init
 ```
-</pre>
 
 This creates a simple widget on the working directory. See other scaffolding options with `crux init --help`.
 
@@ -109,7 +107,7 @@ To commit your participation in this program, send us an email to (TBD) answerin
 7. Was filling in the widget metadata boring or error prone? How would you change this experience?
 8. What aspects of the developer experience felt confusing, slow, or broken?
 
-We expect honest feedback — please send us a bit of though love!
+We expect honest feedback — please send us a bit of tough love!
 
 # Reporting Issues
 

@@ -44,7 +44,7 @@ func (vc *VersionConstraint) String() string {
 	return strings.Join(parts, " || ")
 }
 
-// Checks whether a specific version satisfies this constraint.
+// Whether a specific version satisfies this constraint.
 //
 // Parses the version string and checks it against all constraint groups.
 // Returns true if any group matches (OR logic between groups).
@@ -57,7 +57,7 @@ func (vc *VersionConstraint) Matches(version string) (bool, error) {
 	return vc.MatchesVersion(v)
 }
 
-// Checks whether a specific Version satisfies this constraint.
+// Whether a specific Version satisfies this constraint.
 //
 // Checks the Version against all constraint groups. Returns true if any group
 // matches (OR logic between groups).

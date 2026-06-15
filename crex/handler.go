@@ -191,7 +191,7 @@ func (h *handler) flush() (bool, error) {
 	return true, err
 }
 
-// Reports whether the given level meets the handler's current minimum level.
+// Whether the given level meets the handler's current minimum level.
 func (h *handler) Enabled(_ context.Context, level slog.Level) bool {
 	h.state.mux.RLock()
 	defer h.state.mux.RUnlock()

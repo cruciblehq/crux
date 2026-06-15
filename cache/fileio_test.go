@@ -124,7 +124,6 @@ func TestWriteMetaBadPath(t *testing.T) {
 	}
 }
 
-
 func TestExtractDirAtomic(t *testing.T) {
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "extracted")

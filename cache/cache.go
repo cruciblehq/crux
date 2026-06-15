@@ -92,7 +92,7 @@ func (c *Cache) Close() error {
 	return nil
 }
 
-// Checks whether an entry exists in the cache.
+// Whether an entry exists in the cache.
 func (c *Cache) Has(namespace, resource, version string) (bool, error) {
 	meta, err := c.metaPath(namespace, resource, version)
 	if err != nil {
@@ -137,7 +137,7 @@ func (c *Cache) OpenArchive(namespace, resource, version string) (io.ReadCloser,
 	return &lockedReadCloser{file: f, unlock: c.mu.RUnlock}, nil
 }
 
-// Checks whether an entry has been extracted.
+// Whether an entry has been extracted.
 func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) {
 	dir, err := c.extractedVersionDir(namespace, resource, version)
 	if err != nil {
