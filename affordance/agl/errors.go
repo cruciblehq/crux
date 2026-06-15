@@ -1,8 +1,8 @@
 package agl
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrParse = errors.New("agl parse failed")
-	ErrLex   = errors.New("agl lex failed")
+	ErrParse = crex.New("agl parse failed")
+	ErrLex   = crex.New("agl lex failed")
 )

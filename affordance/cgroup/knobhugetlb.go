@@ -26,7 +26,7 @@ type hugeTLB struct {
 func parseHugeTLB(value string) (hugeTLB, error) {
 	size, rest, _ := strings.Cut(strings.TrimSpace(value), " ")
 	if size == "" {
-		return hugeTLB{}, crex.Wrapf(ErrInvalidGrant, "page size required")
+		return hugeTLB{}, crex.Newf(ErrInvalidGrant, "page size required")
 	}
 	h := hugeTLB{Size: size}
 	if rest != "" {
@@ -53,7 +53,7 @@ func (e hugeTLB) check(other hugeTLB) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %s already set", "hugetlb", other.Size)
+	return crex.Newf(ErrConflict, "%s %s already set", "hugetlb", other.Size)
 }
 
 // Leaves e unchanged and always reports no change.

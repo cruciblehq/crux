@@ -75,7 +75,7 @@ func (s *Subsystem) Build(g *agl.Model) error {
 		}
 		s.spec.Disk = v
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "unknown resource %q in provision grant", resource)
+		return crex.Newf(ErrInvalidGrant, "unknown resource %q in provision grant", resource)
 	}
 	return nil
 }
@@ -86,16 +86,16 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // value) and no keyword arguments or where clause.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in provision grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in provision grant")
 	}
 	if len(g.Kwargs) > 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in provision grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in provision grant")
 	}
 	if len(g.Args) != 2 {
-		return crex.Wrapf(ErrInvalidGrant, "provision grant requires exactly two arguments (resource name and value)")
+		return crex.Newf(ErrInvalidGrant, "provision grant requires exactly two arguments (resource name and value)")
 	}
 	if g.Args[0].Type != agl.ArgName {
-		return crex.Wrapf(ErrInvalidGrant, "first argument must be a resource name (cpu, memory, disk)")
+		return crex.Newf(ErrInvalidGrant, "first argument must be a resource name (cpu, memory, disk)")
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func parseCPU(a agl.Arg) (uint64, error) {
 		return n * 1000, nil
 	case agl.ArgQuantity:
 		if !strings.HasSuffix(a.Value, string(units.SuffixMilli)) {
-			return 0, crex.Wrapf(ErrInvalidGrant, "cpu quantity must use the millicore suffix")
+			return 0, crex.Newf(ErrInvalidGrant, "cpu quantity must use the millicore suffix")
 		}
 		n, err := strconv.ParseUint(strings.TrimSuffix(a.Value, string(units.SuffixMilli)), 10, 64)
 		if err != nil {
@@ -123,7 +123,7 @@ func parseCPU(a agl.Arg) (uint64, error) {
 		}
 		return n, nil
 	default:
-		return 0, crex.Wrapf(ErrInvalidGrant, "cpu must be a vCPU count or millicore quantity")
+		return 0, crex.Newf(ErrInvalidGrant, "cpu must be a vCPU count or millicore quantity")
 	}
 }
 
@@ -142,7 +142,7 @@ func parseBytes(a agl.Arg) (uint64, error) {
 	case agl.ArgQuantity:
 		return parseByteQuantity(a.Value)
 	default:
-		return 0, crex.Wrapf(ErrInvalidGrant, "expected a byte quantity")
+		return 0, crex.Newf(ErrInvalidGrant, "expected a byte quantity")
 	}
 }
 
@@ -167,5 +167,5 @@ func parseByteQuantity(s string) (uint64, error) {
 		}
 		return v * mul, nil
 	}
-	return 0, crex.Wrapf(ErrInvalidGrant, "unknown quantity suffix in %q", s)
+	return 0, crex.Newf(ErrInvalidGrant, "unknown quantity suffix in %q", s)
 }

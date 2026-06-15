@@ -52,7 +52,7 @@ func (c *Codec) applyFieldDefault(field reflect.Value, sf reflect.StructField, s
 		return nil
 	}
 	if err := setDefault(field, def); err != nil {
-		return crex.Wrapf(ErrSetDefault, "field %s: %w", sf.Name, err)
+		return crex.Wrapf(ErrSetDefault, err, "field %s", sf.Name)
 	}
 	return nil
 }
@@ -136,7 +136,7 @@ func setDefault(field reflect.Value, val string) error {
 		}
 		field.SetFloat(n)
 	default:
-		return crex.Wrapf(ErrUnsupportedType, "%s", field.Type())
+		return crex.Newf(ErrUnsupportedType, "%s", field.Type())
 	}
 	return nil
 }

@@ -38,7 +38,7 @@ func (l *layerReader) Close() error {
 func openLayerReader(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	ra, err := cs.ReaderAt(ctx, desc)
 	if err != nil {
-		return nil, crex.Wrapf(ErrContainer, "read layer %s: %w", desc.Digest, err)
+		return nil, crex.Wrapf(ErrContainer, err, "could not read layer %s", desc.Digest)
 	}
 	r := content.NewReader(ra)
 	switch desc.MediaType {
@@ -46,7 +46,7 @@ func openLayerReader(ctx context.Context, cs content.Store, desc ocispec.Descrip
 		gr, err := gzip.NewReader(r)
 		if err != nil {
 			ra.Close()
-			return nil, crex.Wrapf(ErrContainer, "decompress layer: %w", err)
+			return nil, crex.Wrapf(ErrContainer, err, "could not decompress layer")
 		}
 		return &layerReader{Reader: gr, ra: ra, gr: gr}, nil
 	}

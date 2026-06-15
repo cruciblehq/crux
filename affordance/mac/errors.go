@@ -1,11 +1,11 @@
 package mac
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrCompile         = errors.New("MAC compile failed")
-	ErrInvalidMAC      = errors.New("invalid MAC spec")
-	ErrInvalidMACAllow = errors.New("invalid MAC allow rule")
-	ErrInvalidMACExpr  = errors.New("invalid MAC expression")
-	ErrInvalidMACValue = errors.New("invalid MAC value")
+	ErrCompile         = crex.New("MAC compile failed")
+	ErrInvalidMAC      = crex.New("invalid MAC spec")
+	ErrInvalidMACAllow = crex.New("invalid MAC allow rule")
+	ErrInvalidMACExpr  = crex.New("invalid MAC expression")
+	ErrInvalidMACValue = crex.New("invalid MAC value")
 )

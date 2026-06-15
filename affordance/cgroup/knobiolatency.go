@@ -47,7 +47,7 @@ func (e ioLatency) check(other ioLatency) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %d:%d already set", ioLatencyKnob, other.Major, other.Minor)
+	return crex.Newf(ErrConflict, "%s %d:%d already set", ioLatencyKnob, other.Major, other.Minor)
 }
 
 // Leaves e unchanged and always reports no change.

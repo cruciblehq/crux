@@ -27,7 +27,7 @@ type rdma struct {
 func parseRDMA(value string) (rdma, error) {
 	device, rest, _ := strings.Cut(strings.TrimSpace(value), " ")
 	if device == "" {
-		return rdma{}, crex.Wrapf(ErrInvalidGrant, "device name required")
+		return rdma{}, crex.Newf(ErrInvalidGrant, "device name required")
 	}
 	r := rdma{Device: device}
 	if rest != "" {
@@ -51,7 +51,7 @@ func (e rdma) check(other rdma) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %s already set", "rdma", other.Device)
+	return crex.Newf(ErrConflict, "%s %s already set", "rdma", other.Device)
 }
 
 // Leaves e unchanged and always reports no change.

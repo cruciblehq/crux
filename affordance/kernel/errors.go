@@ -1,8 +1,8 @@
 package kernel
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant = errors.New("invalid kernel grant")
-	ErrInvalidSpec  = errors.New("invalid kernel spec")
+	ErrInvalidGrant = crex.New("invalid kernel grant")
+	ErrInvalidSpec  = crex.New("invalid kernel spec")
 )

@@ -1,9 +1,9 @@
 package cache
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrNotFound       = errors.New("entry not found in cache")
-	ErrDigestMismatch = errors.New("archive digest mismatch")
-	ErrInvalidPath    = errors.New("invalid cache path")
+	ErrNotFound       = crex.New("entry not found in cache")
+	ErrDigestMismatch = crex.New("archive digest mismatch")
+	ErrInvalidPath    = crex.New("invalid cache path")
 )

@@ -1,10 +1,10 @@
 package net
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant       = errors.New("invalid net grant")
-	ErrInvalidSpec        = errors.New("invalid network spec")
-	ErrInvalidIngressRule = errors.New("invalid network ingress rule")
-	ErrInvalidEgressRule  = errors.New("invalid network egress rule")
+	ErrInvalidGrant       = crex.New("invalid net grant")
+	ErrInvalidSpec        = crex.New("invalid network spec")
+	ErrInvalidIngressRule = crex.New("invalid network ingress rule")
+	ErrInvalidEgressRule  = crex.New("invalid network egress rule")
 )

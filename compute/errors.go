@@ -1,11 +1,11 @@
 package compute
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrUnknownProvider = errors.New("unknown provider")
-	ErrConnect         = errors.New("containerd connection failed")
-	ErrImport          = errors.New("image import failed")
-	ErrNoImages        = errors.New("no images in archive")
-	ErrContainer       = errors.New("container operation failed")
+	ErrUnknownProvider = crex.New("unknown provider")
+	ErrConnect         = crex.New("containerd connection failed")
+	ErrImport          = crex.New("image import failed")
+	ErrNoImages        = crex.New("no images in archive")
+	ErrContainer       = crex.New("container operation failed")
 )

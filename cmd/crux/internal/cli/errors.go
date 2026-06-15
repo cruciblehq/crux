@@ -1,8 +1,8 @@
 package cli
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrUnexpectedState = errors.New("unexpected runtime state")
-	ErrImport          = errors.New("import failed")
+	ErrUnexpectedState = crex.New("unexpected runtime state")
+	ErrImport          = crex.New("import failed")
 )

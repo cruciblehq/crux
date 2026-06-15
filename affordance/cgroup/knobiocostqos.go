@@ -69,7 +69,7 @@ func (e ioCostQoS) check(other ioCostQoS) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %d:%d already set", ioCostQoSKnob, other.Major, other.Minor)
+	return crex.Newf(ErrConflict, "%s %d:%d already set", ioCostQoSKnob, other.Major, other.Minor)
 }
 
 // Leaves e unchanged and always reports no change.

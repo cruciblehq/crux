@@ -236,7 +236,7 @@ func (c *Client) Close() error {
 func (c *Client) prepareSnapshot(ctx context.Context, img containerd.Image) (string, error) {
 	diffIDs, err := img.RootFS(ctx)
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, "rootfs: %w", err)
+		return "", crex.Wrapf(ErrContainer, err, "could not read image rootfs")
 	}
 	parent := identity.ChainID(diffIDs).String()
 
@@ -266,7 +266,7 @@ func (c *Client) streamExtract(ctx context.Context, img containerd.Image, src st
 	}
 
 	if len(entries) == 0 {
-		return crex.Wrapf(ErrContainer, "path %q not found in image", src)
+		return crex.Newf(ErrContainer, "path %q not found in image", src)
 	}
 
 	return streamEntries(ctx, cs, mfst.Layers, entries, w)
@@ -302,11 +302,11 @@ func readImageConfig(ctx context.Context, cs content.Store, target ocispec.Descr
 	}
 	configData, err := content.ReadBlob(ctx, cs, mfst.Config)
 	if err != nil {
-		return ocispec.Manifest{}, ocispec.Image{}, crex.Wrapf(ErrContainer, "read config: %w", err)
+		return ocispec.Manifest{}, ocispec.Image{}, crex.Wrapf(ErrContainer, err, "could not read image config")
 	}
 	var cfg ocispec.Image
 	if err := json.Unmarshal(configData, &cfg); err != nil {
-		return ocispec.Manifest{}, ocispec.Image{}, crex.Wrapf(ErrContainer, "unmarshal config: %w", err)
+		return ocispec.Manifest{}, ocispec.Image{}, crex.Wrapf(ErrContainer, err, "could not unmarshal image config")
 	}
 	return mfst, cfg, nil
 }
@@ -345,7 +345,7 @@ func scanLayerRefs(ctx context.Context, cs content.Store, layer ocispec.Descript
 			break
 		}
 		if err != nil {
-			return crex.Wrapf(ErrContainer, "read tar entry: %w", err)
+			return crex.Wrapf(ErrContainer, err, "could not read tar entry")
 		}
 		if err := recordTarRef(hdr, tr, layer, srcClean, entries); err != nil {
 			return err
@@ -447,7 +447,7 @@ func streamLayerMatches(ctx context.Context, cs content.Store, layer ocispec.Des
 			break
 		}
 		if err != nil {
-			return crex.Wrapf(ErrContainer, "read tar entry: %w", err)
+			return crex.Wrapf(ErrContainer, err, "could not read tar entry")
 		}
 		if err := streamTarEntry(hdr, tr, names, tw); err != nil {
 			return err
@@ -466,10 +466,10 @@ func streamTarEntry(hdr *tar.Header, tr *tar.Reader, names map[string]struct{}, 
 	}
 	hdr.Name = name
 	if err := tw.WriteHeader(hdr); err != nil {
-		return crex.Wrapf(ErrContainer, "write header for %q: %w", name, err)
+		return crex.Wrapf(ErrContainer, err, "could not write tar header for %q", name)
 	}
 	if _, err := io.Copy(tw, tr); err != nil {
-		return crex.Wrapf(ErrContainer, "write data for %q: %w", name, err)
+		return crex.Wrapf(ErrContainer, err, "could not write tar data for %q", name)
 	}
 	return nil
 }
@@ -481,19 +481,19 @@ func streamTarEntry(hdr *tar.Header, tr *tar.Reader, names map[string]struct{}, 
 func commitSnapshotDiff(ctx context.Context, conn *containerd.Client, img containerd.Image, snapshotID, snapshotterName string, cfgOverride *ocispec.ImageConfig, by string) (string, error) {
 	leaseCtx, doneLease, err := conn.WithLease(ctx)
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, "create lease: %w", err)
+		return "", crex.Wrapf(ErrContainer, err, "create lease")
 	}
 	defer doneLease(ctx)
 
 	snapshotter := conn.SnapshotService(snapshotterName)
 	layerDesc, err := rootfs.CreateDiff(leaseCtx, snapshotID, snapshotter, conn.DiffService())
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, "create diff: %w", err)
+		return "", crex.Wrapf(ErrContainer, err, "create diff")
 	}
 
 	diffID, err := uncompressedDigest(leaseCtx, conn, layerDesc)
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, "compute diff ID: %w", err)
+		return "", crex.Wrapf(ErrContainer, err, "compute diff ID")
 	}
 
 	return appendLayerToImage(leaseCtx, conn, img, layerDesc, diffID, cfgOverride, by)
@@ -597,7 +597,7 @@ func writeImageManifest(ctx context.Context, conn *containerd.Client, parentMfst
 func writeConfigBlob(ctx context.Context, cs content.Store, cfg ocispec.Image) (ocispec.Descriptor, error) {
 	data, err := json.Marshal(cfg)
 	if err != nil {
-		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, "marshal config: %w", err)
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "marshal config")
 	}
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageConfig,
@@ -608,7 +608,7 @@ func writeConfigBlob(ctx context.Context, cs content.Store, cfg ocispec.Image) (
 		fmt.Sprintf("%s-%s", configBlobRefPrefix, desc.Digest.Encoded()),
 		bytes.NewReader(data), desc,
 	); err != nil {
-		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, "write config: %w", err)
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "write config")
 	}
 	return desc, nil
 }
@@ -622,7 +622,7 @@ func writeConfigBlob(ctx context.Context, cs content.Store, cfg ocispec.Image) (
 func writeManifestBlob(ctx context.Context, cs content.Store, mfst ocispec.Manifest, gcLabels map[string]string) (ocispec.Descriptor, error) {
 	data, err := json.Marshal(mfst)
 	if err != nil {
-		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, "marshal manifest: %w", err)
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "marshal manifest")
 	}
 	desc := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageManifest,
@@ -634,13 +634,13 @@ func writeManifestBlob(ctx context.Context, cs content.Store, mfst ocispec.Manif
 		bytes.NewReader(data), desc,
 		content.WithLabels(gcLabels),
 	); err != nil {
-		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, "write manifest: %w", err)
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "write manifest")
 	}
 	if _, err := cs.Update(ctx, content.Info{
 		Digest: desc.Digest,
 		Labels: gcLabels,
 	}, "labels"); err != nil {
-		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, "update manifest gc labels: %w", err)
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "update manifest gc labels")
 	}
 	return desc, nil
 }
@@ -656,10 +656,10 @@ func registerImageRef(ctx context.Context, conn *containerd.Client, mfstDesc oci
 	img := images.Image{Name: ref, Target: mfstDesc}
 	if _, err := conn.ImageService().Create(ctx, img); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
-			return "", crex.Wrapf(ErrContainer, "register image: %w", err)
+			return "", crex.Wrapf(ErrContainer, err, "register image")
 		}
 		if _, err := conn.ImageService().Update(ctx, img); err != nil {
-			return "", crex.Wrapf(ErrContainer, "register image: %w", err)
+			return "", crex.Wrapf(ErrContainer, err, "register image")
 		}
 	}
 	return ref, nil

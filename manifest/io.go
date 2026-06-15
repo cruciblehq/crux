@@ -13,7 +13,7 @@ func As[T any](m *Manifest) (T, error) {
 	cfg, ok := m.Config.(T)
 	if !ok {
 		var zero T
-		return zero, crex.Wrapf(ErrConfigTypeMismatch, "expected manifest type %T", *new(T))
+		return zero, crex.Newf(ErrConfigTypeMismatch, "expected manifest type %T", *new(T))
 	}
 	return cfg, nil
 }

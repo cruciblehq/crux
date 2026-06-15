@@ -1,8 +1,8 @@
 package widget
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidPath = errors.New("invalid build path")
-	ErrBuild       = errors.New("build failed")
+	ErrInvalidPath = crex.New("invalid build path")
+	ErrBuild       = crex.New("build failed")
 )

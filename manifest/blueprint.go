@@ -56,7 +56,7 @@ func (b *Blueprint) Service(id string) *Ref {
 // if a service with the same ID is already registered.
 func (b *Blueprint) AddService(ref Ref) error {
 	if b.Service(ref.ID) != nil {
-		return crex.Wrapf(ErrServiceExists, "%s", ref.ID)
+		return crex.Newf(ErrServiceExists, "id %q", ref.ID)
 	}
 	b.Services = append(b.Services, ref)
 	return nil
@@ -77,7 +77,7 @@ func (b *Blueprint) RemoveService(id string) error {
 			return nil
 		}
 	}
-	return crex.Wrapf(ErrServiceNotFound, "%s", id)
+	return crex.Newf(ErrServiceNotFound, "id %q", id)
 }
 
 // Returns the environment with the given ID.
@@ -102,7 +102,7 @@ func (b *Blueprint) Environment(id string) *Environment {
 // same ID is already declared.
 func (b *Blueprint) AddEnvironment(env Environment) error {
 	if b.Environment(env.ID) != nil {
-		return crex.Wrapf(ErrEnvironmentExists, "%s", env.ID)
+		return crex.Newf(ErrEnvironmentExists, "id %q", env.ID)
 	}
 	b.Environments = append(b.Environments, env)
 	return nil
@@ -120,7 +120,7 @@ func (b *Blueprint) RemoveEnvironment(id string) error {
 			return nil
 		}
 	}
-	return crex.Wrapf(ErrEnvironmentNotFound, "%s", id)
+	return crex.Newf(ErrEnvironmentNotFound, "id %q", id)
 }
 
 // Validates the blueprint configuration.

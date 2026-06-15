@@ -1,5 +1,5 @@
 package mount
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrInvalidGrant = errors.New("invalid mount grant")
+var ErrInvalidGrant = crex.New("invalid mount grant")

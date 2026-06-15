@@ -2,7 +2,6 @@ package compute
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -102,7 +101,7 @@ func (c *Container) Start(ctx context.Context) error {
 	defer c.mu.Unlock()
 
 	if c.task != nil {
-		return crex.Wrapf(ErrContainer, "container already started")
+		return crex.Newf(ErrContainer, "container already started")
 	}
 
 	containerID := fmt.Sprintf("%s-%s", crypto.RandHex(idLen), containerIDSuffix)
@@ -118,26 +117,26 @@ func (c *Container) Start(ctx context.Context) error {
 		),
 	)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, "create container: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not create container")
 	}
 
 	task, err := ctn.NewTask(ctx, cio.NullIO)
 	if err != nil {
 		ctn.Delete(ctx)
-		return crex.Wrapf(ErrContainer, "create task: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not create task")
 	}
 
 	exitCh, err := task.Wait(ctx)
 	if err != nil {
 		task.Delete(ctx)
 		ctn.Delete(ctx)
-		return crex.Wrapf(ErrContainer, "wait task: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not wait for task")
 	}
 
 	if err := task.Start(ctx); err != nil {
 		task.Delete(ctx)
 		ctn.Delete(ctx)
-		return crex.Wrapf(ErrContainer, "start task: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not start task")
 	}
 
 	c.ctr = ctn
@@ -191,7 +190,7 @@ func (c *Container) Exec(ctx context.Context, command string, opts RuntimeOption
 	defer c.mu.Unlock()
 
 	if c.task == nil {
-		return crex.Wrapf(ErrContainer, "container not started")
+		return crex.Newf(ErrContainer, "container not started")
 	}
 
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
@@ -214,14 +213,14 @@ func (c *Container) Copy(ctx context.Context, r io.Reader) error {
 
 	mounts, err := c.conn.SnapshotService(c.snapshotter).Mounts(ctx, c.snapshotID)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, "get snapshot mounts: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not get snapshot mounts")
 	}
 
 	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
 		return err
 	}); err != nil {
-		return crex.Wrapf(ErrContainer, "apply tar: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not apply layer tar")
 	}
 
 	return nil
@@ -253,7 +252,7 @@ func (c *Container) Commit(ctx context.Context, by string) (string, error) {
 
 	mounts, err := c.conn.SnapshotService(c.snapshotter).Mounts(ctx, c.snapshotID)
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, "get snapshot mounts: %w", err)
+		return "", crex.Wrapf(ErrContainer, err, "could not get snapshot mounts")
 	}
 	if !overlayHasChanges(mounts) {
 		if c.config == nil {
@@ -325,37 +324,37 @@ func (c *Container) runExec(ctx context.Context, stdout, stderr io.Writer, comma
 
 	creator, err := eio.creator()
 	if err != nil {
-		return crex.Wrapf(ErrContainer, "create log IO: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not create log IO")
 	}
 
 	spec, err := c.ctr.Spec(ctx)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, "get spec: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not get container spec")
 	}
 
 	process, err := c.task.Exec(ctx, execID, buildExecProcess(spec, command, opts), creator)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, "exec: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not create exec process")
 	}
 
 	exitCh, err := process.Wait(ctx)
 	if err != nil {
 		process.Delete(ctx)
-		return crex.Wrapf(ErrContainer, "exec wait: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not wait for exec process")
 	}
 
 	if err := process.Start(ctx); err != nil {
 		process.Delete(ctx)
-		return crex.Wrapf(ErrContainer, "exec start: %w", err)
+		return crex.Wrapf(ErrContainer, err, "could not start exec process")
 	}
 
 	var execErr error
 	select {
 	case status := <-exitCh:
 		if err := status.Error(); err != nil {
-			execErr = crex.Wrapf(ErrContainer, "exec: %w", err)
+			execErr = crex.Wrapf(ErrContainer, err, "exec process failed")
 		} else if code := status.ExitCode(); code != 0 {
-			execErr = crex.Wrapf(ErrContainer, "command exited with code %d", code)
+			execErr = crex.Newf(ErrContainer, "command exited with code %d", code)
 		}
 	case <-ctx.Done():
 		process.Kill(ctx, syscall.SIGTERM)
@@ -414,13 +413,13 @@ func parseUserSpec(user string) (uid uint32, gid *uint32, err error) {
 	parts := strings.SplitN(user, ":", 2)
 	uid, err = parseID(parts[0])
 	if err != nil {
-		return 0, nil, crex.Wrapf(ErrContainer, "invalid uid %q: %w", user, err)
+		return 0, nil, crex.Wrapf(ErrContainer, err, "invalid uid %q", user)
 	}
 
 	if len(parts) == 2 {
 		g, err := parseID(parts[1])
 		if err != nil {
-			return 0, nil, crex.Wrapf(ErrContainer, "invalid gid %q: %w", user, err)
+			return 0, nil, crex.Wrapf(ErrContainer, err, "invalid gid %q", user)
 		}
 		gid = &g
 	}
@@ -437,7 +436,7 @@ func parseID(s string) (uint32, error) {
 		return 0, err
 	}
 	if v > runcMaxID {
-		return 0, errors.New("exceeds runc maximum")
+		return 0, crex.New("exceeds runc maximum")
 	}
 	return uint32(v), nil
 }

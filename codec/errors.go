@@ -1,12 +1,12 @@
 package codec
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrUnsupportedFormat = errors.New("unsupported codec format")
-	ErrNotValidatable    = errors.New("type does not implement Validatable")
-	ErrInvalidInput      = errors.New("invalid input: must be a pointer to a struct")
-	ErrMissingField      = errors.New("field not found on struct")
-	ErrSetDefault        = errors.New("failed to set default value")
-	ErrUnsupportedType   = errors.New("unsupported field type")
+	ErrUnsupportedFormat = crex.New("unsupported codec format")
+	ErrNotValidatable    = crex.New("type does not implement Validatable")
+	ErrInvalidInput      = crex.New("invalid input: must be a pointer to a struct")
+	ErrMissingField      = crex.New("field not found on struct")
+	ErrSetDefault        = crex.New("failed to set default value")
+	ErrUnsupportedType   = crex.New("unsupported field type")
 )

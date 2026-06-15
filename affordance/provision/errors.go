@@ -1,7 +1,7 @@
 package provision
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant = errors.New("invalid provision grant")
+	ErrInvalidGrant = crex.New("invalid provision grant")
 )

@@ -1,5 +1,5 @@
 package device
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrInvalidGrant = errors.New("invalid device grant")
+var ErrInvalidGrant = crex.New("invalid device grant")

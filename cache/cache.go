@@ -428,13 +428,13 @@ func safeJoin(base string, components ...string) (string, error) {
 // Rejects empty strings, ".", "..", and strings containing path separators.
 func validatePathComponent(s string) error {
 	if s == "" {
-		return crex.Wrapf(ErrInvalidPath, "empty path component")
+		return crex.Newf(ErrInvalidPath, "empty path component")
 	}
 	if s == "." || s == ".." {
-		return crex.Wrapf(ErrInvalidPath, "%q", s)
+		return crex.Newf(ErrInvalidPath, "%q is reserved", s)
 	}
 	if strings.ContainsAny(s, "/\\") {
-		return crex.Wrapf(ErrInvalidPath, "%q contains separator", s)
+		return crex.Newf(ErrInvalidPath, "%q contains separator", s)
 	}
 	return nil
 }

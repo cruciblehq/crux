@@ -15,20 +15,20 @@ import (
 // the host operating system. Wraps ErrInvalidPath on failure.
 func ValidateAbsPath(p string) (string, error) {
 	if p == "" {
-		return "", crex.Wrapf(ErrInvalidPath, "path is empty")
+		return "", crex.Newf(ErrInvalidPath, "path is empty")
 	}
 	if strings.Contains(p, "\x00") {
-		return "", crex.Wrapf(ErrInvalidPath, "path %q contains NUL", p)
+		return "", crex.Newf(ErrInvalidPath, "path %q contains NUL", p)
 	}
 	if !path.IsAbs(p) {
-		return "", crex.Wrapf(ErrInvalidPath, "path %q must be absolute", p)
+		return "", crex.Newf(ErrInvalidPath, "path %q must be absolute", p)
 	}
 	if strings.HasSuffix(p, "/") {
-		return "", crex.Wrapf(ErrInvalidPath, "path %q must not have a trailing slash", p)
+		return "", crex.Newf(ErrInvalidPath, "path %q must not have a trailing slash", p)
 	}
 	clean := path.Clean(p)
 	if p != clean {
-		return "", crex.Wrapf(ErrInvalidPath, "path %q must be clean", p)
+		return "", crex.Newf(ErrInvalidPath, "path %q must be clean", p)
 	}
 	return clean, nil
 }

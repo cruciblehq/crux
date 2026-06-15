@@ -18,7 +18,7 @@ type Mount struct {
 // Destination must be a non-empty absolute path.
 func (m *Mount) Validate() error {
 	if m.Destination == "" {
-		return crex.Wrapf(ErrInvalidMount, "destination is empty")
+		return crex.Newf(ErrInvalidMount, "destination is empty")
 	}
 	return nil
 }

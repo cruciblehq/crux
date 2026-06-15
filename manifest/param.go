@@ -35,14 +35,14 @@ func (p *Param) Validate() error {
 		return crex.Wrap(ErrInvalidParam, ErrMissingParamName)
 	}
 	if !isValidName(p.Name) {
-		return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, ErrInvalidParamName)
+		return crex.Tag(crex.Newf(ErrInvalidParam, "param %q has an invalid name", p.Name), ErrInvalidParamName)
 	}
 	if p.Default != nil {
 		switch p.Default.(type) {
 		case string, int, float64, bool:
 			// valid scalar types
 		default:
-			return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, ErrInvalidParamDefault)
+			return crex.Tag(crex.Newf(ErrInvalidParam, "param %q has an invalid default", p.Name), ErrInvalidParamDefault)
 		}
 	}
 	return nil

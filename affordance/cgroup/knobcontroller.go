@@ -40,7 +40,7 @@ func parseController(value string) (controller, error) {
 		controllerDevMem:
 		return controller(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid cgroup controller %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid cgroup controller %q", value)
 	}
 }
 
@@ -53,20 +53,20 @@ func parseController(value string) (controller, error) {
 func parseSubtreeControl(value string) ([]controller, error) {
 	tokens := strings.Fields(value)
 	if len(tokens) == 0 {
-		return nil, crex.Wrapf(ErrInvalidGrant, "at least one controller required for %q", subtreeControlKnob)
+		return nil, crex.Newf(ErrInvalidGrant, "at least one controller required for %q", subtreeControlKnob)
 	}
 	controllers := make([]controller, 0, len(tokens))
 	seen := make(map[controller]struct{}, len(tokens))
 	for _, token := range tokens {
 		if strings.HasPrefix(token, "+") || strings.HasPrefix(token, "-") {
-			return nil, crex.Wrapf(ErrInvalidGrant, "%q controller names must not include +/- prefix as in %q", subtreeControlKnob, token)
+			return nil, crex.Newf(ErrInvalidGrant, "%q controller names must not include +/- prefix as in %q", subtreeControlKnob, token)
 		}
 		c, err := parseController(token)
 		if err != nil {
 			return nil, err
 		}
 		if _, ok := seen[c]; ok {
-			return nil, crex.Wrapf(ErrInvalidGrant, "duplicate controller %q for %q", token, subtreeControlKnob)
+			return nil, crex.Newf(ErrInvalidGrant, "duplicate controller %q for %q", token, subtreeControlKnob)
 		}
 		seen[c] = struct{}{}
 		controllers = append(controllers, c)

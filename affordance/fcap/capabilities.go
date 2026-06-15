@@ -44,10 +44,10 @@ func (c *Capabilities) GrantInheritable(caps []string) bool {
 // If Effective is true, Permitted must also be non-empty.
 func (c *Capabilities) Validate() error {
 	if len(c.Permitted) == 0 && len(c.Inheritable) == 0 {
-		return crex.Wrapf(ErrInvalidCapabilities, "at least one of permitted or inheritable must be non-empty")
+		return crex.Newf(ErrInvalidCapabilities, "at least one of permitted or inheritable must be non-empty")
 	}
 	if c.Effective && len(c.Permitted) == 0 {
-		return crex.Wrapf(ErrInvalidCapabilities, "effective requires non-empty permitted")
+		return crex.Newf(ErrInvalidCapabilities, "effective requires non-empty permitted")
 	}
 	return nil
 }

@@ -40,7 +40,7 @@ func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdi
 	case manifest.TypeBlueprint:
 		return buildBlueprint(ctx, &m, src, env, output)
 	default:
-		return nil, crex.Wrapf(ErrUnsupportedType, "resource type %q is not supported", m.Resource.Type)
+		return nil, crex.Newf(ErrUnsupportedType, "resource type %q is not supported", m.Resource.Type)
 	}
 }
 

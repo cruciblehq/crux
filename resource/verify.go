@@ -28,7 +28,7 @@ func Verify(buildDir string, t manifest.ResourceType) error {
 	case manifest.TypeBlueprint:
 		return verify(buildDir, t, files.PlanFile)
 	default:
-		return crex.Wrapf(ErrUnsupportedType, "resource type %q is not supported", t)
+		return crex.Newf(ErrUnsupportedType, "resource type %q is not supported", t)
 	}
 }
 
@@ -71,7 +71,7 @@ func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.
 	}
 
 	if m.Resource.Type != expected {
-		return nil, crex.Wrapf(ErrResourceTypeMismatch, "expected %s but got %s", expected, m.Resource.Type)
+		return nil, crex.Newf(ErrResourceTypeMismatch, "expected %s but got %s", expected, m.Resource.Type)
 	}
 
 	return m, nil

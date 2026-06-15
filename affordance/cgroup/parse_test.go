@@ -3,6 +3,8 @@ package cgroup
 import (
 	"errors"
 	"testing"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 func TestParseMajorMinorBare(t *testing.T) {
@@ -91,7 +93,7 @@ func TestParseArgsRejectsMalformed(t *testing.T) {
 }
 
 func TestParseArgsHandlerErrorPropagated(t *testing.T) {
-	sentinel := errors.New("handler boom")
+	sentinel := crex.New("handler boom")
 	err := parseArgs("k=v", map[string]func(string) error{"k": func(string) error { return sentinel }})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("err = %v, want sentinel", err)

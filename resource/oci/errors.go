@@ -1,5 +1,5 @@
 package oci
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrFileSystemOperation = errors.New("file system operation failed")
+var ErrFileSystemOperation = crex.New("file system operation failed")

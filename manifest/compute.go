@@ -50,7 +50,7 @@ func (c *Compute) Validate() error {
 	}
 	v, ok := c.Config.(codec.Validatable)
 	if !ok {
-		return crex.Wrapf(ErrInvalidComputeType, "config type %T is not validatable", c.Config)
+		return crex.Newf(ErrInvalidComputeType, "config type %T is not validatable", c.Config)
 	}
 	if err := v.Validate(); err != nil {
 		return err
@@ -71,7 +71,7 @@ func (c *Compute) Validate() error {
 func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrDecodeFailed, "compute: unexpected type %T", raw)
+		return crex.Newf(ErrDecodeFailed, "unexpected compute type %T", raw)
 	}
 	if err := cd.Field(src, c, "Type"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)
@@ -83,7 +83,7 @@ func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 	case "local":
 		target = &ComputeLocal{}
 	default:
-		return crex.Wrapf(ErrInvalidComputeType, "unknown provider %q", c.Type)
+		return crex.Newf(ErrInvalidComputeType, "unknown provider %q", c.Type)
 	}
 	if err := cd.Decode(src, target); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)

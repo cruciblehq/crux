@@ -64,7 +64,7 @@ func (g *Grant) RefTarget() string {
 // specific subsystem happen later, during the build stage.
 func (g *Grant) Validate() error {
 	if g.Source == "" {
-		return crex.Wrapf(ErrInvalidGrant, "empty grant")
+		return crex.Newf(ErrInvalidGrant, "empty grant")
 	}
 	if g.IsRef() {
 		if err := g.Args.Validate(); err != nil {
@@ -106,7 +106,7 @@ func (g *Grant) Decode(raw any) error {
 	case map[string]any:
 		return g.decodeMap(v)
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "unsupported grant type %T", raw)
+		return crex.Newf(ErrInvalidGrant, "unsupported grant type %T", raw)
 	}
 }
 
@@ -123,7 +123,7 @@ func (g *Grant) decodeMap(m map[string]any) error {
 	g.Source = source
 	if !g.IsRef() {
 		if val != nil {
-			return crex.Wrapf(ErrInvalidGrant, "domain grant %q does not accept args", source)
+			return crex.Newf(ErrInvalidGrant, "domain grant %q does not accept args", source)
 		}
 		return nil
 	}
@@ -134,7 +134,7 @@ func (g *Grant) decodeMap(m map[string]any) error {
 // its value.
 func onlyKeyInGrantMap(m map[string]any) (string, any, error) {
 	if len(m) != 1 {
-		return "", nil, crex.Wrapf(ErrInvalidGrant, "grant must name exactly one source")
+		return "", nil, crex.Newf(ErrInvalidGrant, "grant must name exactly one source")
 	}
 
 	var source string
@@ -158,13 +158,13 @@ func (g *Grant) decodeRefArgs(source string, val any) error {
 		for k, av := range v {
 			s, ok := av.(string)
 			if !ok {
-				return crex.Wrapf(ErrInvalidGrant, "arg %q of ref grant %q must be a string", k, source)
+				return crex.Newf(ErrInvalidGrant, "arg %q of ref grant %q must be a string", k, source)
 			}
 			args[k] = s
 		}
 		g.Args = args
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "unsupported arg type %T for grant %q", val, source)
+		return crex.Newf(ErrInvalidGrant, "unsupported arg type %T for grant %q", val, source)
 	}
 	return nil
 }

@@ -24,7 +24,7 @@ var reMajorMinor = regexp.MustCompile(`^(\d+)\s+(\d+)(?:\s+(.+))?$`)
 func parseMajorMinor(value string) (uint32, uint32, string, error) {
 	m := reMajorMinor.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return 0, 0, "", crex.Wrapf(ErrInvalidGrant, "expected major minor positional operands")
+		return 0, 0, "", crex.Newf(ErrInvalidGrant, "expected major minor positional operands")
 	}
 	maj, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
@@ -50,15 +50,15 @@ func parseArgs(value string, fields map[string]func(string) error) error {
 	for _, tok := range tokens {
 		key, val, ok := strings.Cut(tok, "=")
 		if !ok || key == "" || val == "" {
-			return crex.Wrapf(ErrInvalidGrant, "invalid optional arg %q, expected key=value", tok)
+			return crex.Newf(ErrInvalidGrant, "invalid optional arg %q, expected key=value", tok)
 		}
 		if _, ok := seen[key]; ok {
-			return crex.Wrapf(ErrInvalidGrant, "duplicate key %q", key)
+			return crex.Newf(ErrInvalidGrant, "duplicate key %q", key)
 		}
 		seen[key] = struct{}{}
 		parseCallback, ok := fields[key]
 		if !ok {
-			return crex.Wrapf(ErrInvalidGrant, "unknown key %q", key)
+			return crex.Newf(ErrInvalidGrant, "unknown key %q", key)
 		}
 		if err := parseCallback(val); err != nil {
 			return err
@@ -127,7 +127,7 @@ func parseBool(dst *bool, s string) error {
 	case "false", "0":
 		*dst = false
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "invalid boolean %q", s)
+		return crex.Newf(ErrInvalidGrant, "invalid boolean %q", s)
 	}
 	return nil
 }

@@ -59,7 +59,7 @@ func applyStruct(s *spec, t reflect.Type, v reflect.Value, remaining string, ful
 			return err
 		}
 	}
-	return crex.Wrapf(ErrUnknownKnob, "unknown cgroup knob %q", fullPath)
+	return crex.Newf(ErrUnknownKnob, "unknown cgroup knob %q", fullPath)
 }
 
 // Tries to apply value via a single struct field.
@@ -215,7 +215,7 @@ func applyListField(s *spec, fv reflect.Value, knob string, value string) error 
 			return s.mergePSITriggers(knob, []psiTrigger{t})
 		}, value)
 	}
-	return crex.Wrapf(ErrInvalidGrant, "unsupported list field type %s", elemType)
+	return crex.Newf(ErrInvalidGrant, "unsupported list field type %s", elemType)
 }
 
 // Parses one list entry and folds it into dst.
@@ -318,9 +318,9 @@ func parseKindScalar(t reflect.Type, value string) (reflect.Value, error) {
 			}
 			return reflect.ValueOf(v), nil
 		}
-		return reflect.Value{}, crex.Wrapf(ErrInvalidGrant, "unsupported slice type %s", t)
+		return reflect.Value{}, crex.Newf(ErrInvalidGrant, "unsupported slice type %s", t)
 	default:
-		return reflect.Value{}, crex.Wrapf(ErrInvalidGrant, "unsupported field type %s", t)
+		return reflect.Value{}, crex.Newf(ErrInvalidGrant, "unsupported field type %s", t)
 	}
 	return zero, nil
 }
@@ -330,7 +330,7 @@ func parseKindScalar(t reflect.Type, value string) (reflect.Value, error) {
 // Any second declaration of the same knob is a conflict, regardless of value.
 func (s *spec) declare(knob string) error {
 	if s.seen[knob] {
-		return crex.Wrapf(ErrConflict, "%q already declared", knob)
+		return crex.Newf(ErrConflict, "%q already declared", knob)
 	}
 	s.seen[knob] = true
 	return nil

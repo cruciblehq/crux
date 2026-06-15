@@ -54,16 +54,16 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the grant's structural shape against what the seccomp subsystem accepts.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in seccomp expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in seccomp expression")
 	}
 	if len(g.Kwargs) != 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in seccomp expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in seccomp expression")
 	}
 	if len(g.Args) == 0 {
-		return crex.Wrapf(ErrInvalidGrant, "missing syscall name in seccomp expression")
+		return crex.Newf(ErrInvalidGrant, "missing syscall name in seccomp expression")
 	}
 	if len(g.Args) > 2 {
-		return crex.Wrapf(ErrInvalidGrant, "too many arguments in seccomp expression")
+		return crex.Newf(ErrInvalidGrant, "too many arguments in seccomp expression")
 	}
 	return nil
 }
@@ -79,12 +79,12 @@ func parse(g *agl.Model) ([]specs.LinuxSyscall, error) {
 	knob := make([]string, 0, len(g.Args))
 	for _, a := range g.Args {
 		if a.Type != agl.ArgName {
-			return nil, crex.Wrapf(ErrInvalidGrant, "expected name as argument in seccomp expression")
+			return nil, crex.Newf(ErrInvalidGrant, "expected name as argument in seccomp expression")
 		}
 		knob = append(knob, a.Value)
 	}
 	if _, ok := syscalls[knob[0]]; !ok {
-		return nil, crex.Wrapf(ErrUnknownSyscall, "syscall %q is not part of the x86_64 kernel ABI", knob[0])
+		return nil, crex.Newf(ErrUnknownSyscall, "syscall %q is not part of the x86_64 kernel ABI", knob[0])
 	}
 	switch knob[0] {
 	case sysIoctl:
@@ -95,7 +95,7 @@ func parse(g *agl.Model) ([]specs.LinuxSyscall, error) {
 		return expandSub(sysPrctl, 0, knob[1:], prctlSubs)
 	default:
 		if len(knob) > 1 {
-			return nil, crex.Wrapf(ErrInvalidGrant, "unexpected sub-filter on syscall %q in seccomp expression", knob[0])
+			return nil, crex.Newf(ErrInvalidGrant, "unexpected sub-filter on syscall %q in seccomp expression", knob[0])
 		}
 		return []specs.LinuxSyscall{unconditionalAllow(knob[0])}, nil
 	}
@@ -112,7 +112,7 @@ func expandSub(syscall string, argIndex uint, sub []string, subs map[string][]ui
 	}
 	vals, ok := subs[sub[0]]
 	if !ok {
-		return nil, crex.Wrapf(ErrInvalidGrant, "unknown %s sub-filter %q in seccomp expression", syscall, sub[0])
+		return nil, crex.Newf(ErrInvalidGrant, "unknown %s sub-filter %q in seccomp expression", syscall, sub[0])
 	}
 	out := make([]specs.LinuxSyscall, 0, len(vals))
 	for _, v := range vals {

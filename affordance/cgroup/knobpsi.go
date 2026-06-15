@@ -38,7 +38,7 @@ func parsePSIType(value string) (psiType, error) {
 	case psiTypeSome, psiTypeFull:
 		return psiType(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid PSI stall type %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid PSI stall type %q", value)
 	}
 }
 
@@ -78,5 +78,5 @@ func (s *spec) mergePSITriggers(knob string, triggers []psiTrigger) (bool, error
 	case psiIOKnob:
 		return false, mergePSI(&s.PSI.IO, triggers, knob)
 	}
-	return false, crex.Wrapf(ErrUnknownKnob, "unknown PSI knob %q", knob)
+	return false, crex.Newf(ErrUnknownKnob, "unknown PSI knob %q", knob)
 }

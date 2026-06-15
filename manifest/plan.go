@@ -67,7 +67,7 @@ func (p *Plan) Validate() error {
 
 	for id, c := range p.Containers {
 		if err := c.Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidPlan, "container %q: %w", id, err)
+			return crex.Wrapf(ErrInvalidPlan, err, "container %q", id)
 		}
 	}
 
@@ -91,20 +91,20 @@ func (p *Plan) validateDeployment(d *Deployment) error {
 		return crex.Wrap(ErrInvalidPlan, err)
 	}
 	if _, ok := p.Services[d.Service]; !ok {
-		return crex.Wrap(ErrInvalidPlan, crex.Wrapf(ErrUnresolvedDeploymentService, "%q", d.Service))
+		return crex.Newf(ErrInvalidPlan, "deployment references undefined service %q", d.Service)
 	}
 	if _, ok := p.Containers[d.Container]; !ok {
-		return crex.Wrap(ErrInvalidPlan, crex.Wrapf(ErrUnresolvedDeploymentContainer, "%q", d.Container))
+		return crex.Newf(ErrInvalidPlan, "deployment references undefined container %q", d.Container)
 	}
 	if _, ok := p.Infrastructure.Computes[d.Compute]; !ok {
-		return crex.Wrap(ErrInvalidPlan, crex.Wrapf(ErrUnresolvedDeploymentCompute, "%q", d.Compute))
+		return crex.Newf(ErrInvalidPlan, "deployment references undefined compute %q", d.Compute)
 	}
 	if _, ok := p.Infrastructure.Networks[d.Network]; !ok {
-		return crex.Wrap(ErrInvalidPlan, crex.Wrapf(ErrUnresolvedDeploymentNetwork, "%q", d.Network))
+		return crex.Newf(ErrInvalidPlan, "deployment references undefined network %q", d.Network)
 	}
 	if d.Environment != "" {
 		if _, ok := p.Environments[d.Environment]; !ok {
-			return crex.Wrap(ErrInvalidPlan, crex.Wrapf(ErrUnresolvedDeploymentEnvironment, "%q", d.Environment))
+			return crex.Newf(ErrInvalidPlan, "deployment references undefined environment %q", d.Environment)
 		}
 	}
 	return nil

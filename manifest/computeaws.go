@@ -48,6 +48,6 @@ func (c *ComputeAWS) Validate() error {
 	case "", "default", "dedicated", "host":
 		return nil
 	default:
-		return crex.Wrapf(ErrInvalidTenancy, "unknown tenancy %q", c.Tenancy)
+		return crex.Newf(ErrInvalidTenancy, "unknown tenancy %q", c.Tenancy)
 	}
 }

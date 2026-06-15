@@ -215,13 +215,13 @@ func (s *Subsystem) flushUnified(knob string) {
 // knob and no kwargs). Per-knob value validation runs later in the dispatcher.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in cgroup expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in cgroup expression")
 	}
 	if len(g.Args) == 0 {
-		return crex.Wrapf(ErrInvalidGrant, "missing knob name in cgroup expression")
+		return crex.Newf(ErrInvalidGrant, "missing knob name in cgroup expression")
 	}
 	if len(g.Args) < 2 && len(g.Kwargs) == 0 {
-		return crex.Wrapf(ErrInvalidGrant, "missing value for knob in cgroup expression")
+		return crex.Newf(ErrInvalidGrant, "missing value for knob in cgroup expression")
 	}
 	return nil
 }
@@ -234,7 +234,7 @@ func check(g *agl.Model) error {
 func parseGrant(g *agl.Model) (string, string, error) {
 	knobArg := g.Args[0]
 	if knobArg.Type != agl.ArgName {
-		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as knob in cgroup expression")
+		return "", "", crex.Newf(ErrInvalidGrant, "expected name as knob in cgroup expression")
 	}
 	return knobArg.Value, buildValue(g.Args[1:], g.Kwargs), nil
 }

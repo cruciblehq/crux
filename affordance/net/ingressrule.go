@@ -29,16 +29,16 @@ type IngressRule struct {
 // zero port; all other protocols must leave the port as zero.
 func (r *IngressRule) Validate() error {
 	if !IsValidProtocol(r.Protocol) {
-		return crex.Wrapf(ErrInvalidIngressRule, "unknown protocol %q", r.Protocol)
+		return crex.Newf(ErrInvalidIngressRule, "unknown protocol %q", r.Protocol)
 	}
 	if isPortBased(r.Protocol) {
 		if r.Port == 0 {
-			return crex.Wrapf(ErrInvalidIngressRule, "port must be non-zero for protocol %q", r.Protocol)
+			return crex.Newf(ErrInvalidIngressRule, "port must be non-zero for protocol %q", r.Protocol)
 		}
 		return nil
 	}
 	if r.Port != 0 {
-		return crex.Wrapf(ErrInvalidIngressRule, "protocol %q does not take a port", r.Protocol)
+		return crex.Newf(ErrInvalidIngressRule, "protocol %q does not take a port", r.Protocol)
 	}
 	return nil
 }

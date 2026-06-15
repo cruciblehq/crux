@@ -122,7 +122,7 @@ func (b *Builder) runStep(ctx context.Context, ctr *compute.Container, step *man
 func (b *Builder) copyStep(ctx context.Context, ctr *compute.Container, step *manifest.Step, state *stageState, stageImages map[string]string) error {
 	src, dest, ok := strings.Cut(step.Copy, " ")
 	if !ok {
-		return crex.Wrapf(ErrBuild, "malformed copy step %q: expected \"src dest\"", step.Copy)
+		return crex.Newf(ErrBuild, "malformed copy step %q, expected \"src dest\"", step.Copy)
 	}
 
 	workdir := state.workdir
@@ -156,13 +156,13 @@ func (b *Builder) copyStep(ctx context.Context, ctr *compute.Container, step *ma
 func (b *Builder) crossStageCopy(ctx context.Context, ctr *compute.Container, stageName, srcPath, destPath string, stageImages map[string]string) error {
 	stageRef, ok := stageImages[stageName]
 	if !ok {
-		return crex.Wrapf(ErrBuild, "unknown stage %q in cross-stage copy", stageName)
+		return crex.Newf(ErrBuild, "unknown stage %q in cross-stage copy", stageName)
 	}
 
 	if !path.IsAbs(srcPath) {
 		cfg, err := b.client.Inspect(ctx, stageRef)
 		if err != nil {
-			return crex.Wrapf(ErrBuild, "get config of stage %q: %w", stageName, err)
+			return crex.Wrapf(ErrBuild, err, "get config of stage %q", stageName)
 		}
 		workdir := cfg.WorkingDir
 		if workdir == "" {
@@ -173,7 +173,7 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr *compute.Container, st
 
 	rc, err := b.client.Extract(ctx, stageRef, srcPath)
 	if err != nil {
-		return crex.Wrapf(ErrBuild, "extract %q from stage %q: %w", srcPath, stageName, err)
+		return crex.Wrapf(ErrBuild, err, "extract %q from stage %q", srcPath, stageName)
 	}
 
 	pr, pw := io.Pipe()
@@ -200,7 +200,7 @@ func (b *Builder) applyModifierStep(ctx context.Context, ctr *compute.Container,
 
 	cfg, err := ctr.Inspect(ctx)
 	if err != nil {
-		return crex.Wrapf(ErrBuild, "read config: %w", err)
+		return crex.Wrapf(ErrBuild, err, "read config")
 	}
 	if step.Workdir != "" {
 		cfg.WorkingDir = step.Workdir

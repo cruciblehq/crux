@@ -1,9 +1,9 @@
 package affordance
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrResolution       = errors.New("affordance resolution failed")
-	ErrUnknownSubsystem = errors.New("unknown subsystem")
-	ErrConflict         = errors.New("duplicate grant")
+	ErrResolution       = crex.New("affordance resolution failed")
+	ErrUnknownSubsystem = crex.New("unknown subsystem")
+	ErrConflict         = crex.New("duplicate grant")
 )

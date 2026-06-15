@@ -51,18 +51,18 @@ type EgressRule struct {
 // of the form "*.domain".
 func (r *EgressRule) Validate() error {
 	if !IsValidProtocol(r.Protocol) {
-		return crex.Wrapf(ErrInvalidEgressRule, "unknown protocol %q", r.Protocol)
+		return crex.Newf(ErrInvalidEgressRule, "unknown protocol %q", r.Protocol)
 	}
 	if !isPortBased(r.Protocol) && r.Port != 0 {
-		return crex.Wrapf(ErrInvalidEgressRule, "protocol %q does not take a port", r.Protocol)
+		return crex.Newf(ErrInvalidEgressRule, "protocol %q does not take a port", r.Protocol)
 	}
 	if r.Destination == "" {
-		return crex.Wrapf(ErrInvalidEgressRule, "destination is empty")
+		return crex.Newf(ErrInvalidEgressRule, "destination is empty")
 	}
 	if r.Destination != "*" && strings.Contains(r.Destination, "*") {
 		suffix, ok := strings.CutPrefix(r.Destination, "*.")
 		if !ok || suffix == "" || strings.Contains(suffix, "*") {
-			return crex.Wrapf(ErrInvalidEgressRule, "wildcard destination %q must be \"*\" or of the form \"*.domain\"", r.Destination)
+			return crex.Newf(ErrInvalidEgressRule, "wildcard destination %q must be %q or of the form %q", r.Destination, "*", "*.domain")
 		}
 	}
 	return nil

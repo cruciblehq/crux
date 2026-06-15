@@ -90,10 +90,10 @@ func (s *Step) Validate() error {
 
 	for i := range s.Steps {
 		if s.Steps[i].Platform != "" {
-			return crex.Wrapf(ErrInvalidStep, "step %d: %w", i+1, ErrNestedPlatformGroup)
+			return crex.At(crex.Tag(crex.Newf(ErrInvalidStep, "nested platform group not allowed"), ErrNestedPlatformGroup), "step", i+1)
 		}
 		if err := s.Steps[i].Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidStep, "step %d: %w", i+1, err)
+			return crex.At(err, "step", i+1)
 		}
 	}
 

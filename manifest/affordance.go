@@ -42,7 +42,7 @@ func (a *Affordance) Validate() error {
 
 	for i := range a.Scopes {
 		if err := a.Scopes[i].Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidAffordance, "grant %d: %w", i+1, err)
+			return crex.At(crex.Wrap(ErrInvalidAffordance, err), "grant scope", i+1)
 		}
 	}
 
@@ -107,7 +107,7 @@ func encodeScopes(scopes []GrantScope) ([]any, error) {
 func (a *Affordance) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidAffordance, "unexpected type %T", raw)
+		return crex.Newf(ErrInvalidAffordance, "unexpected type %T", raw)
 	}
 
 	if err := c.Field(src, a, "Schema"); err != nil {

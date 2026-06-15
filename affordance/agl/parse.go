@@ -46,7 +46,7 @@ func Parse(src string) (*Model, error) {
 func (p *parser) parseGrant() (*Model, error) {
 	subsysTok, err := p.expect(TokenSubsystem)
 	if err != nil {
-		return nil, crex.Wrapf(ErrParse, "expected %q at the start of a grant", ".subsystem")
+		return nil, crex.Newf(ErrParse, "expected %q at the start of a grant", ".subsystem")
 	}
 
 	args, err := p.parsePositionalList()
@@ -75,7 +75,7 @@ func (p *parser) parseGrant() (*Model, error) {
 	}
 
 	if p.peek().Type != TokenEOF {
-		return nil, crex.Wrapf(ErrParse, "unexpected %q after grant", p.peek().Type)
+		return nil, crex.Newf(ErrParse, "unexpected %q after grant", p.peek().Type)
 	}
 
 	return grant, nil
@@ -98,7 +98,7 @@ func (p *parser) parsePositionalList() ([]Arg, error) {
 		args = append(args, arg)
 	}
 	if len(args) == 0 {
-		return nil, crex.Wrapf(ErrParse, "expected a positional argument after subsystem, found %q instead", p.peek().Type)
+		return nil, crex.Newf(ErrParse, "expected a positional argument after subsystem, found %q instead", p.peek().Type)
 	}
 	return args, nil
 }
@@ -115,7 +115,7 @@ func (p *parser) parsePositional() (Arg, error) {
 		p.advance()
 		return tokenToArg(tok)
 	default:
-		return Arg{}, crex.Wrapf(ErrParse, "expected argument, found %q instead", tok.Type)
+		return Arg{}, crex.Newf(ErrParse, "expected argument, found %q instead", tok.Type)
 	}
 }
 
@@ -144,11 +144,11 @@ func (p *parser) parseKwargList() ([]Kwarg, error) {
 func (p *parser) parseKwarg() (Kwarg, error) {
 	keyTok := p.peek()
 	if keyTok.Type != TokenName {
-		return Kwarg{}, crex.Wrapf(ErrParse, "kwarg key must be a name, found %q instead", keyTok.Type)
+		return Kwarg{}, crex.Newf(ErrParse, "kwarg key must be a name, found %q instead", keyTok.Type)
 	}
 	p.advance()
 	if _, err := p.expect(TokenEq); err != nil {
-		return Kwarg{}, crex.Wrapf(ErrParse, "expected %q after kwarg name %q", "=", keyTok.Text)
+		return Kwarg{}, crex.Newf(ErrParse, "expected %q after kwarg name %q", "=", keyTok.Text)
 	}
 	val, err := p.parsePositional()
 	if err != nil {
@@ -271,7 +271,7 @@ func (p *parser) parsePredicate() (Expr, error) {
 	case TokenAmpersand:
 		return p.parseBitTest(field)
 	default:
-		return nil, crex.Wrapf(ErrParse, "expected operator after %s, found %q instead", field, p.peek().Type)
+		return nil, crex.Newf(ErrParse, "expected operator after %s, found %q instead", field, p.peek().Type)
 	}
 }
 
@@ -286,7 +286,7 @@ func (p *parser) parseCompare(field Operand) (Expr, error) {
 	op := p.advance()
 	cmpOp, err := tokenToCmpOp(op.Type)
 	if err != nil {
-		return nil, crex.Wrapf(ErrParse, "unexpected comparison operator %q", op.Type)
+		return nil, crex.Newf(ErrParse, "unexpected comparison operator %q", op.Type)
 	}
 	right, err := p.parseOperand()
 	if err != nil {
@@ -304,7 +304,7 @@ func (p *parser) parseIn(field Operand) (Expr, error) {
 		return nil, err
 	}
 	if _, err := p.expect(TokenLParen); err != nil {
-		return nil, crex.Wrapf(ErrParse, "expected %q after %q", "(", "in")
+		return nil, crex.Newf(ErrParse, "expected %q after %q", "(", "in")
 	}
 	var values []Operand
 	for {
@@ -319,7 +319,7 @@ func (p *parser) parseIn(field Operand) (Expr, error) {
 		p.advance()
 	}
 	if _, err := p.expect(TokenRParen); err != nil {
-		return nil, crex.Wrapf(ErrParse, "expected %q after %q list", ")", "in")
+		return nil, crex.Newf(ErrParse, "expected %q after %q list", ")", "in")
 	}
 	return &InExpr{Field: field, Values: values}, nil
 }
@@ -333,14 +333,14 @@ func (p *parser) parseLikePattern(field Operand, negated bool) (Expr, error) {
 	patTok := p.peek()
 	if patTok.Type != TokenString {
 		if negated {
-			return nil, crex.Wrapf(ErrParse, "expected pattern after %q", "not like")
+			return nil, crex.Newf(ErrParse, "expected pattern after %q", "not like")
 		}
-		return nil, crex.Wrapf(ErrParse, "expected pattern after %q", "like")
+		return nil, crex.Newf(ErrParse, "expected pattern after %q", "like")
 	}
 	p.advance()
 	pat, err := patTok.Unquote()
 	if err != nil {
-		return nil, crex.Wrapf(ErrParse, "invalid pattern: %w", err)
+		return nil, crex.Wrapf(ErrParse, err, "invalid pattern")
 	}
 	return &LikeExpr{Field: field, Pattern: pat, Negated: negated}, nil
 }
@@ -352,7 +352,7 @@ func (p *parser) parseLikePattern(field Operand, negated bool) (Expr, error) {
 // operator is not present or if the pattern is not a string literal.
 func (p *parser) parseNotLike(field Operand) (Expr, error) {
 	if p.peekN(1).Type != TokenLike {
-		return nil, crex.Wrapf(ErrParse, "expected %q after %q in predicate", "like", "not")
+		return nil, crex.Newf(ErrParse, "expected %q after %q in predicate", "like", "not")
 	}
 	if _, err := p.expect(TokenNot); err != nil {
 		return nil, err
@@ -377,7 +377,7 @@ func (p *parser) parseBetween(field Operand) (Expr, error) {
 		return nil, err
 	}
 	if _, err := p.expect(TokenAnd); err != nil {
-		return nil, crex.Wrapf(ErrParse, "expected %q in between expression", "and")
+		return nil, crex.Newf(ErrParse, "expected %q in between expression", "and")
 	}
 	high, err := p.parseOperand()
 	if err != nil {
@@ -425,20 +425,20 @@ func (p *parser) parseOperand() (Operand, error) {
 		p.advance()
 		v, err := parseIntLiteral(tok.Text)
 		if err != nil {
-			return Operand{}, crex.Wrapf(ErrParse, "invalid integer literal %q: %w", tok.Text, err)
+			return Operand{}, crex.Wrapf(ErrParse, err, "invalid integer literal %q", tok.Text)
 		}
 		return Operand{Value: Value{Type: ValueInt, Int: v}}, nil
 	case TokenQuantity:
-		return Operand{}, crex.Wrapf(ErrParse, "quantity literals are not yet supported in expressions")
+		return Operand{}, crex.Newf(ErrParse, "quantity literals are not yet supported in expressions")
 	case TokenString:
 		p.advance()
 		decoded, err := tok.Unquote()
 		if err != nil {
-			return Operand{}, crex.Wrapf(ErrParse, "invalid string literal: %w", err)
+			return Operand{}, crex.Wrapf(ErrParse, err, "invalid string literal")
 		}
 		enc, err := tokEncodingToAST(tok.Encoding)
 		if err != nil {
-			return Operand{}, crex.Wrapf(ErrParse, "invalid string encoding: %w", err)
+			return Operand{}, crex.Wrapf(ErrParse, err, "invalid string encoding")
 		}
 		return Operand{
 			Value: Value{
@@ -451,7 +451,7 @@ func (p *parser) parseOperand() (Operand, error) {
 		p.advance()
 		return Operand{Value: Value{Type: ValueVar, Str: tok.Text}}, nil
 	default:
-		return Operand{}, crex.Wrapf(ErrParse, "expected field or value, found %q instead", tok.Type)
+		return Operand{}, crex.Newf(ErrParse, "expected field or value, found %q instead", tok.Type)
 	}
 }
 
@@ -518,7 +518,7 @@ func (p *parser) advance() Token {
 func (p *parser) expect(typ TokenType) (Token, error) {
 	tok := p.peek()
 	if tok.Type != typ {
-		return Token{}, crex.Wrapf(ErrParse, "expected %q, found %q instead", typ, tok.Type)
+		return Token{}, crex.Newf(ErrParse, "expected %q, found %q instead", typ, tok.Type)
 	}
 	return p.advance(), nil
 }
@@ -542,7 +542,7 @@ func tokenToCmpOp(t TokenType) (CmpOp, error) {
 	case TokenLte:
 		return CmpLte, nil
 	default:
-		return "", crex.Wrapf(ErrParse, "not a comparison operator: %q", t)
+		return "", crex.Newf(ErrParse, "not a comparison operator %q", t)
 	}
 }
 
@@ -562,11 +562,11 @@ func tokenToArg(t Token) (Arg, error) {
 	case TokenString:
 		unquoted, err := t.Unquote()
 		if err != nil {
-			return Arg{}, crex.Wrapf(ErrParse, "invalid string literal: %w", err)
+			return Arg{}, crex.Wrapf(ErrParse, err, "invalid string literal")
 		}
 		enc, err := tokEncodingToAST(t.Encoding)
 		if err != nil {
-			return Arg{}, crex.Wrapf(ErrParse, "invalid string encoding: %w", err)
+			return Arg{}, crex.Wrapf(ErrParse, err, "invalid string encoding")
 		}
 		argType := ArgStrASCII
 		if enc == StrUnicode {
@@ -576,7 +576,7 @@ func tokenToArg(t Token) (Arg, error) {
 	case TokenVar:
 		return Arg{Type: ArgVar, Value: t.Text}, nil
 	default:
-		return Arg{}, crex.Wrapf(ErrParse, "unsupported argument token %q", t.Type)
+		return Arg{}, crex.Newf(ErrParse, "unsupported argument token %q", t.Type)
 	}
 }
 
@@ -590,7 +590,7 @@ func tokEncodingToAST(enc TokenEncoding) (StrEncoding, error) {
 	case EncodingUnicode:
 		return StrUnicode, nil
 	default:
-		return 0, crex.Wrapf(ErrParse, "unknown token encoding %q", enc)
+		return 0, crex.Newf(ErrParse, "unknown token encoding %q", enc)
 	}
 }
 

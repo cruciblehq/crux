@@ -1,5 +1,5 @@
 package rlimit
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrInvalidGrant = errors.New("invalid rlimit grant")
+var ErrInvalidGrant = crex.New("invalid rlimit grant")

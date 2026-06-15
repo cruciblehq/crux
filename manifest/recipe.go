@@ -1,8 +1,6 @@
 package manifest
 
 import (
-	"fmt"
-
 	"github.com/cruciblehq/crux/codec"
 	"github.com/cruciblehq/crux/crex"
 )
@@ -41,13 +39,16 @@ func (r *Recipe) Validate() error {
 
 		if name != "" {
 			if seen[name] {
-				return crex.Wrapf(ErrInvalidRecipe, "%w: %s", ErrDuplicateStageName, name)
+				return crex.Wrap(ErrInvalidRecipe, crex.Newf(ErrDuplicateStageName, "%q", name))
 			}
 			seen[name] = true
 		}
 
 		if err := stage.Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidRecipe, "stage %s: %w", stageLabel(name, i), err)
+			if name != "" {
+				return crex.AtName(crex.Wrap(ErrInvalidRecipe, err), "stage", name)
+			}
+			return crex.At(crex.Wrap(ErrInvalidRecipe, err), "stage", i+1)
 		}
 	}
 
@@ -83,13 +84,4 @@ func (r *Recipe) OutputStage() *Stage {
 		return nil
 	}
 	return &r.Stages[len(r.Stages)-1]
-}
-
-// Returns a label for a stage, preferring the name when available and
-// falling back to the 1-based index.
-func stageLabel(name string, index int) string {
-	if name != "" {
-		return fmt.Sprintf("%q", name)
-	}
-	return fmt.Sprintf("%d", index+1)
 }

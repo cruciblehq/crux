@@ -25,6 +25,6 @@ func parseMode(s string) (mode, error) {
 	case modeFull, modeEffective, modeInheritable, modePermitted, modeBound:
 		return v, nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "unknown mode %q", s)
+		return "", crex.Newf(ErrInvalidGrant, "unknown mode %q", s)
 	}
 }

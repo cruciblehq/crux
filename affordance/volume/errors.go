@@ -1,8 +1,8 @@
 package volume
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant = errors.New("invalid volume grant")
-	ErrInvalidMount = errors.New("invalid volume mount")
+	ErrInvalidGrant = crex.New("invalid volume grant")
+	ErrInvalidMount = crex.New("invalid volume mount")
 )

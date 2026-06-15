@@ -53,7 +53,7 @@ func processResult(result es.BuildResult) error {
 		return nil
 	}
 
-	return crex.Wrapf(ErrBuild, "%d error(s) encountered during the build process", len(result.Errors))
+	return crex.Newf(ErrBuild, "%d error(s) encountered during the build process", len(result.Errors))
 }
 
 // Normalizes and sorts esbuild results into [diagnostic] structs.

@@ -55,7 +55,7 @@ func macValuesEqual(a, b []*MACValue) bool {
 // Validates the MAC value.
 func (v *MACValue) Validate() error {
 	if v.IsField && v.Field == "" {
-		return crex.Wrapf(ErrInvalidMACValue, "field reference has empty name")
+		return crex.Newf(ErrInvalidMACValue, "field reference has empty name")
 	}
 	return nil
 }

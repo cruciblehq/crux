@@ -63,16 +63,16 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // name and optional mode. Returns an error if the grant fails this check.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in cap expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in cap expression")
 	}
 	if len(g.Kwargs) != 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in cap expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in cap expression")
 	}
 	if len(g.Args) == 0 {
-		return crex.Wrapf(ErrInvalidGrant, "missing capability name in cap expression")
+		return crex.Newf(ErrInvalidGrant, "missing capability name in cap expression")
 	}
 	if len(g.Args) > 2 {
-		return crex.Wrapf(ErrInvalidGrant, "too many arguments in cap expression")
+		return crex.Newf(ErrInvalidGrant, "too many arguments in cap expression")
 	}
 	return nil
 }
@@ -87,17 +87,17 @@ func check(g *agl.Model) error {
 func parse(g *agl.Model) (capset.Cap, mode, error) {
 	nameArg := g.Args[0]
 	if nameArg.Type != agl.ArgName {
-		return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in cap expression, found %s instead", nameArg)
+		return "", "", crex.Newf(ErrInvalidGrant, "expected name as capability in cap expression, found %s instead", nameArg)
 	}
 	c, err := capset.Parse(nameArg.Value)
 	if err != nil {
-		return "", "", crex.Wrapf(ErrInvalidGrant, "unknown capability %q in cap expression", nameArg.Value)
+		return "", "", crex.Newf(ErrInvalidGrant, "unknown capability %q in cap expression", nameArg.Value)
 	}
 	mode := modeFull
 	if len(g.Args) == 2 {
 		modeArg := g.Args[1]
 		if modeArg.Type != agl.ArgName {
-			return "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in cap expression, found %s instead", modeArg)
+			return "", "", crex.Newf(ErrInvalidGrant, "expected name as mode in cap expression, found %s instead", modeArg)
 		}
 		m, err := parseMode(modeArg.Value)
 		if err != nil {

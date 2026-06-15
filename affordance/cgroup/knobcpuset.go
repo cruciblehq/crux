@@ -39,7 +39,7 @@ func parseCPUSetPartition(value string) (partition, error) {
 	case partitionMember, partitionRoot, partitionIsolated:
 		return partition(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid cpuset partition mode %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid cpuset partition mode %q", value)
 	}
 }
 
@@ -79,7 +79,7 @@ var reIndexToken = regexp.MustCompile(`^(\d+)(?:-(\d+))?$`)
 func parseIndexList(dst *indexList, value string) error {
 	raw := strings.TrimSpace(value)
 	if raw == "" {
-		return crex.Wrapf(ErrInvalidGrant, "list required")
+		return crex.Newf(ErrInvalidGrant, "list required")
 	}
 
 	tokens := strings.Split(raw, ",")
@@ -105,7 +105,7 @@ func parseIndexList(dst *indexList, value string) error {
 func parseIndexToken(token string) (indexRange, error) {
 	m := reIndexToken.FindStringSubmatch(token)
 	if m == nil {
-		return indexRange{}, crex.Wrapf(ErrInvalidGrant, "invalid list element %q", token)
+		return indexRange{}, crex.Newf(ErrInvalidGrant, "invalid list element %q", token)
 	}
 	start, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
@@ -120,7 +120,7 @@ func parseIndexToken(token string) (indexRange, error) {
 		return indexRange{}, crex.Wrap(ErrInvalidGrant, err)
 	}
 	if start > end {
-		return indexRange{}, crex.Wrapf(ErrInvalidGrant, "invalid descending range %q", token)
+		return indexRange{}, crex.Newf(ErrInvalidGrant, "invalid descending range %q", token)
 	}
 	return indexRange{Start: uint32(start), End: uint32(end)}, nil
 }

@@ -587,7 +587,7 @@ func (l *lexer) skip() {
 // any error it surfaces.
 func (l *lexer) errorf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	l.err = crex.Wrapf(ErrLex, "%s", msg)
+	l.err = crex.Newf(ErrLex, "%s", msg)
 	l.tokens = append(l.tokens, Token{
 		Type: TokenError,
 		Text: msg,

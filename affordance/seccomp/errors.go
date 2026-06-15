@@ -1,8 +1,8 @@
 package seccomp
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant   = errors.New("invalid seccomp grant")
-	ErrUnknownSyscall = errors.New("unknown syscall")
+	ErrInvalidGrant   = crex.New("invalid seccomp grant")
+	ErrUnknownSyscall = crex.New("unknown syscall")
 )

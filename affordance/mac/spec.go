@@ -29,10 +29,10 @@ func (s *Spec) Apply(r *MACAllow) bool {
 func (s *Spec) Validate() error {
 	for i, rule := range s.Rules {
 		if rule == nil {
-			return crex.Wrapf(ErrInvalidMAC, "nil rule at index %d", i)
+			return crex.At(crex.Newf(ErrInvalidMAC, "nil rule"), "rule", i+1)
 		}
 		if err := rule.Validate(); err != nil {
-			return crex.Wrap(ErrInvalidMAC, err)
+			return crex.At(crex.Wrap(ErrInvalidMAC, err), "rule", i+1)
 		}
 	}
 	return nil

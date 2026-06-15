@@ -25,7 +25,7 @@ type dmem struct {
 func parseDmemValue(value string, setField func(entry *dmem, v uint64)) (dmem, error) {
 	region, rest, _ := strings.Cut(strings.TrimSpace(value), " ")
 	if region == "" {
-		return dmem{}, crex.Wrapf(ErrInvalidGrant, "device memory region required")
+		return dmem{}, crex.Newf(ErrInvalidGrant, "device memory region required")
 	}
 	entry := dmem{Region: region}
 	if rest == "" {
@@ -54,7 +54,7 @@ func parseDmemEntry(knob string, value string) (dmem, error) {
 	case dmemLowKnob:
 		return parseDmemValue(value, func(e *dmem, v uint64) { e.Low = v })
 	}
-	return dmem{}, crex.Wrapf(ErrUnknownKnob, "unknown dmem knob %q", knob)
+	return dmem{}, crex.Newf(ErrUnknownKnob, "unknown dmem knob %q", knob)
 }
 
 // Whether e and other constrain the same device memory region.
@@ -73,13 +73,13 @@ func (e dmem) check(other dmem) error {
 		return nil
 	}
 	if e.Max != 0 && other.Max != 0 && e.Max != other.Max {
-		return crex.Wrapf(ErrConflict, alreadySetErr, dmemMaxKnob, other.Region)
+		return crex.Newf(ErrConflict, alreadySetErr, dmemMaxKnob, other.Region)
 	}
 	if e.Min != 0 && other.Min != 0 && e.Min != other.Min {
-		return crex.Wrapf(ErrConflict, alreadySetErr, dmemMinKnob, other.Region)
+		return crex.Newf(ErrConflict, alreadySetErr, dmemMinKnob, other.Region)
 	}
 	if e.Low != 0 && other.Low != 0 && e.Low != other.Low {
-		return crex.Wrapf(ErrConflict, alreadySetErr, dmemLowKnob, other.Region)
+		return crex.Newf(ErrConflict, alreadySetErr, dmemLowKnob, other.Region)
 	}
 	return nil
 }

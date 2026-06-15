@@ -1,5 +1,5 @@
 package cap
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrInvalidGrant = errors.New("invalid capability grant")
+var ErrInvalidGrant = crex.New("invalid capability grant")

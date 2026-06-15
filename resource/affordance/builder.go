@@ -111,7 +111,7 @@ func (b *Builder) Build(ctx context.Context, g manifest.Grant, src registry.Sour
 	if g.IsRef() {
 		a, _, err := pull(ctx, src, g.RefTarget())
 		if err != nil {
-			return crex.Wrapf(ErrResolution, "pull %s: %w", g.RefTarget(), err)
+			return crex.Wrapf(ErrResolution, err, "pull %s", g.RefTarget())
 		}
 		for _, scope := range a.Scopes {
 			for _, sg := range scope.Grants {
@@ -124,7 +124,7 @@ func (b *Builder) Build(ctx context.Context, g manifest.Grant, src registry.Sour
 	}
 	parsed, err := agl.Parse(g.Source)
 	if err != nil {
-		return crex.Wrapf(ErrResolution, "parse %q: %w", g.Source, err)
+		return crex.Wrapf(ErrResolution, err, "parse %q", g.Source)
 	}
 	return b.dispatch(parsed)
 }
@@ -139,11 +139,11 @@ func (b *Builder) dispatch(p *agl.Model) error {
 	name := subsystem.Name(p.Subsystem)
 	sub, ok := b.index[name]
 	if !ok {
-		return crex.Wrapf(ErrUnknownSubsystem, "unknown subsystem %q", p.Subsystem)
+		return crex.Newf(ErrUnknownSubsystem, "unknown subsystem %q", p.Subsystem)
 	}
 	if key := sub.Key(p); key != "" {
 		if _, dup := b.seen[name][key]; dup {
-			return crex.Wrapf(ErrConflict, "duplicate %s grant %q", p.Subsystem, key)
+			return crex.Newf(ErrConflict, "duplicate %s grant %q", p.Subsystem, key)
 		}
 		if err := sub.Build(p); err != nil {
 			return err
@@ -184,7 +184,7 @@ func pull(ctx context.Context, src registry.Source, target string) (*manifest.Af
 	}
 	a, err := manifest.ReadAsAt[*manifest.Affordance](result.Extracted)
 	if err != nil {
-		return nil, "", crex.Wrapf(ErrResolution, "%s: %v", target, err)
+		return nil, "", crex.Wrapf(ErrResolution, err, "%s", target)
 	}
 	return a, result.Digest, nil
 }

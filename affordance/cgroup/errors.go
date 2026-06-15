@@ -1,9 +1,9 @@
 package cgroup
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant = errors.New("invalid cgroup grant")
-	ErrConflict     = errors.New("cgroup conflict")
-	ErrUnknownKnob  = errors.New("unknown cgroup knob")
+	ErrInvalidGrant = crex.New("invalid cgroup grant")
+	ErrConflict     = crex.New("cgroup conflict")
+	ErrUnknownKnob  = crex.New("unknown cgroup knob")
 )

@@ -56,7 +56,7 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 		slog.Info("local environment already running")
 		return nil
 	default:
-		return crex.Wrapf(ErrUnexpectedState, "cannot start, local environment is %s", state)
+		return crex.Newf(ErrUnexpectedState, "cannot start, local environment is %s", state)
 	}
 
 	slog.Info("local environment started")

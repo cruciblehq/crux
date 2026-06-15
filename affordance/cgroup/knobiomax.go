@@ -57,7 +57,7 @@ func (e ioMax) check(other ioMax) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %d:%d already set", ioMaxKnob, other.Major, other.Minor)
+	return crex.Newf(ErrConflict, "%s %d:%d already set", ioMaxKnob, other.Major, other.Minor)
 }
 
 // Leaves e unchanged and always reports no change.

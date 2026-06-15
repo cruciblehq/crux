@@ -39,7 +39,7 @@ func (gs *GrantScope) Validate() error {
 	}
 	for i := range gs.Grants {
 		if err := gs.Grants[i].Validate(); err != nil {
-			return err
+			return crex.At(err, "grant", i+1)
 		}
 	}
 	return nil
@@ -83,11 +83,11 @@ func (gs *GrantScope) Encode() (any, error) {
 func (gs *GrantScope) Decode(raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidAffordance, "unexpected type %T", raw)
+		return crex.Newf(ErrInvalidAffordance, "unexpected type %T", raw)
 	}
 	inner, ok := src["grants"].([]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidAffordance, "platform group missing grants key")
+		return crex.Newf(ErrInvalidAffordance, "platform group missing grants key")
 	}
 	gs.Platform, _ = src["platform"].(string)
 	for _, elem := range inner {

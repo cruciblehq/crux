@@ -54,12 +54,12 @@ func resolveVersionConstraint(ctx context.Context, client *Client, ref *referenc
 	}
 
 	if len(versions.Versions) == 0 {
-		return nil, crex.Wrapf(ErrNoVersions, "%s/%s", ref.Namespace(), ref.Name())
+		return nil, crex.Newf(ErrNoVersions, `resource "%s/%s"`, ref.Namespace(), ref.Name())
 	}
 
 	latestVersion := FindLatestVersion(versions.Versions, ref.Version())
 	if latestVersion == nil {
-		return nil, crex.Wrapf(ErrNoMatchingVersion, "%s", ref.Version())
+		return nil, crex.Newf(ErrNoMatchingVersion, "constraint %q", ref.Version())
 	}
 
 	return client.ReadVersion(ctx, ref.Namespace(), ref.Name(), latestVersion.String())

@@ -60,13 +60,13 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the grant's structural shape against what the rlimit subsystem accepts.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in rlimit expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in rlimit expression")
 	}
 	if len(g.Kwargs) != 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in rlimit expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in rlimit expression")
 	}
 	if len(g.Args) < 2 || len(g.Args) > 3 {
-		return crex.Wrapf(ErrInvalidGrant, "wrong number of arguments in rlimit expression")
+		return crex.Newf(ErrInvalidGrant, "wrong number of arguments in rlimit expression")
 	}
 	return nil
 }
@@ -78,10 +78,10 @@ func check(g *agl.Model) error {
 func parse(g *agl.Model) (specs.POSIXRlimit, error) {
 	nameArg := g.Args[argResource]
 	if nameArg.Type != agl.ArgName {
-		return specs.POSIXRlimit{}, crex.Wrapf(ErrInvalidGrant, "expected name as resource in rlimit expression")
+		return specs.POSIXRlimit{}, crex.Newf(ErrInvalidGrant, "expected name as resource in rlimit expression")
 	}
 	if _, ok := knownResources[nameArg.Value]; !ok {
-		return specs.POSIXRlimit{}, crex.Wrapf(ErrInvalidGrant, "unknown resource %q", nameArg.Value)
+		return specs.POSIXRlimit{}, crex.Newf(ErrInvalidGrant, "unknown resource %q", nameArg.Value)
 	}
 	soft, err := parseLimit(g.Args[argSoft], labelSoft)
 	if err != nil {
@@ -95,7 +95,7 @@ func parse(g *agl.Model) (specs.POSIXRlimit, error) {
 		}
 	}
 	if soft > hard {
-		return specs.POSIXRlimit{}, crex.Wrapf(ErrInvalidGrant, "soft limit %d exceeds hard limit %d in rlimit expression", soft, hard)
+		return specs.POSIXRlimit{}, crex.Newf(ErrInvalidGrant, "soft limit %d exceeds hard limit %d in rlimit expression", soft, hard)
 	}
 	full := rlimitNamePrefix + strings.ToUpper(nameArg.Value)
 	return specs.POSIXRlimit{Type: full, Soft: soft, Hard: hard}, nil
@@ -126,11 +126,11 @@ func parseLimit(a agl.Arg, label string) (uint64, error) {
 		return math.MaxUint64, nil
 	}
 	if a.Type != agl.ArgInt {
-		return 0, crex.Wrapf(ErrInvalidGrant, "expected integer or %q as %s limit in rlimit expression", limitUnlimited, label)
+		return 0, crex.Newf(ErrInvalidGrant, "expected integer or %q as %s limit in rlimit expression", limitUnlimited, label)
 	}
 	v, err := strconv.ParseUint(a.Value, limitBase, limitBits)
 	if err != nil {
-		return 0, crex.Wrapf(ErrInvalidGrant, "invalid %s limit in rlimit expression", label)
+		return 0, crex.Newf(ErrInvalidGrant, "invalid %s limit in rlimit expression", label)
 	}
 	return v, nil
 }

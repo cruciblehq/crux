@@ -81,7 +81,7 @@ func (c *Codec) Field(src map[string]any, v any, fieldName string) error {
 
 	sf, ok := rv.Type().FieldByName(fieldName)
 	if !ok {
-		return crex.Wrapf(ErrMissingField, "%s has no field %q", rv.Type().Name(), fieldName)
+		return crex.Newf(ErrMissingField, "%s has no field %q", rv.Type().Name(), fieldName)
 	}
 
 	rawTag := sf.Tag.Get(c.tag)

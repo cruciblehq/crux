@@ -40,7 +40,7 @@ func parseIOPrioClass(value string) (ioPrioClass, error) {
 	case ioPrioClassRT, ioPrioClassBE, ioPrioClassIdle:
 		return ioPrioClass(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid I/O priority class %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid I/O priority class %q", value)
 	}
 }
 
@@ -62,7 +62,7 @@ func parseIOCtrlMode(value string) (ioCtrlMode, error) {
 	case ioCtrlModeAuto, ioCtrlModeUser:
 		return ioCtrlMode(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid I/O cost controller mode %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid I/O cost controller mode %q", value)
 	}
 }
 
@@ -74,7 +74,7 @@ func parseIOWeightScalar(parts []string) (uint16, error) {
 	weight := parts[0]
 	if weight == "default" {
 		if len(parts) < 2 {
-			return 0, crex.Wrapf(ErrInvalidGrant, "value required after 'default' in %q", ioWeightKnob)
+			return 0, crex.Newf(ErrInvalidGrant, "value required after 'default' in %q", ioWeightKnob)
 		}
 		weight = parts[1]
 	}

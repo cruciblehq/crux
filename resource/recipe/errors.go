@@ -1,5 +1,5 @@
 package recipe
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrBuild = errors.New("build failed")
+var ErrBuild = crex.New("build failed")

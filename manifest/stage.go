@@ -106,10 +106,10 @@ func (s *Stage) Validate() error {
 // Validation errors are wrapped with the step index for context.
 func (s *Stage) validateStep(i int) error {
 	if s.Platform != "" && stepUsesPlatform(&s.Steps[i]) {
-		return crex.Wrapf(ErrInvalidStage, "step %d: %w", i+1, ErrPlatformInPlatformStage)
+		return crex.At(crex.Tag(crex.Newf(ErrInvalidStage, "platform not allowed inside a platform-scoped stage"), ErrPlatformInPlatformStage), "step", i+1)
 	}
 	if err := s.Steps[i].Validate(); err != nil {
-		return crex.Wrapf(ErrInvalidStage, "step %d: %w", i+1, err)
+		return crex.At(crex.Wrap(ErrInvalidStage, err), "step", i+1)
 	}
 	return nil
 }
@@ -134,10 +134,10 @@ func stepUsesPlatform(s *Step) bool {
 // index for context.
 func (s *Stage) validateGrantScope(i int) error {
 	if s.Platform != "" && s.Grants[i].Platform != "" {
-		return crex.Wrapf(ErrInvalidStage, "grant scope %d: %w", i+1, ErrGrantScopePlatformInPlatformStage)
+		return crex.At(crex.Tag(crex.Newf(ErrInvalidStage, "platform not allowed inside a platform-scoped stage"), ErrGrantScopePlatformInPlatformStage), "grant scope", i+1)
 	}
 	if err := s.Grants[i].Validate(); err != nil {
-		return crex.Wrapf(ErrInvalidStage, "grant scope %d: %w", i+1, err)
+		return crex.At(crex.Wrap(ErrInvalidStage, err), "grant scope", i+1)
 	}
 	return nil
 }
@@ -189,7 +189,7 @@ func (s *Stage) Encode(c *codec.Codec) (any, error) {
 func (s *Stage) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrInvalidStage, "unexpected type %T", raw)
+		return crex.Newf(ErrInvalidStage, "unexpected type %T", raw)
 	}
 	if err := c.Field(src, s, "Name"); err != nil {
 		return crex.Wrap(ErrInvalidStage, err)

@@ -62,20 +62,20 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the structural shape of a volume grant.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in volume grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in volume grant")
 	}
 	if len(g.Kwargs) > 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in volume grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in volume grant")
 	}
 	if len(g.Args) < 1 || len(g.Args) > 2 {
-		return crex.Wrapf(ErrInvalidGrant, "volume grant requires one or two arguments")
+		return crex.Newf(ErrInvalidGrant, "volume grant requires one or two arguments")
 	}
 	if g.Args[0].Type != agl.ArgStrASCII && g.Args[0].Type != agl.ArgName {
-		return crex.Wrapf(ErrInvalidGrant, "first argument must be a destination path")
+		return crex.Newf(ErrInvalidGrant, "first argument must be a destination path")
 	}
 	if len(g.Args) == 2 {
 		if g.Args[1].Type != agl.ArgName || (g.Args[1].Value != accessRead && g.Args[1].Value != accessReadWrite) {
-			return crex.Wrapf(ErrInvalidGrant, "second argument must be \"r\" (read-only) or \"rw\" (read-write)")
+			return crex.Newf(ErrInvalidGrant, "second argument must be %q (read-only) or %q (read-write)", "r", "rw")
 		}
 	}
 	return nil

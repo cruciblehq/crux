@@ -96,7 +96,7 @@ func (t Token) Unquote() (string, error) {
 		return t.Text, nil
 	}
 	if len(t.Text) == 0 {
-		return "", crex.Wrapf(ErrLex, "empty string token")
+		return "", crex.Newf(ErrLex, "empty string token")
 	}
 	if t.Text[0] == '/' {
 		return t.Text, nil // Unquoted glob; no quotes, no escapes.
@@ -120,7 +120,7 @@ func stripQuotes(src string) (string, error) {
 		s = s[1:]
 	}
 	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
-		return "", crex.Wrapf(ErrLex, "malformed quoted string %q", src)
+		return "", crex.Newf(ErrLex, "malformed quoted string %q", src)
 	}
 	return s[1 : len(s)-1], nil
 }
@@ -142,14 +142,14 @@ func unescapeBody(src, body string) (string, error) {
 		}
 		i++
 		if i >= len(body) {
-			return "", crex.Wrapf(ErrLex, "unterminated escape in %q", src)
+			return "", crex.Newf(ErrLex, "unterminated escape in %q", src)
 		}
 		esc := body[i]
 		switch esc {
 		case '"', '\\':
 			buf.WriteByte(esc)
 		default:
-			return "", crex.Wrapf(ErrLex, "unknown escape \\%c in %q", esc, src)
+			return "", crex.Newf(ErrLex, "unknown escape \\%c in %q", esc, src)
 		}
 	}
 	return buf.String(), nil

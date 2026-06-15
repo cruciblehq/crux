@@ -1,10 +1,10 @@
 package fcap
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrInvalidGrant        = errors.New("invalid fcap grant")
-	ErrUnknownFcapMode     = errors.New("unknown fcap mode")
-	ErrInvalidFcap         = errors.New("invalid fcap spec")
-	ErrInvalidCapabilities = errors.New("invalid fcap capabilities")
+	ErrInvalidGrant        = crex.New("invalid fcap grant")
+	ErrUnknownFcapMode     = crex.New("unknown fcap mode")
+	ErrInvalidFcap         = crex.New("invalid fcap spec")
+	ErrInvalidCapabilities = crex.New("invalid fcap capabilities")
 )

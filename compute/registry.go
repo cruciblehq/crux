@@ -46,7 +46,7 @@ func BackendFor(p Provider) (Backend, error) {
 	r := defaultRegistry()
 	b, ok := r.backends[p]
 	if !ok {
-		return nil, crex.Wrapf(ErrUnknownProvider, "%s", p)
+		return nil, crex.Newf(ErrUnknownProvider, "%q", p)
 	}
 	return b, nil
 }

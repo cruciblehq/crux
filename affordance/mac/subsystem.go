@@ -46,10 +46,10 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the grant's structural shape against what the mac subsystem accepts.
 func check(g *agl.Model) error {
 	if len(g.Kwargs) != 0 {
-		return crex.Wrapf(ErrCompile, "unexpected keyword arguments in mac expression")
+		return crex.Newf(ErrCompile, "unexpected keyword arguments in mac expression")
 	}
 	if len(g.Args) != 1 {
-		return crex.Wrapf(ErrCompile, "wrong number of arguments in mac expression")
+		return crex.Newf(ErrCompile, "wrong number of arguments in mac expression")
 	}
 	return nil
 }
@@ -63,11 +63,11 @@ func check(g *agl.Model) error {
 func parse(g *agl.Model) (*MACAllow, error) {
 	hookArg := g.Args[0]
 	if hookArg.Type != agl.ArgName {
-		return nil, crex.Wrapf(ErrCompile, "expected name as hook in mac expression")
+		return nil, crex.Newf(ErrCompile, "expected name as hook in mac expression")
 	}
 	hook := catalog().LookupHook(hookArg.Value)
 	if hook == nil {
-		return nil, crex.Wrapf(ErrCompile, "unknown hook %q in mac expression", hookArg.Value)
+		return nil, crex.Newf(ErrCompile, "unknown hook %q in mac expression", hookArg.Value)
 	}
 	allow := &MACAllow{Hook: hookArg.Value}
 	if g.Where != nil {
@@ -99,7 +99,7 @@ func translateExpr(expr agl.Expr, hook *Hook) (*MACExpr, error) {
 	case *agl.BitTestExpr:
 		return translateBitTest(e, hook)
 	default:
-		return nil, crex.Wrapf(ErrCompile, "unknown expression type %T", expr)
+		return nil, crex.Newf(ErrCompile, "unknown expression type %T", expr)
 	}
 }
 
@@ -222,7 +222,7 @@ func requireFieldType(op agl.Operand, hook *Hook, want FieldType, label string) 
 	if want == TypeUint64 {
 		fieldType = "numeric field"
 	}
-	return crex.Wrapf(ErrCompile, "%s requires a %s, but %q is %s", label, fieldType, op.Field, f.Type)
+	return crex.Newf(ErrCompile, "%s requires a %s, but %q is %s", label, fieldType, op.Field, f.Type)
 }
 
 // Translates a grant operand into a MAC value, validating field references.
@@ -230,10 +230,10 @@ func translateOperand(op agl.Operand, hook *Hook) (*MACValue, error) {
 	if op.IsField {
 		f, ok := hook.Fields[op.Field]
 		if !ok {
-			return nil, crex.Wrapf(ErrCompile, "field %q is not available on hook %q", op.Field, hook.Name)
+			return nil, crex.Newf(ErrCompile, "field %q is not available on hook %q", op.Field, hook.Name)
 		}
 		if f.Sleepable && !hook.Sleepable {
-			return nil, crex.Wrapf(ErrCompile, "field %q requires a sleepable hook, but %q is not sleepable", op.Field, hook.Name)
+			return nil, crex.Newf(ErrCompile, "field %q requires a sleepable hook, but %q is not sleepable", op.Field, hook.Name)
 		}
 		return &MACValue{IsField: true, Field: op.Field}, nil
 	}
@@ -243,9 +243,9 @@ func translateOperand(op agl.Operand, hook *Hook) (*MACValue, error) {
 	case agl.ValueStr:
 		return &MACValue{StrVal: op.Value.Str}, nil
 	case agl.ValueVar:
-		return nil, crex.Wrapf(ErrCompile, "variable references are not supported in mac filters")
+		return nil, crex.Newf(ErrCompile, "variable references are not supported in mac filters")
 	default:
-		return nil, crex.Wrapf(ErrCompile, "unsupported operand value")
+		return nil, crex.Newf(ErrCompile, "unsupported operand value")
 	}
 }
 
@@ -257,7 +257,7 @@ func checkTypeCompat(left, right agl.Operand, hook *Hook) error {
 		return nil
 	}
 	if *lt != *rt {
-		return crex.Wrapf(ErrCompile, "type mismatch between left (%s) and right (%s)", *lt, *rt)
+		return crex.Newf(ErrCompile, "type mismatch between left (%s) and right (%s)", *lt, *rt)
 	}
 	return nil
 }

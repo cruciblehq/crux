@@ -1,5 +1,5 @@
 package capset
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
-var ErrUnknownCap = errors.New("unknown linux capability")
+var ErrUnknownCap = crex.New("unknown linux capability")

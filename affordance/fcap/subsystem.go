@@ -69,13 +69,13 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // validation are deferred to parse.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in fcap expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in fcap expression")
 	}
 	if len(g.Kwargs) != 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in fcap expression")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in fcap expression")
 	}
 	if len(g.Args) != 3 {
-		return crex.Wrapf(ErrInvalidGrant, "wrong number of arguments in fcap expression")
+		return crex.Newf(ErrInvalidGrant, "wrong number of arguments in fcap expression")
 	}
 	return nil
 }
@@ -90,24 +90,24 @@ func check(g *agl.Model) error {
 func parse(g *agl.Model) (string, Mode, string, error) {
 	capArg := g.Args[0]
 	if capArg.Type != agl.ArgName {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as capability in fcap expression")
+		return "", "", "", crex.Newf(ErrInvalidGrant, "expected name as capability in fcap expression")
 	}
 	if _, err := capset.Parse(capArg.Value); err != nil {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "unknown capability %q in fcap expression", capArg.Value)
+		return "", "", "", crex.Newf(ErrInvalidGrant, "unknown capability %q in fcap expression", capArg.Value)
 	}
 	modeArg := g.Args[1]
 	if modeArg.Type != agl.ArgName {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected name as mode in fcap expression")
+		return "", "", "", crex.Newf(ErrInvalidGrant, "expected name as mode in fcap expression")
 	}
 	mode, err := ParseMode(modeArg.Value)
 	if err != nil {
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "unknown fcap mode %q", modeArg.Value)
+		return "", "", "", crex.Newf(ErrInvalidGrant, "unknown fcap mode %q", modeArg.Value)
 	}
 	pathArg := g.Args[2]
 	switch pathArg.Type {
 	case agl.ArgStrASCII, agl.ArgStrUnicode, agl.ArgName:
 	default:
-		return "", "", "", crex.Wrapf(ErrInvalidGrant, "expected string as path in fcap expression")
+		return "", "", "", crex.Newf(ErrInvalidGrant, "expected string as path in fcap expression")
 	}
 	path, err := files.ValidateAbsPath(pathArg.Value)
 	if err != nil {

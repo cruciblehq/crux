@@ -25,7 +25,7 @@ type misc struct {
 func parseMisc(value string) (misc, error) {
 	resource, rest, _ := strings.Cut(strings.TrimSpace(value), " ")
 	if resource == "" {
-		return misc{}, crex.Wrapf(ErrInvalidGrant, "resource name required")
+		return misc{}, crex.Newf(ErrInvalidGrant, "resource name required")
 	}
 	m := misc{Resource: resource}
 	if rest != "" {
@@ -48,7 +48,7 @@ func (e misc) check(other misc) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %s already set", "misc", other.Resource)
+	return crex.Newf(ErrConflict, "%s %s already set", "misc", other.Resource)
 }
 
 // Leaves e unchanged and always reports no change.

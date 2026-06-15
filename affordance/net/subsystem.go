@@ -112,17 +112,17 @@ type parsedGrant struct {
 // optional for egress. The egress destination argument type is also checked.
 func parseGrant(g *agl.Model) (parsedGrant, error) {
 	if g.Where != nil {
-		return parsedGrant{}, crex.Wrapf(ErrInvalidGrant, "unexpected where clause in net grant")
+		return parsedGrant{}, crex.Newf(ErrInvalidGrant, "unexpected where clause in net grant")
 	}
 	if len(g.Kwargs) > 0 {
-		return parsedGrant{}, crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in net grant")
+		return parsedGrant{}, crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in net grant")
 	}
 	if len(g.Args) < 1 || g.Args[0].Type != agl.ArgName {
-		return parsedGrant{}, crex.Wrapf(ErrInvalidGrant, "first argument must be an operation (ingress, egress)")
+		return parsedGrant{}, crex.Newf(ErrInvalidGrant, "first argument must be an operation (ingress, egress)")
 	}
 	op := g.Args[0].Value
 	if op != opIngress && op != opEgress {
-		return parsedGrant{}, crex.Wrapf(ErrInvalidGrant, "unknown operation %q in net grant", op)
+		return parsedGrant{}, crex.Newf(ErrInvalidGrant, "unknown operation %q in net grant", op)
 	}
 	proto, rest, err := parseProtocol(g.Args[1:])
 	if err != nil {
@@ -143,15 +143,15 @@ func parseGrant(g *agl.Model) (parsedGrant, error) {
 // identifies a recognized protocol is normalized to its keyword.
 func parseProtocol(args []agl.Arg) (string, []agl.Arg, error) {
 	if len(args) < 1 || args[0].Type != agl.ArgName {
-		return "", nil, crex.Wrapf(ErrInvalidGrant, "second argument must be a protocol (tcp, udp, sctp, dccp, icmp, icmpv6, gre, esp, ah, ip, or \"proto N\")")
+		return "", nil, crex.Newf(ErrInvalidGrant, "second argument must be a protocol (tcp, udp, sctp, dccp, icmp, icmpv6, gre, esp, ah, ip, or %q)", "proto N")
 	}
 	if args[0].Value == protoNumber {
 		if len(args) < 2 || args[1].Type != agl.ArgInt {
-			return "", nil, crex.Wrapf(ErrInvalidGrant, "proto requires a numeric protocol number")
+			return "", nil, crex.Newf(ErrInvalidGrant, "proto requires a numeric protocol number")
 		}
 		n, err := strconv.ParseUint(args[1].Value, 0, 8)
 		if err != nil {
-			return "", nil, crex.Wrapf(ErrInvalidGrant, "protocol number out of range (0-255) in net grant")
+			return "", nil, crex.Newf(ErrInvalidGrant, "protocol number out of range (0-255) in net grant")
 		}
 		return normalizeProtocolNumber(n), args[2:], nil
 	}
@@ -160,7 +160,7 @@ func parseProtocol(args []agl.Arg) (string, []agl.Arg, error) {
 		proto = protoIP
 	}
 	if !isPortBased(proto) && !isPortless(proto) && proto != protoIP {
-		return "", nil, crex.Wrapf(ErrInvalidGrant, "unknown protocol %q in net grant", args[0].Value)
+		return "", nil, crex.Newf(ErrInvalidGrant, "unknown protocol %q in net grant", args[0].Value)
 	}
 	return proto, args[1:], nil
 }
@@ -172,12 +172,12 @@ func parseProtocol(args []agl.Arg) (string, []agl.Arg, error) {
 func parseIngressRest(p *parsedGrant, rest []agl.Arg) error {
 	if !isPortBased(p.proto) {
 		if len(rest) != 0 {
-			return crex.Wrapf(ErrInvalidGrant, "protocol %q takes no port in net ingress grant", p.proto)
+			return crex.Newf(ErrInvalidGrant, "protocol %q takes no port in net ingress grant", p.proto)
 		}
 		return nil
 	}
 	if len(rest) != 1 {
-		return crex.Wrapf(ErrInvalidGrant, "ingress grant for %q requires a port", p.proto)
+		return crex.Newf(ErrInvalidGrant, "ingress grant for %q requires a port", p.proto)
 	}
 	port, err := parsePort(rest[0])
 	if err != nil {
@@ -195,7 +195,7 @@ func parseIngressRest(p *parsedGrant, rest []agl.Arg) error {
 func parseEgressRest(p *parsedGrant, rest []agl.Arg) error {
 	if !isPortBased(p.proto) {
 		if len(rest) != 1 {
-			return crex.Wrapf(ErrInvalidGrant, "egress grant for %q requires exactly one destination", p.proto)
+			return crex.Newf(ErrInvalidGrant, "egress grant for %q requires exactly one destination", p.proto)
 		}
 		return parseDestination(p, rest[0])
 	}
@@ -210,7 +210,7 @@ func parseEgressRest(p *parsedGrant, rest []agl.Arg) error {
 		p.port = port
 		return parseDestination(p, rest[1])
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "egress grant for %q accepts at most a port and a destination", p.proto)
+		return crex.Newf(ErrInvalidGrant, "egress grant for %q accepts at most a port and a destination", p.proto)
 	}
 }
 
@@ -224,7 +224,7 @@ func parseDestination(p *parsedGrant, a agl.Arg) error {
 		p.dest = a.Value
 		return nil
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "destination must be a hostname, service name, CIDR, or \"*\" in net egress grant")
+		return crex.Newf(ErrInvalidGrant, "destination must be a hostname, service name, CIDR, or %q in net egress grant", "*")
 	}
 }
 
@@ -233,14 +233,14 @@ func parseDestination(p *parsedGrant, a agl.Arg) error {
 // A port is in the range 1–65535; zero is not a valid port and is rejected.
 func parsePort(a agl.Arg) (uint16, error) {
 	if a.Type != agl.ArgInt {
-		return 0, crex.Wrapf(ErrInvalidGrant, "port must be an integer in net grant")
+		return 0, crex.Newf(ErrInvalidGrant, "port must be an integer in net grant")
 	}
 	n, err := strconv.ParseUint(a.Value, 0, 16)
 	if err != nil {
-		return 0, crex.Wrapf(ErrInvalidGrant, "port out of range in net grant")
+		return 0, crex.Newf(ErrInvalidGrant, "port out of range in net grant")
 	}
 	if n == 0 {
-		return 0, crex.Wrapf(ErrInvalidGrant, "port must be in the range 1-65535 in net grant")
+		return 0, crex.Newf(ErrInvalidGrant, "port must be in the range 1-65535 in net grant")
 	}
 	return uint16(n), nil
 }

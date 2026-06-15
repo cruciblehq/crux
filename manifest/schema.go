@@ -35,24 +35,21 @@ func (s *Schema) Validate() error {
 	for i := range s.Params {
 		p := &s.Params[i]
 		if err := p.Validate(); err != nil {
-			if p.Name != "" {
-				return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, err)
-			}
-			return crex.Wrapf(ErrInvalidParam, "param %d: %w", i+1, err)
+			return err
 		}
 
 		if seen[p.Name] {
-			return crex.Wrapf(ErrInvalidParam, "param %q: %w", p.Name, ErrDuplicateParamName)
+			return crex.Tag(crex.Newf(ErrInvalidParam, "param %q is a duplicate", p.Name), ErrDuplicateParamName)
 		}
 		seen[p.Name] = true
 	}
 
 	if s.Default != "" && !isValidName(s.Default) {
-		return crex.Wrapf(ErrInvalidParam, "default %q: %w", s.Default, ErrInvalidParamName)
+		return crex.Tag(crex.Newf(ErrInvalidParam, "default %q has an invalid name", s.Default), ErrInvalidParamName)
 	}
 
 	if s.Default != "" && !seen[s.Default] {
-		return crex.Wrapf(ErrInvalidParam, "default %q: %w", s.Default, ErrDefaultNotInSchema)
+		return crex.Tag(crex.Newf(ErrInvalidParam, "default %q is not in the schema", s.Default), ErrDefaultNotInSchema)
 	}
 
 	return nil

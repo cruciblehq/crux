@@ -35,7 +35,7 @@ var reIOWeightDevice = regexp.MustCompile(`^(\d+):(\d+)(?:\s+(\S+))?$`)
 func parseIOWeightDevice(value string) (ioWeightDevice, error) {
 	m := reIOWeightDevice.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "expected major:minor weight for io.weight device entry")
+		return ioWeightDevice{}, crex.Newf(ErrInvalidGrant, "expected major:minor weight for io.weight device entry")
 	}
 	maj, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
@@ -46,7 +46,7 @@ func parseIOWeightDevice(value string) (ioWeightDevice, error) {
 		return ioWeightDevice{}, crex.Wrap(ErrInvalidGrant, err)
 	}
 	if m[3] == "" || m[3] == "default" {
-		return ioWeightDevice{}, crex.Wrapf(ErrInvalidGrant, "restrictive form %q not allowed", value)
+		return ioWeightDevice{}, crex.Newf(ErrInvalidGrant, "restrictive form %q not allowed", value)
 	}
 	wd := ioWeightDevice{Major: uint32(maj), Minor: uint32(min)}
 	if err := parseUint16(&wd.Weight, m[3]); err != nil {
@@ -65,7 +65,7 @@ func (e ioWeightDevice) check(other ioWeightDevice) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %d:%d already set", ioWeightKnob, other.Major, other.Minor)
+	return crex.Newf(ErrConflict, "%s %d:%d already set", ioWeightKnob, other.Major, other.Minor)
 }
 
 // Leaves e unchanged and always reports no change.

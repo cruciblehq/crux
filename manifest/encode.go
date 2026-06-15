@@ -20,7 +20,7 @@ func encodeToMap(c *codec.Codec, v any) (map[string]any, error) {
 		}
 		m, ok := raw.(map[string]any)
 		if !ok {
-			return nil, crex.Wrapf(ErrEncodeFailed, "encoded value %T is not a map", raw)
+			return nil, crex.Newf(ErrEncodeFailed, "encoded value %T is not a map", raw)
 		}
 		return m, nil
 	}
@@ -35,7 +35,7 @@ func encodeToMap(c *codec.Codec, v any) (map[string]any, error) {
 func mergeMap(dst, src map[string]any) (map[string]any, error) {
 	for k := range dst {
 		if _, exists := src[k]; exists {
-			return nil, crex.Wrapf(ErrEncodeFailed, "key %q conflicts", k)
+			return nil, crex.Newf(ErrEncodeFailed, "key %q conflicts", k)
 		}
 	}
 	maps.Copy(dst, src)

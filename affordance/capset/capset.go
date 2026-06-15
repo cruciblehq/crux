@@ -72,7 +72,7 @@ func Parse(s string) (Cap, error) {
 		WakeAlarm, BlockSuspend, AuditRead, Perfmon, Bpf, CheckpointRestore:
 		return c, nil
 	default:
-		return "", crex.Wrapf(ErrUnknownCap, "unknown capability %q", s)
+		return "", crex.Newf(ErrUnknownCap, "unknown capability %q", s)
 	}
 }
 

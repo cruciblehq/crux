@@ -142,7 +142,7 @@ func planService(ctx context.Context, service manifest.Ref, env *manifest.Enviro
 
 	output := serviceCfg.OutputStage()
 	if output == nil {
-		return serviceResult{}, crex.Wrapf(ErrBuildPlan, "service %s: no output stage", service.ID)
+		return serviceResult{}, crex.Newf(ErrBuildPlan, "service %s has no output stage", service.ID)
 	}
 
 	ctr, kspec, prov, err := collectGrants(ctx, service.ID, output, src)
@@ -174,7 +174,7 @@ func findEnvironment(cfg *manifest.Blueprint, envID string) (*manifest.Environme
 	if len(cfg.Environments) == 0 {
 		return &manifest.Environment{ID: envID}, nil
 	}
-	return nil, crex.Wrapf(ErrBuildPlan, "environment %q not found", envID)
+	return nil, crex.Newf(ErrBuildPlan, "environment %q not found", envID)
 }
 
 // Checks that all required service schema parameters are present in the
@@ -190,7 +190,7 @@ func validateEnvironment(schema *manifest.Schema, env *manifest.Environment) err
 			continue
 		}
 		if _, ok := env.Variables[p.Name]; !ok {
-			return crex.Wrapf(ErrBuildPlan, "missing required variable %q", p.Name)
+			return crex.Newf(ErrBuildPlan, "missing required variable %q", p.Name)
 		}
 	}
 	return nil
@@ -217,7 +217,7 @@ func collectGrants(ctx context.Context, serviceID string, output *manifest.Stage
 	for _, scope := range scopes {
 		for _, g := range scope.Grants {
 			if err := b.Build(ctx, g, src); err != nil {
-				return manifest.Container{}, kernel.Spec{}, nil, crex.Wrapf(ErrBuildPlan, "service %s: %w", serviceID, err)
+				return manifest.Container{}, kernel.Spec{}, nil, crex.Wrapf(ErrBuildPlan, err, "service %s", serviceID)
 			}
 		}
 	}

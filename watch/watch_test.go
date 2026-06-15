@@ -1,11 +1,12 @@
 package watch
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 func TestWatchCreate(t *testing.T) {
@@ -172,7 +173,7 @@ func TestWatchCallbackError(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "testwatchcallbackerror.txt")
 
-	callbackErr := errors.New("callback error")
+	callbackErr := crex.New("callback error")
 
 	w, err := Watch(dir, func(e *Event) error {
 		return callbackErr

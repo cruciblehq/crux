@@ -1,9 +1,9 @@
 package files
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrNotSupported  = errors.New("file locking is not supported on this platform")
-	ErrInvalidPath   = errors.New("invalid path")
-	ErrUnsafeTempDir = errors.New("unsafe temporary directory")
+	ErrNotSupported  = crex.New("file locking is not supported on this platform")
+	ErrInvalidPath   = crex.New("invalid path")
+	ErrUnsafeTempDir = crex.New("unsafe temporary directory")
 )

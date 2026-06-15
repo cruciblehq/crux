@@ -65,10 +65,10 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the structural shape of a device grant.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in device grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in device grant")
 	}
 	if len(g.Args) != deviceArgCount {
-		return crex.Wrapf(ErrInvalidGrant, "device grant requires exactly four arguments: type, path, major, and minor")
+		return crex.Newf(ErrInvalidGrant, "device grant requires exactly four arguments (type, path, major, and minor)")
 	}
 	return nil
 }
@@ -81,14 +81,14 @@ func check(g *agl.Model) error {
 func parse(g *agl.Model) (specs.LinuxDevice, error) {
 	typeArg := g.Args[argType]
 	if typeArg.Type != agl.ArgName {
-		return specs.LinuxDevice{}, crex.Wrapf(ErrInvalidGrant, "first argument must be a device type name")
+		return specs.LinuxDevice{}, crex.Newf(ErrInvalidGrant, "first argument must be a device type name")
 	}
 	if _, ok := knownTypes[typeArg.Value]; !ok {
-		return specs.LinuxDevice{}, crex.Wrapf(ErrInvalidGrant, "unknown device type %q; accepted types: c, b, u, p", typeArg.Value)
+		return specs.LinuxDevice{}, crex.Newf(ErrInvalidGrant, "unknown device type %q (accepted types are c, b, u, and p)", typeArg.Value)
 	}
 	pathArg := g.Args[argPath]
 	if pathArg.Type != agl.ArgName && pathArg.Type != agl.ArgStrASCII {
-		return specs.LinuxDevice{}, crex.Wrapf(ErrInvalidGrant, "second argument must be a device node path")
+		return specs.LinuxDevice{}, crex.Newf(ErrInvalidGrant, "second argument must be a device node path")
 	}
 	nodePath, err := files.ValidateAbsPath(pathArg.Value)
 	if err != nil {
@@ -140,7 +140,7 @@ func applyKwarg(dev *specs.LinuxDevice, kw agl.Kwarg) error {
 		}
 		dev.GID = &gid
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "unknown keyword argument %q for device grant", kw.Key)
+		return crex.Newf(ErrInvalidGrant, "unknown keyword argument %q for device grant", kw.Key)
 	}
 	return nil
 }
@@ -148,11 +148,11 @@ func applyKwarg(dev *specs.LinuxDevice, kw agl.Kwarg) error {
 // Parses a device major or minor number from an integer argument.
 func parseNumber(a agl.Arg, label string) (int64, error) {
 	if a.Type != agl.ArgInt {
-		return 0, crex.Wrapf(ErrInvalidGrant, "%s number must be an integer", label)
+		return 0, crex.Newf(ErrInvalidGrant, "%s number must be an integer", label)
 	}
 	v, err := strconv.ParseInt(a.Value, decimalBase, deviceNumBits)
 	if err != nil {
-		return 0, crex.Wrapf(ErrInvalidGrant, "invalid %s number %q", label, a.Value)
+		return 0, crex.Newf(ErrInvalidGrant, "invalid %s number %q", label, a.Value)
 	}
 	return v, nil
 }
@@ -160,11 +160,11 @@ func parseNumber(a agl.Arg, label string) (int64, error) {
 // Parses an octal permission mode from a keyword-argument value.
 func parseMode(a agl.Arg) (os.FileMode, error) {
 	if a.Type != agl.ArgInt {
-		return 0, crex.Wrapf(ErrInvalidGrant, "mode must be an octal integer")
+		return 0, crex.Newf(ErrInvalidGrant, "mode must be an octal integer")
 	}
 	v, err := strconv.ParseUint(a.Value, octalBase, idBits)
 	if err != nil {
-		return 0, crex.Wrapf(ErrInvalidGrant, "invalid octal mode %q", a.Value)
+		return 0, crex.Newf(ErrInvalidGrant, "invalid octal mode %q", a.Value)
 	}
 	return os.FileMode(v), nil
 }
@@ -172,11 +172,11 @@ func parseMode(a agl.Arg) (os.FileMode, error) {
 // Parses an unsigned owner identifier from a keyword-argument value.
 func parseID(a agl.Arg, label string) (uint32, error) {
 	if a.Type != agl.ArgInt {
-		return 0, crex.Wrapf(ErrInvalidGrant, "%s must be an integer", label)
+		return 0, crex.Newf(ErrInvalidGrant, "%s must be an integer", label)
 	}
 	v, err := strconv.ParseUint(a.Value, decimalBase, idBits)
 	if err != nil {
-		return 0, crex.Wrapf(ErrInvalidGrant, "invalid %s %q", label, a.Value)
+		return 0, crex.Newf(ErrInvalidGrant, "invalid %s %q", label, a.Value)
 	}
 	return uint32(v), nil
 }

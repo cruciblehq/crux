@@ -29,7 +29,7 @@ var rePSITrigger = regexp.MustCompile(`^(\S+)\s+(\d+)\s+(\d+)$`)
 func parsePSITrigger(value string) (psiTrigger, error) {
 	m := rePSITrigger.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return psiTrigger{}, crex.Wrapf(ErrInvalidGrant, "expected psi trigger as type threshold window")
+		return psiTrigger{}, crex.Newf(ErrInvalidGrant, "expected psi trigger as type threshold window")
 	}
 	threshold, err := strconv.ParseUint(m[2], 10, 64)
 	if err != nil {
@@ -60,7 +60,7 @@ func (e psiTrigger) check(other psiTrigger, knob string) error {
 	if !e.equal(other) || e == other {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %s already set", knob, other.Type)
+	return crex.Newf(ErrConflict, "%s %s already set", knob, other.Type)
 }
 
 // Leaves e unchanged and always reports no change.

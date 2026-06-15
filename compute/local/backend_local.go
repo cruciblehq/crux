@@ -192,7 +192,7 @@ func waitForContainerd(ctx context.Context) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return crex.Wrapf(ErrHostStart, "timed out waiting for containerd to become ready")
+			return crex.Newf(ErrHostStart, "timed out waiting for containerd to become ready")
 		}
 		select {
 		case <-ctx.Done():
@@ -290,7 +290,7 @@ func cachedMachineImagePath() (string, error) {
 		arch+machineExtension,
 	)
 	if _, err := os.Stat(path); err != nil {
-		return "", crex.Wrapf(ErrMachineImageMissing, "expected at %s", path)
+		return "", crex.Newf(ErrMachineImageMissing, "expected at %s", path)
 	}
 	return path, nil
 }

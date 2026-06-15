@@ -112,7 +112,7 @@ func (e *MACExpr) Validate() error {
 	case exprBitTest:
 		return e.validateBitTest()
 	default:
-		return crex.Wrapf(ErrInvalidMACExpr, "unknown type %q", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "unknown type %q", e.Type)
 	}
 }
 
@@ -139,7 +139,7 @@ func validateValues(values ...*MACValue) error {
 // Validates a binary node, requiring both child operands.
 func (e *MACExpr) validateBinary() error {
 	if e.Left == nil || e.Right == nil {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires left and right operands", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires left and right operands", e.Type)
 	}
 	return validateExprs(e.Left, e.Right)
 }
@@ -147,7 +147,7 @@ func (e *MACExpr) validateBinary() error {
 // Validates a unary node, requiring its single operand.
 func (e *MACExpr) validateUnary() error {
 	if e.Operand == nil {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires an operand", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires an operand", e.Type)
 	}
 	return validateExprs(e.Operand)
 }
@@ -155,7 +155,7 @@ func (e *MACExpr) validateUnary() error {
 // Validates a comparison node, requiring an operator and both sides.
 func (e *MACExpr) validateComparison() error {
 	if e.Op == "" || e.LHS == nil || e.RHS == nil {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires op, lhs, and rhs", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires op, lhs, and rhs", e.Type)
 	}
 	return validateValues(e.LHS, e.RHS)
 }
@@ -163,14 +163,14 @@ func (e *MACExpr) validateComparison() error {
 // Validates a membership node, requiring a field and non-nil values.
 func (e *MACExpr) validateIn() error {
 	if e.Field == nil || len(e.Values) == 0 {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires a field and at least one value", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires a field and at least one value", e.Type)
 	}
 	if err := validateValues(e.Field); err != nil {
 		return err
 	}
 	for i, v := range e.Values {
 		if v == nil {
-			return crex.Wrapf(ErrInvalidMACExpr, "%q has nil value at index %d", e.Type, i)
+			return crex.At(crex.Newf(ErrInvalidMACExpr, "%q has a nil value", e.Type), "value", i+1)
 		}
 		if err := validateValues(v); err != nil {
 			return err
@@ -182,7 +182,7 @@ func (e *MACExpr) validateIn() error {
 // Validates a pattern-match node, requiring a field and pattern.
 func (e *MACExpr) validateLike() error {
 	if e.Field == nil || e.Pattern == "" {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires a field and pattern", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires a field and pattern", e.Type)
 	}
 	return validateValues(e.Field)
 }
@@ -190,7 +190,7 @@ func (e *MACExpr) validateLike() error {
 // Validates a range node, requiring a field and both bounds.
 func (e *MACExpr) validateBetween() error {
 	if e.Field == nil || e.Low == nil || e.High == nil {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires field, low, and high", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires field, low, and high", e.Type)
 	}
 	return validateValues(e.Field, e.Low, e.High)
 }
@@ -198,7 +198,7 @@ func (e *MACExpr) validateBetween() error {
 // Validates a bit-test node, requiring a field and mask.
 func (e *MACExpr) validateBitTest() error {
 	if e.Field == nil || e.Mask == nil {
-		return crex.Wrapf(ErrInvalidMACExpr, "%q requires field and mask", e.Type)
+		return crex.Newf(ErrInvalidMACExpr, "%q requires field and mask", e.Type)
 	}
 	return validateValues(e.Field, e.Mask)
 }

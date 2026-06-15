@@ -37,19 +37,19 @@ type stageState struct {
 func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, stageImages map[string]string) (*compute.Container, error) {
 	security, err := b.applyGrants(ctx, stage.Grants)
 	if err != nil {
-		return nil, crex.Wrapf(ErrBuild, "stage %d: compile grants: %w", num, err)
+		return nil, crex.At(crex.Wrap(ErrBuild, err), "stage", num)
 	}
 
 	ctr, err := b.importBase(ctx, stage, compute.RuntimeOptions{OCI: *security})
 	if err != nil {
-		return nil, crex.Wrapf(ErrBuild, "stage %d: import base: %w", num, err)
+		return nil, crex.At(crex.Wrap(ErrBuild, err), "stage", num)
 	}
 
 	state := &stageState{}
 	for j := range stage.Steps {
 		if err := b.executeStep(ctx, ctr, &stage.Steps[j], state, stageImages); err != nil {
 			ctr.Destroy(ctx)
-			return nil, crex.Wrapf(ErrBuild, "stage %d step %d: %w", num, j+1, err)
+			return nil, crex.At(crex.At(crex.Wrap(ErrBuild, err), "step", j+1), "stage", num)
 		}
 	}
 
@@ -57,7 +57,7 @@ func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, 
 		img, err := ctr.Commit(ctx, stage.Name)
 		if err != nil {
 			ctr.Destroy(ctx)
-			return nil, crex.Wrapf(ErrBuild, "stage %d: commit: %w", num, err)
+			return nil, crex.At(crex.Wrap(ErrBuild, err), "stage", num)
 		}
 		stageImages[stage.Name] = img
 	}

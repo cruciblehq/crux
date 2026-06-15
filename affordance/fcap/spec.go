@@ -22,10 +22,10 @@ type Spec struct {
 func (s *Spec) Validate() error {
 	for path, caps := range s.Entries {
 		if path == "" {
-			return crex.Wrapf(ErrInvalidFcap, "empty path key")
+			return crex.Newf(ErrInvalidFcap, "empty path key")
 		}
 		if caps == nil {
-			return crex.Wrapf(ErrInvalidFcap, "nil capabilities for path %q", path)
+			return crex.Newf(ErrInvalidFcap, "nil capabilities for path %q", path)
 		}
 		if err := caps.Validate(); err != nil {
 			return crex.Wrap(ErrInvalidFcap, err)

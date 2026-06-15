@@ -143,7 +143,7 @@ func ensureLima(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return crex.Wrapf(ErrLimaDownload, "unexpected status %d from %s", resp.StatusCode, limaURL())
+		return crex.Newf(ErrLimaDownload, "unexpected status %d from %s", resp.StatusCode, limaURL())
 	}
 
 	slog.Debug("download complete, extracting Lima",
@@ -164,7 +164,7 @@ func extractLima(r io.Reader, dest string) error {
 	}
 
 	if _, err := os.Stat(files.LimactlBin()); err != nil {
-		return crex.Wrapf(ErrLimaDownload, "limactl not found in archive")
+		return crex.Newf(ErrLimaDownload, "limactl not found in archive")
 	}
 	return nil
 }
@@ -243,7 +243,7 @@ func limactlRun(ctx context.Context, args ...string) error {
 	if err := cmd.Run(); err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg != "" {
-			return crex.Wrapf(ErrLimaCtl, "%s: %s", err, msg)
+			return crex.Wrapf(ErrLimaCtl, err, "%s", msg)
 		}
 		return crex.Wrap(ErrLimaCtl, err)
 	}

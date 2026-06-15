@@ -4,10 +4,12 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 func TestErrService(t *testing.T) {
-	cause := errors.New("boom")
+	cause := crex.New("boom")
 
 	err := errService("api", cause)
 	if !errors.Is(err, ErrBuildPlan) {
@@ -22,7 +24,7 @@ func TestErrService(t *testing.T) {
 }
 
 func TestErrServiceRuntime(t *testing.T) {
-	cause := errors.New("boom")
+	cause := crex.New("boom")
 
 	err := errServiceRuntime("api", cause)
 	if !errors.Is(err, ErrBuildPlan) {

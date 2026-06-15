@@ -1,13 +1,13 @@
 package archive
 
-import "errors"
+import "github.com/cruciblehq/crux/crex"
 
 var (
-	ErrCreateFailed        = errors.New("archive creation failed")
-	ErrExtractFailed       = errors.New("archive extraction failed")
-	ErrReadFailed          = errors.New("archive read failed")
-	ErrNotFound            = errors.New("file not found in archive")
-	ErrInvalidPath         = errors.New("invalid archive path")
-	ErrUnsupportedFileType = errors.New("unsupported file type")
-	ErrUnsupportedFormat   = errors.New("unsupported archive format")
+	ErrCreateFailed        = crex.New("archive creation failed")
+	ErrExtractFailed       = crex.New("archive extraction failed")
+	ErrReadFailed          = crex.New("archive read failed")
+	ErrNotFound            = crex.New("file not found in archive")
+	ErrInvalidPath         = crex.New("invalid archive path")
+	ErrUnsupportedFileType = crex.New("unsupported file type")
+	ErrUnsupportedFormat   = crex.New("unsupported archive format")
 )

@@ -76,20 +76,20 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the structural shape of a mount grant.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in mount grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in mount grant")
 	}
 	if len(g.Args) != mountArgCount {
-		return crex.Wrapf(ErrInvalidGrant, "mount grant requires exactly two arguments: type and destination")
+		return crex.Newf(ErrInvalidGrant, "mount grant requires exactly two arguments: type and destination")
 	}
 	if g.Args[argType].Type != agl.ArgName {
-		return crex.Wrapf(ErrInvalidGrant, "first argument must be a filesystem type name")
+		return crex.Newf(ErrInvalidGrant, "first argument must be a filesystem type name")
 	}
 	fsType := g.Args[argType].Value
 	if _, ok := knownTypes[fsType]; !ok {
-		return crex.Wrapf(ErrInvalidGrant, "unknown filesystem type %q; accepted types: tmpfs, proc, sysfs, devpts, mqueue, cgroup2", fsType)
+		return crex.Newf(ErrInvalidGrant, "unknown filesystem type %q (expected tmpfs, proc, sysfs, devpts, mqueue, or cgroup2)", fsType)
 	}
 	if g.Args[argDest].Type != agl.ArgName && g.Args[argDest].Type != agl.ArgStrASCII {
-		return crex.Wrapf(ErrInvalidGrant, "second argument must be a destination path")
+		return crex.Newf(ErrInvalidGrant, "second argument must be a destination path")
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func buildOptions(fsType string, kwargs []agl.Kwarg) ([]string, error) {
 	base := []string{optNosuid, optNodev, optNoexec}
 	if fsType != fsTmpfs {
 		if len(kwargs) > 0 {
-			return nil, crex.Wrapf(ErrInvalidGrant, "keyword arguments are not supported for %s mounts", fsType)
+			return nil, crex.Newf(ErrInvalidGrant, "keyword arguments are not supported for %s mounts", fsType)
 		}
 		return base, nil
 	}
@@ -126,7 +126,7 @@ func buildOptions(fsType string, kwargs []agl.Kwarg) ([]string, error) {
 			}
 			mode = m
 		default:
-			return nil, crex.Wrapf(ErrInvalidGrant, "unknown keyword argument %q for tmpfs mount; accepted: size, mode", kw.Key)
+			return nil, crex.Newf(ErrInvalidGrant, "unknown keyword argument %q for tmpfs mount (expected size or mode)", kw.Key)
 		}
 	}
 
@@ -141,10 +141,10 @@ func buildOptions(fsType string, kwargs []agl.Kwarg) ([]string, error) {
 // can be emitted verbatim into the mount options.
 func parseMode(a agl.Arg) (string, error) {
 	if a.Type != agl.ArgInt {
-		return "", crex.Wrapf(ErrInvalidGrant, "mode must be an octal integer")
+		return "", crex.Newf(ErrInvalidGrant, "mode must be an octal integer")
 	}
 	if _, err := strconv.ParseUint(a.Value, 8, 32); err != nil {
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid octal mode %q", a.Value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid octal mode %q", a.Value)
 	}
 	return a.Value, nil
 }
@@ -159,7 +159,7 @@ func parseSize(a agl.Arg) (uint64, error) {
 	case agl.ArgInt:
 		n, err := strconv.ParseUint(a.Value, 10, 64)
 		if err != nil {
-			return 0, crex.Wrapf(ErrInvalidGrant, "invalid size %q", a.Value)
+			return 0, crex.Newf(ErrInvalidGrant, "invalid size %q", a.Value)
 		}
 		return n, nil
 	case agl.ArgQuantity:
@@ -174,12 +174,12 @@ func parseSize(a agl.Arg) (uint64, error) {
 			}
 			v, err := strconv.ParseUint(a.Value[:len(a.Value)-n], 10, 64)
 			if err != nil {
-				return 0, crex.Wrapf(ErrInvalidGrant, "invalid size %q", a.Value)
+				return 0, crex.Newf(ErrInvalidGrant, "invalid size %q", a.Value)
 			}
 			return v * mul, nil
 		}
-		return 0, crex.Wrapf(ErrInvalidGrant, "unknown size suffix in %q", a.Value)
+		return 0, crex.Newf(ErrInvalidGrant, "unknown size suffix in %q", a.Value)
 	default:
-		return 0, crex.Wrapf(ErrInvalidGrant, "size must be a byte quantity")
+		return 0, crex.Newf(ErrInvalidGrant, "size must be a byte quantity")
 	}
 }

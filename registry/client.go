@@ -312,7 +312,7 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 		defer resp.Body.Close()
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return nil, crex.Wrapf(ErrHTTPStatus, "HTTP %d: %s", resp.StatusCode, resp.Status)
+			return nil, crex.Newf(ErrHTTPStatus, "server returned status %d (%s)", resp.StatusCode, resp.Status)
 		}
 		return nil, &regErr
 	}
@@ -427,7 +427,7 @@ func (c *Client) do(req *http.Request, result interface{}) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return crex.Wrapf(ErrHTTPStatus, "HTTP %d: %s", resp.StatusCode, resp.Status)
+			return crex.Newf(ErrHTTPStatus, "server returned status %d (%s)", resp.StatusCode, resp.Status)
 		}
 		return &regErr
 	}

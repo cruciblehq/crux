@@ -88,7 +88,7 @@ func (p *identifierParser) parseType(id *Identifier, contextType string) error {
 
 	// Token is a type; must match context.
 	if tok != contextType {
-		return crex.Wrapf(ErrTypeMismatch, "type %q does not match context %q", tok, contextType)
+		return crex.Newf(ErrTypeMismatch, "type %q does not match context %q", tok, contextType)
 	}
 	p.pos++
 

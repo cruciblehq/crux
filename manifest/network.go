@@ -22,12 +22,12 @@ type Network struct {
 func (n *Network) Validate() error {
 	for i := range n.Ingress {
 		if err := n.Ingress[i].Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidProtocol, "ingress[%d]: %w", i, err)
+			return crex.At(crex.Wrap(ErrInvalidNetwork, err), "ingress rule", i+1)
 		}
 	}
 	for i := range n.Egress {
 		if err := n.Egress[i].Validate(); err != nil {
-			return crex.Wrapf(ErrInvalidProtocol, "egress[%d]: %w", i, err)
+			return crex.At(crex.Wrap(ErrInvalidNetwork, err), "egress rule", i+1)
 		}
 	}
 	return nil
@@ -95,5 +95,5 @@ func validateProtocol(p string) error {
 	if net.IsValidProtocol(p) {
 		return nil
 	}
-	return crex.Wrapf(ErrInvalidProtocol, "unknown protocol %q", p)
+	return crex.Newf(ErrInvalidProtocol, "unknown protocol %q", p)
 }

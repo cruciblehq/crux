@@ -43,7 +43,7 @@ func parseNodeType(value string) (nodeType, error) {
 	case nodeTypeDomain, nodeTypeThreaded:
 		return nodeType(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid cgroup node type %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid cgroup node type %q", value)
 	}
 }
 
@@ -59,7 +59,7 @@ func (s *spec) mergeSubtreeControl(incoming []controller) (bool, error) {
 		if slices.Equal(s.Cgroup.SubtreeControl, incoming) {
 			return false, nil
 		}
-		return false, crex.Wrapf(ErrConflict, "%s already set", subtreeControlKnob)
+		return false, crex.Newf(ErrConflict, "%s already set", subtreeControlKnob)
 	}
 	s.Cgroup.SubtreeControl = slices.Clone(incoming)
 	return true, nil

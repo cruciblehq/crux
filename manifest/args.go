@@ -13,7 +13,7 @@ type Args map[string]string
 func (a Args) Validate() error {
 	for k := range a {
 		if !isValidName(k) {
-			return crex.Wrapf(ErrInvalidArgKey, "arg key %q", k)
+			return crex.Newf(ErrInvalidArgKey, "arg key %q", k)
 		}
 	}
 	return nil

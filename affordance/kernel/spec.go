@@ -77,7 +77,7 @@ func (s *Spec) Validate() error {
 func validateNonEmpty(label string, items []string) error {
 	for i, s := range items {
 		if s == "" {
-			return crex.Wrapf(ErrInvalidSpec, "empty %s at index %d", label, i)
+			return crex.At(crex.Newf(ErrInvalidSpec, "empty value"), label, i+1)
 		}
 	}
 	return nil

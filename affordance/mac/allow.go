@@ -23,7 +23,7 @@ func cloneMACAllow(a *MACAllow) *MACAllow {
 // Validates the allow rule.
 func (a *MACAllow) Validate() error {
 	if a.Hook == "" {
-		return crex.Wrapf(ErrInvalidMACAllow, "hook is empty")
+		return crex.Newf(ErrInvalidMACAllow, "hook is empty")
 	}
 	if a.Where != nil {
 		if err := a.Where.Validate(); err != nil {

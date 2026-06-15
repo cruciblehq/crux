@@ -83,7 +83,7 @@ func (m *Manifest) validateConfig() error {
 	}
 	v, ok := m.Config.(codec.Validatable)
 	if !ok {
-		return crex.Wrapf(ErrInvalidManifest, "config type %T is not validatable", m.Config)
+		return crex.Newf(ErrInvalidManifest, "config type %T is not validatable", m.Config)
 	}
 	return v.Validate()
 }
@@ -114,7 +114,7 @@ func (m *Manifest) Encode(c *codec.Codec) (any, error) {
 func (m *Manifest) Decode(c *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
-		return crex.Wrapf(ErrDecodeFailed, "unexpected type %T", raw)
+		return crex.Newf(ErrDecodeFailed, "unexpected type %T", raw)
 	}
 	if err := c.Field(src, m, "Version"); err != nil {
 		return crex.Wrap(ErrDecodeFailed, err)

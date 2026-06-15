@@ -64,7 +64,7 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	case typeHW:
 		s.spec.HWFeatures = append(s.spec.HWFeatures, value)
 	default:
-		return crex.Wrapf(ErrInvalidGrant, "unknown kernel grant type %q; expected config, module, version, boot, lsm, or hw", typ)
+		return crex.Newf(ErrInvalidGrant, "unknown kernel grant type %q (expected config, module, version, boot, lsm, or hw)", typ)
 	}
 	return nil
 }
@@ -72,19 +72,19 @@ func (s *Subsystem) Build(g *agl.Model) error {
 // Validates the structural shape of a kernel grant.
 func check(g *agl.Model) error {
 	if g.Where != nil {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected where clause in kernel grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected where clause in kernel grant")
 	}
 	if len(g.Kwargs) > 0 {
-		return crex.Wrapf(ErrInvalidGrant, "unexpected keyword arguments in kernel grant")
+		return crex.Newf(ErrInvalidGrant, "unexpected keyword arguments in kernel grant")
 	}
 	if len(g.Args) != kernelArgCount {
-		return crex.Wrapf(ErrInvalidGrant, "kernel grant requires exactly two arguments: type and value")
+		return crex.Newf(ErrInvalidGrant, "kernel grant requires exactly two arguments (type and value)")
 	}
 	if g.Args[argType].Type != agl.ArgName {
-		return crex.Wrapf(ErrInvalidGrant, "first argument must be a type name")
+		return crex.Newf(ErrInvalidGrant, "first argument must be a type name")
 	}
 	if g.Args[argValue].Type != agl.ArgName && g.Args[argValue].Type != agl.ArgStrASCII {
-		return crex.Wrapf(ErrInvalidGrant, "second argument must be a name or quoted string value")
+		return crex.Newf(ErrInvalidGrant, "second argument must be a name or quoted string value")
 	}
 	return nil
 }

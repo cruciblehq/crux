@@ -32,7 +32,7 @@ func parseDeviceType(value string) (deviceType, error) {
 	case deviceTypeChar, deviceTypeBlock, deviceTypeAll:
 		return deviceType(s), nil
 	default:
-		return "", crex.Wrapf(ErrInvalidGrant, "invalid device type %q", value)
+		return "", crex.Newf(ErrInvalidGrant, "invalid device type %q", value)
 	}
 }
 
@@ -53,7 +53,7 @@ var reDevice = regexp.MustCompile(`^(\S+)\s+(\d+)\s+(\d+)\s+([rwm]+)$`)
 func parseDevice(value string) (device, error) {
 	m := reDevice.FindStringSubmatch(strings.TrimSpace(value))
 	if m == nil {
-		return device{}, crex.Wrapf(ErrInvalidGrant, "expected type major minor access")
+		return device{}, crex.Newf(ErrInvalidGrant, "expected type major minor access")
 	}
 	maj, err := strconv.ParseUint(m[2], 10, 32)
 	if err != nil {
@@ -93,7 +93,7 @@ func (e device) check(other device) error {
 	if !e.equal(other) {
 		return nil
 	}
-	return crex.Wrapf(ErrConflict, "%s %s %d:%d already granted", devicesKnob, other.Type, other.Major, other.Minor)
+	return crex.Newf(ErrConflict, "%s %s %d:%d already granted", devicesKnob, other.Type, other.Major, other.Minor)
 }
 
 // Always returns false; same-identity device entries are rejected by check

@@ -227,7 +227,7 @@ func verifyTempDir(dir string) error {
 		return err
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return crex.Wrapf(ErrUnsafeTempDir, "%q is a symlink or not a directory", dir)
+		return crex.Newf(ErrUnsafeTempDir, "%q is a symlink or not a directory", dir)
 	}
 	if info.Mode().Perm()&0o077 != 0 {
 		return os.Chmod(dir, tempDirMode)
