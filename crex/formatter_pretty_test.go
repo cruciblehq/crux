@@ -161,12 +161,12 @@ func TestPrettyFormatter_Write_CrexError(t *testing.T) {
 	}
 }
 
-func TestPrettyFormatter_Write_CrexError_WithFallback(t *testing.T) {
+func TestPrettyFormatter_Write_CrexError_WithRecovery(t *testing.T) {
 	f := NewPrettyFormatter(false)
 	var buf bytes.Buffer
 
 	crexErr := UserError("operation failed", "invalid type").
-		Fallback("Use widget or service").
+		Recovery("Use widget or service").
 		Err().(*Error)
 
 	record := slog.NewRecord(time.Now(), slog.LevelError, "build failed", 0)
@@ -183,7 +183,7 @@ func TestPrettyFormatter_Write_CrexError_WithFallback(t *testing.T) {
 		t.Errorf("output missing reason: %q", got)
 	}
 	if !strings.Contains(got, ". Use widget or service") {
-		t.Errorf("output missing fallback: %q", got)
+		t.Errorf("output missing recovery: %q", got)
 	}
 }
 

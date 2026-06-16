@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/compute/local"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 )
 
@@ -33,16 +34,25 @@ func newBackendLocal() Backend {
 func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error) {
 	f, err := files.CreateTemp("upload-*.img")
 	if err != nil {
-		return "", err
+		return "", crex.SystemError("cannot stage machine image", "failed to create a temporary file for the image upload").
+			Recovery("Free up disk space, then try again.").
+			Cause(err).
+			Err()
 	}
 	name := f.Name()
 	defer os.Remove(name)
 	if _, err := io.Copy(f, r); err != nil {
 		f.Close()
-		return "", err
+		return "", crex.SystemError("cannot stage machine image", "failed to write the image to a temporary file").
+			Recovery("Free up disk space, then try again.").
+			Cause(err).
+			Err()
 	}
 	if err := f.Close(); err != nil {
-		return "", err
+		return "", crex.SystemError("cannot stage machine image", "failed to finalize the temporary image file").
+			Recovery("Free up disk space, then try again.").
+			Cause(err).
+			Err()
 	}
 	return bl.local.UploadImage(ctx, name)
 }

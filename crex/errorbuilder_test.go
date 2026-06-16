@@ -108,36 +108,36 @@ func TestNewError_TrimsSurroundingWhitespace(t *testing.T) {
 	}
 }
 
-func TestErrorBuilder_Fallback(t *testing.T) {
+func TestErrorBuilder_Recovery(t *testing.T) {
 	err := UserError("test", "reason").
-		Fallback("try again").
+		Recovery("try again").
 		Err()
 	crexErr := err.(*Error)
 
-	if crexErr.Fallback() != "try again" {
-		t.Errorf("Fallback() = %q, want %q", crexErr.Fallback(), "try again")
+	if crexErr.Recovery() != "try again" {
+		t.Errorf("Recovery() = %q, want %q", crexErr.Recovery(), "try again")
 	}
 }
 
-func TestErrorBuilder_Fallbackf(t *testing.T) {
+func TestErrorBuilder_Recoveryf(t *testing.T) {
 	err := UserError("test", "reason").
-		Fallbackf("retry in %d seconds", 30).
+		Recoveryf("retry in %d seconds", 30).
 		Err()
 	crexErr := err.(*Error)
 
-	if crexErr.Fallback() != "retry in 30 seconds" {
-		t.Errorf("Fallback() = %q, want %q", crexErr.Fallback(), "retry in 30 seconds")
+	if crexErr.Recovery() != "retry in 30 seconds" {
+		t.Errorf("Recovery() = %q, want %q", crexErr.Recovery(), "retry in 30 seconds")
 	}
 }
 
-func TestErrorBuilder_Fallback_TrimsWhitespace(t *testing.T) {
+func TestErrorBuilder_Recovery_TrimsWhitespace(t *testing.T) {
 	err := UserError("test", "reason").
-		Fallback("  try again  ").
+		Recovery("  try again  ").
 		Err()
 	crexErr := err.(*Error)
 
-	if crexErr.Fallback() != "try again" {
-		t.Errorf("Fallback() = %q, want %q", crexErr.Fallback(), "try again")
+	if crexErr.Recovery() != "try again" {
+		t.Errorf("Recovery() = %q, want %q", crexErr.Recovery(), "try again")
 	}
 }
 
@@ -193,7 +193,7 @@ func TestErrorBuilder_Chaining(t *testing.T) {
 	ctx := context.Background()
 
 	err := UserError("operation failed", "invalid input").
-		Fallback("Use valid input").
+		Recovery("Use valid input").
 		Cause(underlying).
 		Detail("field", "username").
 		Detail("value", "abc").
@@ -208,8 +208,8 @@ func TestErrorBuilder_Chaining(t *testing.T) {
 	if crexErr.Reason() != "invalid input" {
 		t.Errorf("Reason() = %q, want %q", crexErr.Reason(), "invalid input")
 	}
-	if crexErr.Fallback() != "Use valid input" {
-		t.Errorf("Fallback() = %q, want %q", crexErr.Fallback(), "Use valid input")
+	if crexErr.Recovery() != "Use valid input" {
+		t.Errorf("Recovery() = %q, want %q", crexErr.Recovery(), "Use valid input")
 	}
 	if crexErr.Cause() != underlying {
 		t.Errorf("Cause() = %v, want %v", crexErr.Cause(), underlying)
@@ -221,5 +221,64 @@ func TestErrorBuilder_Chaining(t *testing.T) {
 	field, ok := crexErr.Detail("field")
 	if !ok || field != "username" {
 		t.Errorf("Detail(field) = (%v, %v), want (username, true)", field, ok)
+	}
+}
+
+func TestErrorBuilder_Ensure_ClasslessGetsClassed(t *testing.T) {
+	cause := errors.New("boom")
+	err := SystemError("fetch failed", "registry unreachable").Ensure(cause)
+
+	class, ok := ClassOf(err)
+	if !ok || class != ErrorClassSystem {
+		t.Errorf("ClassOf() = (%v, %v), want (system, true)", class, ok)
+	}
+	if !errors.Is(err, cause) {
+		t.Error("errors.Is(err, cause) = false, want true")
+	}
+}
+
+func TestErrorBuilder_Ensure_RespectsExistingClass(t *testing.T) {
+	inner := UserError("bad input", "missing flag").Err()
+	err := SystemError("fetch failed", "registry unreachable").Ensure(inner)
+
+	if err != inner {
+		t.Error("Ensure() replaced an already-classed error, want no-op")
+	}
+	class, _ := ClassOf(err)
+	if class != ErrorClassUser {
+		t.Errorf("ClassOf() = %v, want user (first classification wins)", class)
+	}
+}
+
+func TestErrorBuilder_Ensure_NilReturnsNil(t *testing.T) {
+	if got := UserError("x", "y").Ensure(nil); got != nil {
+		t.Errorf("Ensure(nil) = %v, want nil", got)
+	}
+}
+
+func TestErrorBuilder_Reclassify_OverridesExistingClass(t *testing.T) {
+	inner := UserError("bad input", "missing flag").Err()
+	err := SystemError("fetch failed", "registry unreachable").Reclassify(inner)
+
+	class, ok := ClassOf(err)
+	if !ok || class != ErrorClassSystem {
+		t.Errorf("ClassOf() = (%v, %v), want (system, true)", class, ok)
+	}
+	// The prior classification stays in the chain for errors.Is.
+	if !errors.Is(err, inner) {
+		t.Error("errors.Is(err, inner) = false, want true")
+	}
+}
+
+func TestErrorBuilder_Reclassify_NilReturnsNil(t *testing.T) {
+	if got := UserError("x", "y").Reclassify(nil); got != nil {
+		t.Errorf("Reclassify(nil) = %v, want nil", got)
+	}
+}
+
+func TestClassOf_Unclassified(t *testing.T) {
+	class, ok := ClassOf(errors.New("plain"))
+	if ok || class != ErrorClassUnknown {
+		t.Errorf("ClassOf(plain) = (%v, %v), want (unknown, false)", class, ok)
 	}
 }

@@ -22,10 +22,10 @@ func TestError_Reason(t *testing.T) {
 	}
 }
 
-func TestError_Fallback(t *testing.T) {
-	err := &Error{fallback: "test fallback"}
-	if got := err.Fallback(); got != "test fallback" {
-		t.Errorf("Fallback() = %q, want %q", got, "test fallback")
+func TestError_Recovery(t *testing.T) {
+	err := &Error{recovery: "test recovery"}
+	if got := err.Recovery(); got != "test recovery" {
+		t.Errorf("Recovery() = %q, want %q", got, "test recovery")
 	}
 }
 
@@ -192,7 +192,7 @@ func TestError_String(t *testing.T) {
 			err: &Error{
 				description: "operation failed",
 				reason:      "invalid input",
-				fallback:    "Use valid input",
+				recovery:    "Use valid input",
 			},
 			want: "operation failed: invalid input. Use valid input",
 		},
@@ -200,12 +200,12 @@ func TestError_String(t *testing.T) {
 			name: "no reason",
 			err: &Error{
 				description: "operation failed",
-				fallback:    "Try again",
+				recovery:    "Try again",
 			},
 			want: "operation failed. Try again",
 		},
 		{
-			name: "no fallback",
+			name: "no recovery",
 			err: &Error{
 				description: "operation failed",
 				reason:      "invalid input",
@@ -262,7 +262,7 @@ func TestError_LogValue(t *testing.T) {
 		class:       ErrorClassUser,
 		description: "test failed",
 		reason:      "bad input",
-		fallback:    "fix it",
+		recovery:    "fix it",
 		cause:       errors.New("underlying"),
 		details: map[string]any{
 			"key": "value",

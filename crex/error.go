@@ -2,6 +2,7 @@ package crex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -14,8 +15,8 @@ const crexErrorMarker = "!github.com/cruciblehq/crex.Error"
 // Represents an error with rich context.
 //
 // crex errors are composed of a description (what failed), a reason (why it
-// failed), and an optional fallback (how to fix it or system compromise). The
-// fallback either provides a suggestion to the user to recover from the error
+// failed), and an optional recovery (how to fix it or system compromise). The
+// recovery either provides a suggestion to the user to recover from the error
 // or indicates how the system has compromised itself to continue operating.
 //
 // Errors also have a class (user, system, programming/bug) that indicates the
@@ -31,7 +32,7 @@ const crexErrorMarker = "!github.com/cruciblehq/crex.Error"
 type Error struct {
 	description string          // What failed.
 	reason      string          // Why it failed.
-	fallback    string          // Fallback suggestion or compromise, if any.
+	recovery    string          // Recovery suggestion or compromise, if any.
 	cause       error           // Underlying cause error, if any.
 	class       ErrorClass      // Classification of the error.
 	details     map[string]any  // Additional key-value details about the error.
@@ -48,9 +49,9 @@ func (r *Error) Reason() string {
 	return r.reason
 }
 
-// Returns the error fallback suggestion or compromise.
-func (r *Error) Fallback() string {
-	return r.fallback
+// Returns the error recovery suggestion or compromise.
+func (r *Error) Recovery() string {
+	return r.recovery
 }
 
 // Returns the underlying cause error, if any.
@@ -61,6 +62,19 @@ func (r *Error) Cause() error {
 // Returns the error classification.
 func (r *Error) Class() ErrorClass {
 	return r.class
+}
+
+// Returns the error class carried by err, walking the chain to the outermost
+// [Error].
+//
+// The boolean is false when no layer of err carries a class, in which case the
+// returned class is [ErrorClassUnknown].
+func ClassOf(err error) (ErrorClass, bool) {
+	var e *Error
+	if errors.As(err, &e) {
+		return e.class, true
+	}
+	return ErrorClassUnknown, false
 }
 
 // Returns the context associated with the error, or nil if none was set.
@@ -115,9 +129,9 @@ func (r *Error) Unwrap() error {
 }
 
 // Returns a string representation of the error, including description, reason,
-// and fallback.
+// and recovery.
 //
-// The format is: "description: reason. fallback", omitting any empty parts.
+// The format is: "description: reason. recovery", omitting any empty parts.
 func (r *Error) String() string {
 	var b strings.Builder
 	b.WriteString(r.description)
@@ -125,9 +139,9 @@ func (r *Error) String() string {
 		b.WriteString(": ")
 		b.WriteString(r.reason)
 	}
-	if r.fallback != "" {
+	if r.recovery != "" {
 		b.WriteString(". ")
-		b.WriteString(r.fallback)
+		b.WriteString(r.recovery)
 	}
 	return b.String()
 }
@@ -150,7 +164,7 @@ func (r *Error) Format(f fmt.State, verb rune) {
 // Implements [slog.LogValuer].
 //
 // Returns a grouped value containing the error's class, description, reason,
-// fallback, cause, and details (if present). Includes a sentinel marker for
+// recovery, cause, and details (if present). Includes a sentinel marker for
 // reliable identification by formatters.
 func (r *Error) LogValue() slog.Value {
 	attrs := []slog.Attr{
@@ -163,8 +177,8 @@ func (r *Error) LogValue() slog.Value {
 		attrs = append(attrs, slog.String("reason", r.reason))
 	}
 
-	if r.fallback != "" {
-		attrs = append(attrs, slog.String("fallback", r.fallback))
+	if r.recovery != "" {
+		attrs = append(attrs, slog.String("recovery", r.recovery))
 	}
 
 	if r.cause != nil {

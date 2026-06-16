@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/compute"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
 )
@@ -69,17 +70,26 @@ func localPlanOptions() compute.Options {
 func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) error) error {
 	dir := files.LocalDir()
 	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
-		return err
+		return crex.SystemError("cannot access local state", "failed to create the local state directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+			Cause(err).
+			Err()
 	}
 
 	lf, err := os.OpenFile(filepath.Join(dir, localLockFile), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot access local state", "failed to open the local state lock").
+			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+			Cause(err).
+			Err()
 	}
 	defer lf.Close()
 
 	if err := files.LockWithContext(ctx, lf); err != nil {
-		return err
+		return crex.SystemError("cannot access local state", "failed to lock the local state").
+			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", filepath.Join(dir, localLockFile)).
+			Cause(err).
+			Err()
 	}
 	defer files.Unlock(lf)
 
@@ -92,7 +102,13 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 		return err
 	}
 
-	return manifest.WriteAt(m, dir)
+	if err := manifest.WriteAt(m, dir); err != nil {
+		return crex.SystemError("cannot update local state", "failed to write the local blueprint").
+			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+			Cause(err).
+			Err()
+	}
+	return nil
 }
 
 // Opens the local blueprint from disk, falling back to an empty in-memory
@@ -113,11 +129,17 @@ func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
 			}
 			return m, bp, nil
 		}
-		return nil, nil, err
+		return nil, nil, crex.SystemError("cannot read local state", "the local blueprint could not be read").
+			Recoveryf("Make sure you have read access to %s, then try again.", dir).
+			Cause(err).
+			Err()
 	}
 	bp, err := manifest.As[*manifest.Blueprint](m)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, crex.SystemError("cannot read local state", "the local blueprint is malformed").
+			Recoveryf("The local state at %s is corrupt and may need to be removed manually.", dir).
+			Cause(err).
+			Err()
 	}
 	return m, bp, nil
 }

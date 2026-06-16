@@ -56,18 +56,27 @@ func Open() (*Cache, error) {
 // The caller must call Close when done with the cache.
 func OpenAt(root string) (*Cache, error) {
 	if err := os.MkdirAll(root, files.DefaultDirMode); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot open cache", "failed to create the cache directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", root).
+			Cause(err).
+			Err()
 	}
 
 	lockPath := filepath.Join(root, lockFilename)
 	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, files.DefaultFileMode)
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot open cache", "failed to create the cache lock file").
+			Recoveryf("Make sure you have write access to %s, then try again.", root).
+			Cause(err).
+			Err()
 	}
 
 	if err := files.Lock(lf); err != nil {
 		lf.Close()
-		return nil, err
+		return nil, crex.SystemError("cannot open cache", "failed to acquire the cache lock").
+			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", lockPath).
+			Cause(err).
+			Err()
 	}
 
 	return &Cache{root: root, lock: lf}, nil
@@ -279,7 +288,10 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	// Already extracted.
 	exists, err := files.PathExists(dir)
 	if err != nil {
-		return "", err
+		return "", crex.SystemError("cannot read cache", "failed to check the extracted cache entry").
+			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Cause(err).
+			Err()
 	}
 	if exists {
 		return dir, nil
@@ -293,7 +305,10 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	defer f.Close()
 
 	if err := extractDirAtomic(f, dir); err != nil {
-		return "", err
+		return "", crex.SystemError("cannot extract cache entry", "failed to extract the cached archive").
+			Recovery("The cached archive may be corrupt; run 'crux cache clear' and try again.").
+			Cause(err).
+			Err()
 	}
 
 	return dir, nil
@@ -316,7 +331,10 @@ func (c *Cache) list() ([]*Version, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, crex.SystemError("cannot list cache", "failed to read the cache directory").
+			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Cause(err).
+			Err()
 	}
 
 	var versions []*Version
@@ -356,10 +374,16 @@ func listNamespace(root, ns string) []*Version {
 
 // Removes both the archives and extracted trees.
 func (c *Cache) clear() error {
-	return errors.Join(
+	if err := errors.Join(
 		os.RemoveAll(c.archivesRoot()),
 		os.RemoveAll(c.extractedRoot()),
-	)
+	); err != nil {
+		return crex.SystemError("cannot clear cache", "failed to remove cached files").
+			Recoveryf("Make sure you have write access to %s, then try again.", c.root).
+			Cause(err).
+			Err()
+	}
+	return nil
 }
 
 // Creates the directory structure, writes the archive, and stores metadata.
@@ -369,13 +393,19 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 		return nil, err
 	}
 	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot write to cache", "failed to create the cache entry directory").
+			Recoveryf("Make sure you have write access to %s and enough free disk space, then try again.", dir).
+			Cause(err).
+			Err()
 	}
 
 	archPath := filepath.Join(dir, archiveFilename)
 	digest, size, err := files.WriteAtomic(r, dir, archPath)
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot write to cache", "failed to write the cached archive").
+			Recovery("Free up disk space, then try again.").
+			Cause(err).
+			Err()
 	}
 
 	metPath := filepath.Join(dir, metaFilename)
@@ -398,6 +428,12 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 		os.RemoveAll(vDir),
 		os.RemoveAll(eDir),
 	)
+	if err != nil {
+		err = crex.SystemError("cannot remove cache entry", "failed to delete cached files").
+			Recoveryf("Make sure you have write access to %s, then try again.", c.root).
+			Cause(err).
+			Err()
+	}
 
 	// Best-effort parent directory cleanup.
 	for _, dir := range []string{

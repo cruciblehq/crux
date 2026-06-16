@@ -46,7 +46,9 @@ func BackendFor(p Provider) (Backend, error) {
 	r := defaultRegistry()
 	b, ok := r.backends[p]
 	if !ok {
-		return nil, crex.Newf(ErrUnknownProvider, "%q", p)
+		return nil, crex.ProgrammingErrorf("unknown compute provider", "no backend is registered for provider %q", p).
+			Cause(ErrUnknownProvider).
+			Err()
 	}
 	return b, nil
 }

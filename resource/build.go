@@ -116,7 +116,10 @@ func buildBlueprint(ctx context.Context, m *manifest.Manifest, src registry.Sour
 // Writes the resolved manifest to dir and returns the build result.
 func writeResult(m *manifest.Manifest, dir string) (*BuildResult, error) {
 	if err := manifest.WriteAt(m, dir); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot write build output", "failed to write the resolved manifest to the build directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+			Cause(err).
+			Err()
 	}
 	return &BuildResult{Output: dir, Manifest: m}, nil
 }

@@ -13,7 +13,7 @@ const colorReset = "\033[0m"
 //
 // The formatter outputs log records with optional ANSI color codes for log
 // levels. Crex errors are detected automatically and formatted as "message:
-// reason. fallback" instead of key=value pairs.
+// reason. recovery" instead of key=value pairs.
 //
 // When verbose mode is disabled (default), only the message and crex error
 // info are shown. When enabled, all attributes are included.
@@ -115,22 +115,22 @@ func formatValue(v slog.Value) string {
 	}
 }
 
-// Writes a crex error in "message: reason. fallback" format.
+// Writes a crex error in "message: reason. recovery" format.
 func (f *PrettyFormatter) writeCrexError(sb *strings.Builder, errMap map[string]slog.Value) {
 	if reason, ok := errMap["reason"]; ok && reason.String() != "" {
 		sb.WriteString(": ")
 		sb.WriteString(reason.String())
 	}
 
-	if fallback, ok := errMap["fallback"]; ok && fallback.String() != "" {
+	if recovery, ok := errMap["recovery"]; ok && recovery.String() != "" {
 		sb.WriteString(". ")
-		sb.WriteString(fallback.String())
+		sb.WriteString(recovery.String())
 	}
 
 	// In verbose mode, include additional error details
 	if f.Verbose {
 		for key, val := range errMap {
-			if key == "reason" || key == "fallback" || key == "description" || key == crexErrorMarker {
+			if key == "reason" || key == "recovery" || key == "description" || key == crexErrorMarker {
 				continue
 			}
 			sb.WriteString(" ")

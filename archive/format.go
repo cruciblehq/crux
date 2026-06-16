@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Supported archive compression formats.
@@ -89,7 +91,9 @@ func newCompressWriter(w io.Writer, f Format) (io.WriteCloser, error) {
 	case Tar:
 		return nopWriteCloser{w}, nil
 	default:
-		return nil, ErrUnsupportedFormat
+		return nil, crex.ProgrammingErrorf("cannot compress archive", "unsupported archive format %d", f).
+			Cause(ErrUnsupportedFormat).
+			Err()
 	}
 }
 
@@ -112,6 +116,8 @@ func newDecompressReader(r io.Reader, f Format) (io.ReadCloser, error) {
 	case Tar:
 		return io.NopCloser(r), nil
 	default:
-		return nil, ErrUnsupportedFormat
+		return nil, crex.ProgrammingErrorf("cannot decompress archive", "unsupported archive format %d", f).
+			Cause(ErrUnsupportedFormat).
+			Err()
 	}
 }

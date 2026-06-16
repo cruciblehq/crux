@@ -26,7 +26,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 	resType, err := manifest.ParseResourceType(c.Type)
 	if err != nil {
 		return crex.UserError("invalid resource type", c.Type).
-			Fallback("Use a valid resource type such as 'widget' or 'service'.").
+			Recovery("Use a valid resource type such as 'widget' or 'service'.").
 			Err()
 	}
 
@@ -57,7 +57,7 @@ func removeReference(c *cache.Cache, src registry.Source, resType manifest.Resou
 	ref, err := src.Parse(string(resType), refStr)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).
-			Fallback("Use the format 'namespace/resource version'.").
+			Recovery("Use the format 'namespace/resource version'.").
 			Err()
 	}
 

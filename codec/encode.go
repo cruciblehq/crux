@@ -5,6 +5,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"gopkg.in/yaml.v3"
+
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Implemented by types that need custom encoding logic.
@@ -76,6 +78,8 @@ func encodeValue(v any, f Format) ([]byte, error) {
 	case YAML:
 		return yaml.Marshal(v)
 	default:
-		return nil, ErrUnsupportedFormat
+		return nil, crex.ProgrammingErrorf("cannot encode value", "unsupported codec format %s", f).
+			Cause(ErrUnsupportedFormat).
+			Err()
 	}
 }

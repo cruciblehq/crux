@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"errors"
 
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
 )
 
@@ -16,6 +18,12 @@ func (c *LocalRemoveCmd) Run(ctx context.Context) error {
 	if err := modifyLocalBlueprint(ctx, func(bp *manifest.Blueprint) error {
 		return bp.RemoveService(c.ID)
 	}); err != nil {
+		if errors.Is(err, manifest.ErrServiceNotFound) {
+			return crex.UserError("service not found", c.ID).
+				Recovery("Use 'crux local list' to see the registered services.").
+				Cause(err).
+				Err()
+		}
 		return err
 	}
 	return nil

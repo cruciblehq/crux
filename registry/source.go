@@ -23,10 +23,14 @@ type Source struct {
 // if either is empty.
 func NewSource(registry, namespace string) (Source, error) {
 	if registry == "" {
-		return Source{}, crex.Wrap(ErrMissingOption, ErrMissingRegistry)
+		return Source{}, crex.ProgrammingError("missing registry", "a registry URL is required").
+			Cause(crex.Wrap(ErrMissingOption, ErrMissingRegistry)).
+			Err()
 	}
 	if namespace == "" {
-		return Source{}, crex.Wrap(ErrMissingOption, ErrMissingNamespace)
+		return Source{}, crex.ProgrammingError("missing namespace", "a namespace is required").
+			Cause(crex.Wrap(ErrMissingOption, ErrMissingNamespace)).
+			Err()
 	}
 	return Source{Registry: registry, Namespace: namespace}, nil
 }

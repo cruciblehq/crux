@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource/blueprint"
@@ -41,7 +42,10 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 
 	output := files.BuildDir(files.LocalDir())
 	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
-		return err
+		return crex.SystemError("cannot prepare build output", "failed to create the build output directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", output).
+			Cause(crex.Wrap(registry.ErrFileSystemOperation, err)).
+			Err()
 	}
 
 	if err := blueprint.NewBuilder(src, c.Environment).Build(ctx, bp, output); err != nil {

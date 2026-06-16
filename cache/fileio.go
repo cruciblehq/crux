@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cruciblehq/crux/archive"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 )
 
@@ -50,12 +51,18 @@ func readMeta(metaPath string) (*Version, error) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read cache", "failed to read the cache metadata file").
+			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Cause(err).
+			Err()
 	}
 
 	var ver Version
 	if err := json.Unmarshal(data, &ver); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read cache", "the cache metadata file is corrupt").
+			Recovery("Run 'crux cache clear' to remove the corrupt entry and try again.").
+			Cause(err).
+			Err()
 	}
 	return &ver, nil
 }
@@ -78,10 +85,16 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 
 	data, err := json.Marshal(ver)
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot write to cache", "failed to encode the cache metadata").
+			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Cause(err).
+			Err()
 	}
 	if err := os.WriteFile(metPath, data, files.DefaultFileMode); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot write to cache", "failed to write the cache metadata file").
+			Recovery("Free up disk space, then try again.").
+			Cause(err).
+			Err()
 	}
 	return ver, nil
 }

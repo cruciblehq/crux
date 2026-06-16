@@ -1,6 +1,6 @@
 // Crex provides structured error management.
 //
-// Crex errors include a description, reason, fallback suggestion, underlying
+// Crex errors include a description, reason, recovery suggestion, underlying
 // cause, error class, and additional details. They are designed to provide
 // user-friendly error messages that explain what happened, why, and what the
 // user can do about it.
@@ -24,7 +24,7 @@
 // [ErrorBuilder] for further configuration:
 //
 //	err := crex.UserError("could not retrieve data", "connection timed out").
-//		Fallback("Check your network settings.").
+//		Recovery("Check your network settings.").
 //		Detail("server", serverName).
 //		Cause(previousError).
 //		Err()
@@ -75,7 +75,7 @@
 //   - [JSONFormatter]: Machine-readable JSON output
 //
 // The [PrettyFormatter] automatically detects crex errors and formats them
-// as "description: reason. fallback". The [JSONFormatter] outputs all attributes
+// as "description: reason. recovery". The [JSONFormatter] outputs all attributes
 // as nested JSON objects.
 //
 // Crex provides [Assert] and [Assertf] for debug-only assertions that are

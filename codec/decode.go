@@ -75,13 +75,17 @@ func (c *Codec) Unmarshal(data []byte, v any, f Format) error {
 func (c *Codec) Field(src map[string]any, v any, fieldName string) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Pointer || rv.Elem().Kind() != reflect.Struct {
-		return ErrInvalidInput
+		return crex.ProgrammingError("cannot decode field", "the decode target must be a pointer to a struct").
+			Cause(ErrInvalidInput).
+			Err()
 	}
 	rv = rv.Elem()
 
 	sf, ok := rv.Type().FieldByName(fieldName)
 	if !ok {
-		return crex.Newf(ErrMissingField, "%s has no field %q", rv.Type().Name(), fieldName)
+		return crex.ProgrammingErrorf("cannot decode field", "%s has no field %q", rv.Type().Name(), fieldName).
+			Cause(ErrMissingField).
+			Err()
 	}
 
 	rawTag := sf.Tag.Get(c.tag)
@@ -147,7 +151,9 @@ func decodeMap(data []byte, f Format) (map[string]any, error) {
 			return nil, err
 		}
 	default:
-		return nil, ErrUnsupportedFormat
+		return nil, crex.ProgrammingErrorf("cannot decode data", "unsupported codec format %s", f).
+			Cause(ErrUnsupportedFormat).
+			Err()
 	}
 	return m, nil
 }

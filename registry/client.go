@@ -305,14 +305,18 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, crex.Wrap(ErrHTTPExecute, err)
+		return nil, crex.SystemError("cannot reach registry", "the request to the registry failed").
+			Cause(crex.Wrap(ErrHTTPExecute, err)).
+			Err()
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return nil, crex.Newf(ErrHTTPStatus, "server returned status %d (%s)", resp.StatusCode, resp.Status)
+			return nil, crex.SystemErrorf("registry request failed", "the server returned status %d (%s)", resp.StatusCode, resp.Status).
+				Cause(ErrHTTPStatus).
+				Err()
 		}
 		return nil, &regErr
 	}
@@ -420,21 +424,27 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 func (c *Client) do(req *http.Request, result interface{}) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return crex.Wrap(ErrHTTPExecute, err)
+		return crex.SystemError("cannot reach registry", "the request to the registry failed").
+			Cause(crex.Wrap(ErrHTTPExecute, err)).
+			Err()
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var regErr Error
 		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
-			return crex.Newf(ErrHTTPStatus, "server returned status %d (%s)", resp.StatusCode, resp.Status)
+			return crex.SystemErrorf("registry request failed", "the server returned status %d (%s)", resp.StatusCode, resp.Status).
+				Cause(ErrHTTPStatus).
+				Err()
 		}
 		return &regErr
 	}
 
 	if result != nil {
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return crex.Wrap(ErrResponseDecode, err)
+			return crex.SystemError("cannot read registry response", "the registry returned an unreadable response").
+				Cause(crex.Wrap(ErrResponseDecode, err)).
+				Err()
 		}
 	}
 

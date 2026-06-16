@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/manifest"
 )
 
@@ -19,7 +22,16 @@ type LocalAddCmd struct{}
 func (c *LocalAddCmd) Run(ctx context.Context) error {
 	man, err := manifest.ReadAt(RootCmd.Context)
 	if err != nil {
-		return err
+		if errors.Is(err, os.ErrNotExist) {
+			return crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
+				Recovery("Run this command from a directory containing a crucible.yaml.").
+				Cause(err).
+				Err()
+		}
+		return crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
+			Recovery("Check that crucible.yaml is present and valid.").
+			Cause(err).
+			Err()
 	}
 
 	name := man.Resource.Name
@@ -34,6 +46,12 @@ func (c *LocalAddCmd) Run(ctx context.Context) error {
 	if err := modifyLocalBlueprint(ctx, func(bp *manifest.Blueprint) error {
 		return bp.AddService(ref)
 	}); err != nil {
+		if errors.Is(err, manifest.ErrServiceExists) {
+			return crex.UserError("service already added", ref.ID).
+				Recovery("This service is already registered in the local blueprint.").
+				Cause(err).
+				Err()
+		}
 		return err
 	}
 

@@ -33,7 +33,7 @@ func main() {
 	defer stop()
 
 	if err := cli.Execute(ctx); err != nil {
-		slog.Error(err.Error())
+		crex.LogError(slog.Default(), err)
 		os.Exit(1)
 	}
 }

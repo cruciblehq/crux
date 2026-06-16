@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -66,7 +67,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
 		if _, err := c.build(ctx, registryURL); err != nil {
-			slog.Error(err.Error())
+			crex.LogError(slog.Default(), err)
 			return nil
 		}
 
@@ -76,7 +77,10 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 	}
 
 	if _, err := watch.WatchRecursive(RootCmd.Context, callback); err != nil {
-		return err
+		return crex.SystemError("cannot watch for changes", "the file watcher could not be started").
+			Recovery("Try running the command again without watch mode.").
+			Cause(err).
+			Err()
 	}
 
 	// Wait for cancellation
@@ -93,12 +97,24 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 
 	man, err := manifest.ReadAt(RootCmd.Context)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
+				Recovery("Run this command from a directory containing a crucible.yaml.").
+				Cause(err).
+				Err()
+		}
+		return nil, crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
+			Recovery("Check that crucible.yaml is present and valid.").
+			Cause(err).
+			Err()
 	}
 
 	output := files.BuildDir(RootCmd.Context)
 	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
-		return nil, crex.Wrap(registry.ErrFileSystemOperation, err)
+		return nil, crex.SystemError("cannot prepare build output", "failed to create the build output directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", output).
+			Cause(crex.Wrap(registry.ErrFileSystemOperation, err)).
+			Err()
 	}
 
 	return resource.Build(ctx, *man, src, RootCmd.Context, c.Environment, output)

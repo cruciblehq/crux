@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
 	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/registry"
@@ -32,7 +35,16 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	man, err := manifest.ReadAt(RootCmd.Context)
 	if err != nil {
-		return err
+		if errors.Is(err, os.ErrNotExist) {
+			return crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
+				Recovery("Run this command from a directory containing a crucible.yaml.").
+				Cause(err).
+				Err()
+		}
+		return crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
+			Recovery("Check that crucible.yaml is present and valid.").
+			Cause(err).
+			Err()
 	}
 
 	if err := resource.Push(ctx, src, *man, files.Package(RootCmd.Context)); err != nil {

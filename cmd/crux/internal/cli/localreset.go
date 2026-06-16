@@ -8,6 +8,7 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/compute/local"
+	"github.com/cruciblehq/crux/crex"
 )
 
 // Represents the 'crux local reset' command.
@@ -34,7 +35,10 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 	}
 	f, err := os.Open(imagePath)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
+			Recovery("Check your network connection and try again.").
+			Cause(err).
+			Err()
 	}
 	defer f.Close()
 	imageID, err := b.Upload(ctx, f)

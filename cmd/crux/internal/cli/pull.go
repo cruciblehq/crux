@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -28,7 +29,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 	resType, err := manifest.ParseResourceType(c.Type)
 	if err != nil {
 		return crex.UserError("invalid resource type", c.Type).
-			Fallback("Use a valid resource type such as 'widget' or 'service'.").
+			Recovery("Use a valid resource type such as 'widget' or 'service'.").
 			Err()
 	}
 
@@ -46,11 +47,22 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	ref, err := src.Parse(string(resType), raw)
 	if err != nil {
-		return err
+		return crex.UserError("invalid resource reference", raw).
+			Recovery("Use a valid reference.").
+			Cause(err).
+			Err()
 	}
 
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
+		if errors.Is(err, registry.ErrNoVersions) ||
+			errors.Is(err, registry.ErrNoMatchingVersion) ||
+			errors.Is(err, registry.ErrTypeMismatch) {
+			return crex.UserError("resource not found", raw).
+				Recovery("Check the resource reference and version, then try again.").
+				Cause(err).
+				Err()
+		}
 		return err
 	}
 

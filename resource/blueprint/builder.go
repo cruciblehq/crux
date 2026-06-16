@@ -37,7 +37,13 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, output str
 	if err != nil {
 		return err
 	}
-	return manifest.WritePlanAt(p, output)
+	if err := manifest.WritePlanAt(p, output); err != nil {
+		return crex.SystemError("cannot write deployment plan", "failed to write the deployment plan to the build directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", output).
+			Cause(err).
+			Err()
+	}
+	return nil
 }
 
 // Produces the deployment plan for a blueprint without writing it to disk.

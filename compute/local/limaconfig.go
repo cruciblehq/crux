@@ -71,7 +71,10 @@ type limaConfig struct {
 func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
 	u, err := user.Current()
 	if err != nil {
-		return limaConfig{}, crex.Wrap(ErrHostConfig, err)
+		return limaConfig{}, crex.SystemError("cannot configure local environment", "failed to determine the current host user").
+			Recovery("If the problem persists, report it to the Crucible team.").
+			Cause(crex.Wrap(ErrHostConfig, err)).
+			Err()
 	}
 
 	data := limaConfig{
@@ -103,17 +106,26 @@ func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error
 
 	configPath := files.LimaConfig()
 	if err := os.MkdirAll(filepath.Dir(configPath), files.DefaultDirMode); err != nil {
-		return "", crex.Wrap(ErrHostConfig, err)
+		return "", crex.SystemError("cannot configure local environment", "failed to create the configuration directory").
+			Recoveryf("Make sure you have write access to %s, then try again.", filepath.Dir(configPath)).
+			Cause(crex.Wrap(ErrHostConfig, err)).
+			Err()
 	}
 
 	f, err := os.Create(configPath)
 	if err != nil {
-		return "", crex.Wrap(ErrHostConfig, err)
+		return "", crex.SystemError("cannot configure local environment", "failed to write the configuration file").
+			Recoveryf("Make sure you have write access to %s, then try again.", configPath).
+			Cause(crex.Wrap(ErrHostConfig, err)).
+			Err()
 	}
 	defer f.Close()
 
 	if err := limaConfigTemplate.Execute(f, data); err != nil {
-		return "", crex.Wrap(ErrHostConfig, err)
+		return "", crex.SystemError("cannot configure local environment", "failed to render the configuration file").
+			Recovery("If the problem persists, report it to the Crucible team.").
+			Cause(crex.Wrap(ErrHostConfig, err)).
+			Err()
 	}
 
 	return configPath, nil

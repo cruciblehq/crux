@@ -38,7 +38,10 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 		}
 		f, err := os.Open(imagePath)
 		if err != nil {
-			return err
+			return crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
+				Recovery("Run 'crux local reset' to re-download the machine image.").
+				Cause(err).
+				Err()
 		}
 		defer f.Close()
 		imageID, err := b.Upload(ctx, f)

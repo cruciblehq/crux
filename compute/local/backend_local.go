@@ -70,7 +70,10 @@ func ensureMachineImage(ctx context.Context) (string, error) {
 // during provisioning.
 func uploadImage(_ context.Context, path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
-		return "", crex.Wrap(ErrImageUpload, err)
+		return "", crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
+			Recovery("Run 'crux local reset' to re-download the machine image.").
+			Cause(crex.Wrap(ErrImageUpload, err)).
+			Err()
 	}
 	return path, nil
 }
@@ -105,7 +108,10 @@ func start(ctx context.Context, _ string) error {
 	}
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
-		return crex.Wrap(ErrHostStart, err)
+		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
+			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Cause(crex.Wrap(ErrHostStart, err)).
+			Err()
 	}
 	return nil
 }
@@ -122,7 +128,10 @@ func stop(ctx context.Context, _ string) error {
 	}
 
 	if err := limactlRun(ctx, "stop", limaInstanceName); err != nil {
-		return crex.Wrap(ErrHostStop, err)
+		return crex.SystemError("cannot stop local environment", "the local virtual machine failed to stop").
+			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Cause(crex.Wrap(ErrHostStop, err)).
+			Err()
 	}
 	return nil
 }
@@ -192,7 +201,10 @@ func waitForContainerd(ctx context.Context) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return crex.Newf(ErrHostStart, "timed out waiting for containerd to become ready")
+			return crex.SystemErrorf("local runtime not ready", "containerd did not become ready within %s", containerdReadyTimeout).
+				Recovery("Run 'crux local reset' to recreate the local environment.").
+				Cause(ErrHostStart).
+				Err()
 		}
 		select {
 		case <-ctx.Done():
@@ -232,19 +244,31 @@ func isContainerdReady(ctx context.Context) bool {
 func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel.Spec) error {
 	configPath, err := generateLimaConfig(imagePath, kernelSpec)
 	if err != nil {
-		return crex.Wrap(ErrHostCreate, err)
+		return crex.SystemError("cannot create local environment", "failed to generate the virtual machine configuration").
+			Recovery("Run 'crux local reset' and try again.").
+			Cause(crex.Wrap(ErrHostCreate, err)).
+			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "create", "--name="+limaInstanceName, configPath); err != nil {
-		return crex.Wrap(ErrHostCreate, err)
+		return crex.SystemError("cannot create local environment", "the local virtual machine could not be created").
+			Recovery("Run 'crux local reset' and try again.").
+			Cause(crex.Wrap(ErrHostCreate, err)).
+			Err()
 	}
 
 	if err := removeInstanceSocket(); err != nil {
-		return crex.Wrap(ErrHostCreate, err)
+		return crex.SystemError("cannot create local environment", "failed to reset the local runtime socket").
+			Recovery("Run 'crux local reset' and try again.").
+			Cause(crex.Wrap(ErrHostCreate, err)).
+			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
-		return crex.Wrap(ErrHostStart, err)
+		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
+			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Cause(crex.Wrap(ErrHostStart, err)).
+			Err()
 	}
 
 	if err := waitForContainerd(ctx); err != nil {
@@ -263,17 +287,26 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 func fetchMachineImage(ctx context.Context) error {
 	src, err := registry.NewSource(machineRegistryURL, machineNamespace)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot download machine image", "the registry source could not be initialized").
+			Recovery("Check your network connection and try again.").
+			Cause(err).
+			Err()
 	}
 
 	id := reference.NewIdentifier(machineName, machineRegistryURL, machineNamespace, machineName)
 	ref, err := reference.New(id, machineVersion, nil)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot download machine image", "the machine image reference is invalid").
+			Recovery("If the problem persists, report it to the Crucible team.").
+			Cause(err).
+			Err()
 	}
 
 	if _, err := src.Pull(ctx, ref); err != nil {
-		return err
+		return crex.SystemError("cannot download machine image", "the machine image could not be retrieved from the registry").
+			Recovery("Check your network connection and try again.").
+			Cause(err).
+			Err()
 	}
 	return nil
 }
@@ -331,14 +364,20 @@ func destroyHost(ctx context.Context) error {
 	}
 
 	if err := limactlRun(ctx, "delete", "--force", limaInstanceName); err != nil {
-		return crex.Wrap(ErrHostDestroy, err)
+		return crex.SystemError("cannot destroy local environment", "the local virtual machine could not be deleted").
+			Recovery("Try again, or stop the local environment first with 'crux local stop'.").
+			Cause(crex.Wrap(ErrHostDestroy, err)).
+			Err()
 	}
 
 	// limactl delete does not stop the VM first, so the forwarded socket may
 	// be left on disk. Remove the instance socket directory so a subsequent
 	// start can bind a fresh listener.
 	if err := removeInstanceSocket(); err != nil {
-		return crex.Wrap(ErrHostDestroy, err)
+		return crex.SystemError("cannot destroy local environment", "failed to remove the local runtime socket").
+			Recoveryf("Make sure you can delete %s, then try again.", filepath.Dir(files.ContainerdSocket(limaInstanceName))).
+			Cause(crex.Wrap(ErrHostDestroy, err)).
+			Err()
 	}
 
 	return nil

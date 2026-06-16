@@ -29,12 +29,18 @@ func (c *ImportCmd) Run(ctx context.Context) error {
 
 	p, err := v1.ParsePlatform(platform)
 	if err != nil {
-		return crex.Wrap(ErrImport, err)
+		return crex.UserError("invalid platform", platform).
+			Recovery("Use a valid platform such as 'linux/amd64' or 'linux/arm64'.").
+			Cause(err).
+			Err()
 	}
 
 	parsed, err := name.ParseReference(c.Image)
 	if err != nil {
-		return crex.Wrap(ErrImport, err)
+		return crex.UserError("invalid image reference", c.Image).
+			Recovery("Use a valid OCI image reference such as 'alpine:3.21' or 'ghcr.io/user/image:tag'.").
+			Cause(err).
+			Err()
 	}
 
 	slog.Info("pulling image...", "image", parsed.String(), "platform", platform)
