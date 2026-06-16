@@ -12,7 +12,7 @@ func TestPlanValidateOK(t *testing.T) {
 		Version:  PlanVersion,
 		Services: map[string]string{"svc": "ns/x"},
 		Infrastructure: Infrastructure{
-			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{Host: "localhost"}}},
+			Computes: map[string]Compute{"c1": {Type: ComputeTypeLocal, Config: &ComputeLocal{Host: "localhost"}}},
 			Networks: map[string]Network{"n1": {}},
 		},
 		Containers:  map[string]Container{"svc": {}},

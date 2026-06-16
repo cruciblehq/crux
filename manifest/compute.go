@@ -1,8 +1,21 @@
 package manifest
 
 import (
+	"github.com/cruciblehq/crux/affordance/kernel"
 	"github.com/cruciblehq/crux/codec"
 	"github.com/cruciblehq/crux/crex"
+)
+
+// Identifies a compute provider.
+//
+// Each value names a provider whose backend the compute package resolves to
+// provision and connect to a compute unit.
+type ComputeType string
+
+// Supported compute provider types.
+const (
+	ComputeTypeAWS   ComputeType = "aws"   // AWS EC2 provider.
+	ComputeTypeLocal ComputeType = "local" // Local machine provider.
 )
 
 // Represents one compute unit in the infrastructure plan.
@@ -18,9 +31,9 @@ type Compute struct {
 	//
 	// Determines the type of [Compute.Config], which holds the configuration
 	// fields specific to that provider. Supported providers are determined by
-	// the compute package. Currently supported providers are "aws" for AWS EC2
-	// instances and "local".
-	Type string `codec:"type"`
+	// the compute package. Currently supported providers are [ComputeTypeAWS]
+	// for AWS EC2 instances and [ComputeTypeLocal].
+	Type ComputeType `codec:"type"`
 
 	// Provider-specific configuration.
 	//
@@ -28,12 +41,13 @@ type Compute struct {
 	// [*ComputeLocal] for "local".
 	Config any `codec:"-"`
 
-	// Compiled VM-level security model derived from service grants.
+	// Kernel requirements derived from service grants.
 	//
-	// Populated by the blueprint builder after bin-packing. Nil when the
-	// compute unit has not yet had a security model derived for it. The provider
-	// applies this model at provisioning time.
-	Security *ComputeSecurityModel `codec:"security,omitempty"`
+	// Union of the kernel specs accumulated by all service affordance builders
+	// assigned to this compute unit. Populated by the blueprint builder after
+	// bin-packing; nil when no requirements have been derived yet. The provider
+	// must satisfy these requirements with the VM image at provisioning time.
+	Kernel *kernel.Spec `codec:"kernel,omitempty"`
 }
 
 // Validates the compute entry.
@@ -42,8 +56,8 @@ type Compute struct {
 // supported types. The provider-specific configuration (Compute.Config) must
 // implement the Validatable interface and is validated by calling its Validate
 // method. The configuration must also be present (non-nil), since the provider
-// type implies required configuration fields. If a security model is present
-// it is also validated.
+// type implies required configuration fields. If kernel requirements are
+// present they are also validated.
 func (c *Compute) Validate() error {
 	if c.Config == nil {
 		return ErrMissingComputeProvider
@@ -55,8 +69,8 @@ func (c *Compute) Validate() error {
 	if err := v.Validate(); err != nil {
 		return err
 	}
-	if c.Security != nil {
-		if err := c.Security.Validate(); err != nil {
+	if c.Kernel != nil {
+		if err := c.Kernel.Validate(); err != nil {
 			return err
 		}
 	}
@@ -66,8 +80,8 @@ func (c *Compute) Validate() error {
 // Decodes a raw parsed map into the compute entry.
 //
 // Reads the provider type first, then decodes the remaining fields into the
-// concrete configuration type for that provider. The optional "security" key
-// is decoded into a [ComputeSecurityModel] if present.
+// concrete configuration type for that provider. The optional "kernel" key is
+// decoded into a [kernel.Spec] if present.
 func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 	src, ok := raw.(map[string]any)
 	if !ok {
@@ -78,9 +92,9 @@ func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 	}
 	var target any
 	switch c.Type {
-	case "aws":
+	case ComputeTypeAWS:
 		target = &ComputeAWS{}
-	case "local":
+	case ComputeTypeLocal:
 		target = &ComputeLocal{}
 	default:
 		return crex.Newf(ErrInvalidComputeType, "unknown provider %q", c.Type)
@@ -89,16 +103,16 @@ func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 		return crex.Wrap(ErrDecodeFailed, err)
 	}
 	c.Config = target
-	if rawSecurity, ok := src["security"]; ok && rawSecurity != nil {
-		securityMap, ok := rawSecurity.(map[string]any)
+	if rawKernel, ok := src["kernel"]; ok && rawKernel != nil {
+		kernelMap, ok := rawKernel.(map[string]any)
 		if !ok {
-			return crex.Wrap(ErrDecodeFailed, ErrInvalidComputeSecurityModel)
+			return crex.Newf(ErrDecodeFailed, "unexpected kernel type %T", rawKernel)
 		}
-		p := &ComputeSecurityModel{}
-		if err := cd.Decode(securityMap, p); err != nil {
+		k := &kernel.Spec{}
+		if err := cd.Decode(kernelMap, k); err != nil {
 			return crex.Wrap(ErrDecodeFailed, err)
 		}
-		c.Security = p
+		c.Kernel = k
 	}
 	return nil
 }
@@ -106,8 +120,8 @@ func (c *Compute) Decode(cd *codec.Codec, raw any) error {
 // Encodes the compute entry to a serializable map.
 //
 // Merges the provider configuration fields with the provider type key into a
-// single flat map. The security model, if present, is encoded as a nested
-// "security" key.
+// single flat map. The kernel requirements, if present, are encoded as a
+// nested "kernel" key.
 func (c *Compute) Encode(cd *codec.Codec) (any, error) {
 	var cfg map[string]any
 	if c.Config == nil {
@@ -120,12 +134,12 @@ func (c *Compute) Encode(cd *codec.Codec) (any, error) {
 		}
 		cfg["type"] = c.Type
 	}
-	if c.Security != nil {
-		raw, err := encodeToMap(cd, c.Security)
+	if c.Kernel != nil {
+		raw, err := encodeToMap(cd, c.Kernel)
 		if err != nil {
 			return nil, err
 		}
-		cfg["security"] = raw
+		cfg["kernel"] = raw
 	}
 	return cfg, nil
 }

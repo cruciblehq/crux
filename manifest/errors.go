@@ -79,5 +79,4 @@ var (
 	ErrInvalidState                      = crex.New("invalid state")
 	ErrUnsupportedStateVersion           = crex.New("unsupported state version")
 	ErrMissingDeployedAt                 = crex.New("missing deployment timestamp")
-	ErrInvalidComputeSecurityModel       = crex.New("invalid compute security model")
 )

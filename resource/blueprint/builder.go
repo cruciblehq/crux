@@ -56,7 +56,7 @@ func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src
 	p := &manifest.Plan{
 		Version: manifest.PlanVersion,
 		Infrastructure: manifest.Infrastructure{
-			Computes: map[string]manifest.Compute{"default": {Type: "local", Config: &manifest.ComputeLocal{Host: computeHost}}},
+			Computes: map[string]manifest.Compute{"default": {Type: manifest.ComputeTypeLocal, Config: &manifest.ComputeLocal{Host: computeHost}}},
 		},
 		Services:     make(map[string]string),
 		Containers:   make(map[string]manifest.Container),
@@ -87,9 +87,9 @@ func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src
 
 	// Derive the kernel requirements per compute unit from the union of assigned services.
 	for computeID := range p.Infrastructure.Computes {
-		model := deriveComputeSecurityModel(computeID, assignments, results)
+		spec := deriveComputeKernel(computeID, assignments, results)
 		compute := p.Infrastructure.Computes[computeID]
-		compute.Security = &model
+		compute.Kernel = &spec
 		p.Infrastructure.Computes[computeID] = compute
 	}
 
@@ -272,19 +272,19 @@ func binPack(results []serviceResult, computes map[string]manifest.Compute) map[
 	return assignments
 }
 
-// Derives the kernel-level ComputeSecurityModel for a single compute unit.
+// Derives the union of kernel requirements for a single compute unit.
 //
 // Unions the kernel specs of all services assigned to computeID. Entries are
 // deduplicated.
-func deriveComputeSecurityModel(computeID string, assignments map[string]string, results []serviceResult) manifest.ComputeSecurityModel {
-	var model manifest.ComputeSecurityModel
+func deriveComputeKernel(computeID string, assignments map[string]string, results []serviceResult) kernel.Spec {
+	var spec kernel.Spec
 	for _, r := range results {
 		if assignments[r.serviceID] != computeID {
 			continue
 		}
-		model.Kernel.Merge(r.kernel)
+		spec.Merge(r.kernel)
 	}
-	return model
+	return spec
 }
 
 // Pulls a service resource and extracts its manifest config.

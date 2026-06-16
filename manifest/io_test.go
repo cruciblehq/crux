@@ -121,7 +121,7 @@ func TestWritePlan(t *testing.T) {
 		Version:  PlanVersion,
 		Services: map[string]string{"svc": "ns/x"},
 		Infrastructure: Infrastructure{
-			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{}}},
+			Computes: map[string]Compute{"c1": {Type: ComputeTypeLocal, Config: &ComputeLocal{}}},
 			Networks: map[string]Network{"n1": {}},
 		},
 		Containers:  map[string]Container{"svc": {}},
@@ -147,7 +147,7 @@ func TestWritePlanAt(t *testing.T) {
 		Version:  PlanVersion,
 		Services: map[string]string{"svc": "ns/x"},
 		Infrastructure: Infrastructure{
-			Computes: map[string]Compute{"c1": {Type: "local", Config: &ComputeLocal{}}},
+			Computes: map[string]Compute{"c1": {Type: ComputeTypeLocal, Config: &ComputeLocal{}}},
 			Networks: map[string]Network{"n1": {}},
 		},
 		Containers:  map[string]Container{"svc": {}},

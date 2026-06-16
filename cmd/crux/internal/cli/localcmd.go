@@ -53,10 +53,10 @@ func localPlanOptions() compute.Options {
 	if !ok {
 		return compute.Options{}
 	}
-	if c.Security == nil {
+	if c.Kernel == nil {
 		return compute.Options{}
 	}
-	return compute.Options{Kernel: c.Security.Kernel}
+	return compute.Options{Kernel: *c.Kernel}
 }
 
 // Acquires an exclusive lock on the blueprint file, reads it, calls fn, and

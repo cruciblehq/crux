@@ -102,17 +102,17 @@ func TestBinPack(t *testing.T) {
 	}
 }
 
-func TestDeriveComputeSecurityModel(t *testing.T) {
+func TestDeriveComputeKernel(t *testing.T) {
 	results := []serviceResult{
 		{serviceID: "a", kernel: kernel.Spec{Features: []string{"NETFILTER"}}},
 		{serviceID: "b", kernel: kernel.Spec{Features: []string{"FUSE_FS"}}},
 	}
 	assignments := map[string]string{"a": "c1", "b": "c2"}
 
-	model := deriveComputeSecurityModel("c1", assignments, results)
+	spec := deriveComputeKernel("c1", assignments, results)
 
 	// Only the service assigned to c1 contributes its kernel requirements.
-	if len(model.Kernel.Features) != 1 || model.Kernel.Features[0] != "NETFILTER" {
-		t.Fatalf("c1 features = %v, want [NETFILTER]", model.Kernel.Features)
+	if len(spec.Features) != 1 || spec.Features[0] != "NETFILTER" {
+		t.Fatalf("c1 features = %v, want [NETFILTER]", spec.Features)
 	}
 }
