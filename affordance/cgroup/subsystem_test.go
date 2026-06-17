@@ -209,63 +209,6 @@ func TestBuildListFieldDispatch(t *testing.T) {
 	}
 }
 
-func TestKey(t *testing.T) {
-	cases := []struct {
-		name string
-		src  string
-		want string
-	}{
-		// Scalar knobs: key = knob name.
-		{"cpu.weight scalar", ".cgroup cpu.weight 100", "cpu.weight"},
-		{"cpu.max scalar", ".cgroup cpu.max 50000 100000", "cpu.max"},
-		{"memory.max scalar", ".cgroup memory.max 67108864", "memory.max"},
-		{"pids.max scalar", ".cgroup pids.max 100", "pids.max"},
-		{"cgroup.subtree_control", ".cgroup cgroup.subtree_control cpu memory", "cgroup.subtree_control"},
-
-		// MAJOR MINOR list knobs: key = knob:major:minor.
-		{"io.max", ".cgroup io.max 8 0 rbps=1024", "io.max:8:0"},
-		{"io.latency", ".cgroup io.latency 8 0 target=2000", "io.latency:8:0"},
-		{"io.cost.model", ".cgroup io.cost.model 8 0 rbps=1000", "io.cost.model:8:0"},
-		{"io.cost.qos", ".cgroup io.cost.qos 8 0 enable=true", "io.cost.qos:8:0"},
-
-		// io.weight: scalar key vs per-device key.
-		{"io.weight scalar", ".cgroup io.weight 500", "io.weight"},
-		{"io.weight per-device", ".cgroup io.weight \"8:16\" 200", "io.weight:8:16"},
-
-		// Single-token identity list knobs: key = knob:token.
-		{"hugetlb", ".cgroup hugetlb \"2MB\" max=1048576", "hugetlb:2MB"},
-		{"rdma.max", ".cgroup rdma.max mlx5_0 hca_handle=4 hca_object=16", "rdma.max:mlx5_0"},
-		{"misc.max", ".cgroup misc.max sev max=10", "misc.max:sev"},
-		{"dmem.max", ".cgroup dmem.max gpu0 1024", "dmem.max:gpu0"},
-		{"dmem.min", ".cgroup dmem.min gpu0 512", "dmem.min:gpu0"},
-		{"cpu.pressure", ".cgroup cpu.pressure some 80 1000000", "cpu.pressure:some"},
-		{"memory.pressure", ".cgroup memory.pressure full 60 2000000", "memory.pressure:full"},
-		{"io.pressure", ".cgroup io.pressure some 80 1000000", "io.pressure:some"},
-
-		// Device knobs: identity is type + major + minor; key = "devices:type:major:minor".
-		{"devices", ".cgroup devices c 8 0 rw", "devices:c:8:0"},
-	}
-	sub, _ := newSub()
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			g, err := agl.Parse(c.src)
-			if err != nil {
-				t.Fatalf("Parse(%q): %v", c.src, err)
-			}
-			if got := sub.Key(g); got != c.want {
-				t.Fatalf("Key() = %q, want %q", got, c.want)
-			}
-		})
-	}
-}
-
-func TestKeyEmptyModel(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() on empty model = %q, want empty", got)
-	}
-}
-
 // Two grants for the same device identity (type + major + minor) must conflict
 // even when they specify different access bits. Callers must combine all
 // access permissions into a single grant.

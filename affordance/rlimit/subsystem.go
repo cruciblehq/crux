@@ -19,27 +19,18 @@ import (
 // slice with one entry per known resource at soft=hard=0; Build updates
 // matching entries in place rather than appending duplicates.
 type Subsystem struct {
-	spec *[]specs.POSIXRlimit
+	spec     *[]specs.POSIXRlimit
+	declared map[string]specs.POSIXRlimit
 }
 
 // Returns a Subsystem wired to mutate the rlimits slice header.
 func New(spec *[]specs.POSIXRlimit) *Subsystem {
-	return &Subsystem{spec: spec}
+	return &Subsystem{spec: spec, declared: make(map[string]specs.POSIXRlimit)}
 }
 
 // Returns the rlimit subsystem identifier.
 func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameRlimit
-}
-
-// Returns the deduplication key for an rlimit grant.
-//
-// The key is the resource type string from args[0] (e.g. "nofile").
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) == 0 {
-		return ""
-	}
-	return g.Args[argResource].Value
 }
 
 // Applies a parsed grant to the wired-in section.
@@ -106,14 +97,22 @@ func parse(g *agl.Model) (specs.POSIXRlimit, error) {
 // On first declaration, an existing baseline entry is updated in place;
 // otherwise the entry is appended.
 func (s *Subsystem) apply(e specs.POSIXRlimit) error {
+	if existing, ok := s.declared[e.Type]; ok {
+		if existing.Soft == e.Soft && existing.Hard == e.Hard {
+			return nil
+		}
+		return crex.Newf(ErrInvalidGrant, "%s already declared with different limits", e.Type)
+	}
 	for i, existing := range *s.spec {
 		if existing.Type != e.Type {
 			continue
 		}
 		(*s.spec)[i] = e
+		s.declared[e.Type] = e
 		return nil
 	}
 	*s.spec = append(*s.spec, e)
+	s.declared[e.Type] = e
 	return nil
 }
 

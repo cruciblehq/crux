@@ -31,21 +31,6 @@ func TestSpecValidate(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsResourceName(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("cpu"), intArg("4")}}
-	if got := sub.Key(&g); got != "cpu" {
-		t.Fatalf("Key() = %q, want %q", got, "cpu")
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestBuildCPUInt(t *testing.T) {
 	sub, s := newSub()
 	g := agl.Model{Args: []agl.Arg{nameArg("cpu"), intArg("4")}}

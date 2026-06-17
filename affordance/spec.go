@@ -8,6 +8,13 @@ import (
 	"github.com/cruciblehq/crux/affordance/volume"
 )
 
+// Media type for a serialized compiled affordance spec.
+//
+// Used as the artifactType when the non-OCI portion of a spec is attached to a
+// service image as an OCI referrer or stored as a typed content-store blob, so
+// the runtime enforcement plugin can identify and resolve it.
+const MediaType = "application/vnd.crucible.affordance.v0"
+
 // Mutable runtime model accumulated by the affordance builder.
 //
 // Subsystems for caps, rlimits, seccomp, and cgroup mutate OCI directly; they
@@ -18,7 +25,7 @@ import (
 // knob goes into the Unified map in v2 kernel format. The kernel subsystem
 // populates Kernel with the kernel requirements.
 type Spec struct {
-	OCI    *OCI         `codec:"oci"`              // OCI runtime spec.
+	OCI    *OCI         `codec:"oci,omitempty"`    // OCI runtime spec.
 	Fcap   *fcap.Spec   `codec:"fcap,omitempty"`   // File capabilities per binary path.
 	MAC    *mac.Spec    `codec:"mac,omitempty"`    // MAC (LSM) hook allow rules.
 	Kernel *kernel.Spec `codec:"kernel,omitempty"` // Kernel requirements for the VM image.

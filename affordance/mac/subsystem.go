@@ -22,14 +22,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameMAC
 }
 
-// Returns the deduplication key for a mac grant.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) == 0 {
-		return ""
-	}
-	return g.Args[0].Value
-}
-
 // Applies a parsed grant to the wired-in section.
 func (s *Subsystem) Build(g *agl.Model) error {
 	if err := check(g); err != nil {

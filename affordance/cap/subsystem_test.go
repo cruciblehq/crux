@@ -180,21 +180,6 @@ func TestApplyBoundMode(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsFirstArg(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{{Type: agl.ArgName, Value: "net_admin"}}}
-	if got := sub.Key(&g); got != "net_admin" {
-		t.Fatalf("Key() = %q, want %q", got, "net_admin")
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestParseRejectsNonNameCapArg(t *testing.T) {
 	sub, _ := newSub()
 	g := agl.Model{

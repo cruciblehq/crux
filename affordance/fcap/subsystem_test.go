@@ -128,22 +128,6 @@ func TestNameReturnsFcap(t *testing.T) {
 	}
 }
 
-func TestKeyWithThreeArgs(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("chown"), nameArg("effective"), strArg("/bin/x")}}
-	if got := sub.Key(&g); got != "chown:/bin/x" {
-		t.Fatalf("Key() = %q, want %q", got, "chown:/bin/x")
-	}
-}
-
-func TestKeyWithTooFewArgs(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("chown")}}
-	if got := sub.Key(&g); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestBuildRejectsKwargs(t *testing.T) {
 	sub, _ := newSub()
 	g := agl.Model{

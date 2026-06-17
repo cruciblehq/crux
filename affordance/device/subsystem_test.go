@@ -80,14 +80,6 @@ func TestBuildFIFO(t *testing.T) {
 	}
 }
 
-func TestKeyIsPath(t *testing.T) {
-	sub, _ := newSub()
-	g := parseGrant(t, ".device c /dev/nvidia0 195 0")
-	if got := sub.Key(g); got != "/dev/nvidia0" {
-		t.Fatalf("Key() = %q, want %q", got, "/dev/nvidia0")
-	}
-}
-
 func TestName(t *testing.T) {
 	sub, _ := newSub()
 	if got := sub.Name(); got != subsystem.NameDevice {
@@ -152,13 +144,5 @@ func TestBuildRejectsInvalidGrants(t *testing.T) {
 				t.Fatalf("err = %v, want ErrInvalidGrant", err)
 			}
 		})
-	}
-}
-
-func TestKeyEmptyWhenPathMissing(t *testing.T) {
-	sub, _ := newSub()
-	g := &agl.Model{Args: []agl.Arg{{Type: agl.ArgName, Value: "c"}}}
-	if got := sub.Key(g); got != "" {
-		t.Fatalf("Key() = %q, want empty string", got)
 	}
 }

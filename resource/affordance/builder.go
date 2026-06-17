@@ -34,9 +34,7 @@ type Builder struct {
 	network   *net.Spec                              // Accumulated network spec state.
 	volume    *volume.Spec                           // Accumulated volume declarations.
 	kernel    *kernel.Spec                           // Accumulated kernel requirements.
-	subs      []subsystem.Subsystem                  // All subsystem implementations in fixed order.
 	index     map[subsystem.Name]subsystem.Subsystem // Name-indexed dispatch map.
-	seen      map[subsystem.Name]map[string]struct{} // Per-subsystem set of observed grant keys for conflict detection.
 }
 
 // Returns a [Builder].
@@ -66,13 +64,11 @@ func NewBuilder() *Builder {
 	}
 
 	idx := make(map[subsystem.Name]subsystem.Subsystem, len(subs))
-	seen := make(map[subsystem.Name]map[string]struct{}, len(subs))
 	for _, sub := range subs {
 		idx[sub.Name()] = sub
-		seen[sub.Name()] = make(map[string]struct{})
 	}
 
-	return &Builder{spec: s, provision: prov, network: netw, volume: volm, kernel: kspec, subs: subs, index: idx, seen: seen}
+	return &Builder{spec: s, provision: prov, network: netw, volume: volm, kernel: kspec, index: idx}
 }
 
 // Returns the accumulated runtime spec produced by all processed grants.
@@ -131,25 +127,13 @@ func (b *Builder) Build(ctx context.Context, g manifest.Grant, src registry.Sour
 
 // Dispatches a parsed AGL model to the matching subsystem.
 //
-// Before calling Build, checks whether the subsystem's Key returns a non-empty
-// string and rejects the grant with ErrConflict if an identical key has already
-// been processed. Subsystems that return an empty key handle their own conflict
-// detection internally.
+// Subsystems own repeat handling. They may treat repeated grants as a no-op,
+// merge them into the accumulated state, or reject them as a conflict.
 func (b *Builder) dispatch(p *agl.Model) error {
 	name := subsystem.Name(p.Subsystem)
 	sub, ok := b.index[name]
 	if !ok {
 		return crex.Newf(ErrUnknownSubsystem, "unknown subsystem %q", p.Subsystem)
-	}
-	if key := sub.Key(p); key != "" {
-		if _, dup := b.seen[name][key]; dup {
-			return crex.Newf(ErrConflict, "duplicate %s grant %q", p.Subsystem, key)
-		}
-		if err := sub.Build(p); err != nil {
-			return err
-		}
-		b.seen[name][key] = struct{}{}
-		return nil
 	}
 	return sub.Build(p)
 }

@@ -24,30 +24,6 @@ func TestNameReturnsNet(t *testing.T) {
 	}
 }
 
-func TestKeyIngress(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("ingress"), nameArg("tcp"), intArg("80")}}
-	if got := sub.Key(&g); got != "ingress:tcp:80" {
-		t.Fatalf("Key() = %q, want %q", got, "ingress:tcp:80")
-	}
-}
-
-func TestKeyEgress(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("egress"), nameArg("tcp"), intArg("443"), nameArg("api.crucible.com")}}
-	if got := sub.Key(&g); got != "egress:tcp:443:api.crucible.com" {
-		t.Fatalf("Key() = %q, want %q", got, "egress:tcp:443:api.crucible.com")
-	}
-}
-
-func TestKeyTooFewArgs(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("ingress")}}
-	if got := sub.Key(&g); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestBuildIngress(t *testing.T) {
 	sub, s := newSub()
 	g := agl.Model{Args: []agl.Arg{nameArg("ingress"), nameArg("tcp"), intArg("8080")}}
@@ -429,30 +405,6 @@ func TestSpecValidatePropagatesEgressError(t *testing.T) {
 	}
 	if err := p.Validate(); !errors.Is(err, ErrInvalidSpec) {
 		t.Fatalf("err = %v, want ErrInvalidSpec", err)
-	}
-}
-
-func TestKeyIngressTooFewArgs(t *testing.T) {
-	sub, _ := newSub()
-	key := sub.Key(&agl.Model{Args: []agl.Arg{nameArg("ingress"), nameArg("tcp")}})
-	if key != "" {
-		t.Fatalf("Key = %q, want empty string for ingress with too few args", key)
-	}
-}
-
-func TestKeyEgressTooFewArgs(t *testing.T) {
-	sub, _ := newSub()
-	key := sub.Key(&agl.Model{Args: []agl.Arg{nameArg("egress"), nameArg("tcp"), intArg("443")}})
-	if key != "" {
-		t.Fatalf("Key = %q, want empty string for egress with too few args", key)
-	}
-}
-
-func TestKeyUnknownOp(t *testing.T) {
-	sub, _ := newSub()
-	key := sub.Key(&agl.Model{Args: []agl.Arg{nameArg("foobar"), nameArg("tcp"), intArg("80")}})
-	if key != "" {
-		t.Fatalf("Key = %q, want empty string for unknown op", key)
 	}
 }
 

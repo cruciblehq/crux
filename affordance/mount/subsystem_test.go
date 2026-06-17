@@ -230,26 +230,10 @@ func TestBuildRejectsWhereClause(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsDestination(t *testing.T) {
-	sub, _ := newSub()
-	g := parse(t, ".mount tmpfs /tmp")
-	if got := sub.Key(g); got != "/tmp" {
-		t.Errorf("Key = %q, want %q", got, "/tmp")
-	}
-}
-
 func TestName(t *testing.T) {
 	sub, _ := newSub()
 	if got := sub.Name(); got != subsystem.NameMount {
 		t.Fatalf("Name() = %q, want %q", got, subsystem.NameMount)
-	}
-}
-
-func TestKeyEmptyWhenNoDest(t *testing.T) {
-	sub, _ := newSub()
-	g := &agl.Model{Args: []agl.Arg{{Type: agl.ArgName, Value: "tmpfs"}}}
-	if got := sub.Key(g); got != "" {
-		t.Fatalf("Key() = %q, want empty string", got)
 	}
 }
 

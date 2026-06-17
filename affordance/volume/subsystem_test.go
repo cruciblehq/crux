@@ -116,14 +116,6 @@ func TestBuildRejectsNonCleanDestination(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsDestination(t *testing.T) {
-	sub, _ := newSub()
-	g := parse(t, ".volume /data")
-	if got := sub.Key(g); got != "/data" {
-		t.Errorf("Key = %q, want %q", got, "/data")
-	}
-}
-
 func TestMountValidate(t *testing.T) {
 	if err := (&Mount{Destination: "/data"}).Validate(); err != nil {
 		t.Errorf("Validate: %v", err)
@@ -141,13 +133,6 @@ func TestName(t *testing.T) {
 	sub, _ := newSub()
 	if got := sub.Name(); got != subsystem.NameVolume {
 		t.Fatalf("Name() = %q, want %q", got, subsystem.NameVolume)
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty string", got)
 	}
 }
 

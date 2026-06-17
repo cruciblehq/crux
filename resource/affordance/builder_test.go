@@ -1,9 +1,13 @@
 package affordance
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"github.com/cruciblehq/crux/affordance/rlimit"
 	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/crux/registry"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -69,5 +73,66 @@ func TestSubstituteGrant(t *testing.T) {
 	got := substituteGrant(g, params)
 	if got.Source != "tcp://db:8080/$missing" {
 		t.Fatalf("Source = %q, want tcp://db:8080/$missing", got.Source)
+	}
+}
+
+func TestBuildAllowsRepeatedMACHooks(t *testing.T) {
+	b := NewBuilder()
+	ctx := context.Background()
+	grants := []manifest.Grant{
+		{Source: `.mac file_open where file.path like "/var/lib/agent/**"`},
+		{Source: `.mac file_open where task.uid = 0`},
+	}
+	src := registry.Source{}
+	for _, grant := range grants {
+		if err := b.Build(ctx, grant, src); err != nil {
+			t.Fatalf("Build(%q): %v", grant.Source, err)
+		}
+	}
+	if got := len(b.Spec().MAC.Rules); got != 2 {
+		t.Fatalf("MAC rule count = %d, want 2", got)
+	}
+}
+
+func TestBuildDeduplicatesRepeatedSeccompGrant(t *testing.T) {
+	b := NewBuilder()
+	ctx := context.Background()
+	grant := manifest.Grant{Source: `.seccomp ioctl tty`}
+	src := registry.Source{}
+	if err := b.Build(ctx, grant, src); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	count := len(b.Spec().OCI.Linux.Seccomp.Syscalls)
+	if err := b.Build(ctx, grant, src); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+	if got := len(b.Spec().OCI.Linux.Seccomp.Syscalls); got != count {
+		t.Fatalf("seccomp syscall count = %d, want %d", got, count)
+	}
+}
+
+func TestBuildRepeatedRlimitSameValueNoOp(t *testing.T) {
+	b := NewBuilder()
+	ctx := context.Background()
+	grant := manifest.Grant{Source: `.rlimit nofile 1024 1024`}
+	src := registry.Source{}
+	if err := b.Build(ctx, grant, src); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	if err := b.Build(ctx, grant, src); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+}
+
+func TestBuildRepeatedRlimitDifferentValueConflicts(t *testing.T) {
+	b := NewBuilder()
+	ctx := context.Background()
+	src := registry.Source{}
+	if err := b.Build(ctx, manifest.Grant{Source: `.rlimit nofile 1024 1024`}, src); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	err := b.Build(ctx, manifest.Grant{Source: `.rlimit nofile 2048 2048`}, src)
+	if !errors.Is(err, rlimit.ErrInvalidGrant) {
+		t.Fatalf("err = %v, want rlimit.ErrInvalidGrant", err)
 	}
 }

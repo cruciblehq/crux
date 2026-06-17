@@ -30,18 +30,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameMount
 }
 
-// Returns the deduplication key for a mount grant.
-//
-// The key is the destination path. Two grants for the same destination —
-// regardless of type — are treated as a conflict because a path can only
-// hold one mount.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) <= argDest {
-		return ""
-	}
-	return g.Args[argDest].Value
-}
-
 // Applies a parsed grant to the wired-in mounts slice.
 //
 // The grant has the form ".mount TYPE DESTINATION [size=QUANTITY] [mode=OCTAL]".
@@ -63,14 +51,43 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	if err != nil {
 		return err
 	}
-
-	*s.mounts = append(*s.mounts, specs.Mount{
+	return s.upsertMount(specs.Mount{
 		Type:        fsType,
 		Source:      fsType,
 		Destination: dest,
 		Options:     opts,
 	})
+}
+
+// Merges a mount declaration into the wired-in mount list.
+//
+// Identical declarations are no-ops. A destination already declared with
+// different mount attributes is rejected.
+func (s *Subsystem) upsertMount(newMount specs.Mount) error {
+	for _, existing := range *s.mounts {
+		if existing.Destination != newMount.Destination {
+			continue
+		}
+		if mountEqual(existing, newMount) {
+			return nil
+		}
+		return crex.Newf(ErrInvalidGrant, "mount destination %q already declared with different options", newMount.Destination)
+	}
+	*s.mounts = append(*s.mounts, newMount)
 	return nil
+}
+
+// Whether a and b describe the same mount.
+func mountEqual(a, b specs.Mount) bool {
+	if a.Type != b.Type || a.Source != b.Source || a.Destination != b.Destination || len(a.Options) != len(b.Options) {
+		return false
+	}
+	for i := range a.Options {
+		if a.Options[i] != b.Options[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Validates the structural shape of a mount grant.

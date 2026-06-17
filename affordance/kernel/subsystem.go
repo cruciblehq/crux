@@ -1,8 +1,6 @@
 package kernel
 
 import (
-	"fmt"
-
 	"github.com/cruciblehq/crux/affordance/agl"
 	"github.com/cruciblehq/crux/affordance/subsystem"
 	"github.com/cruciblehq/crux/crex"
@@ -26,17 +24,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameKernel
 }
 
-// Returns the deduplication key for a kernel grant.
-//
-// The key is "type:value", ensuring two grants for the same type and value
-// within one affordance are treated as a conflict.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) <= argValue {
-		return ""
-	}
-	return fmt.Sprintf("%s:%s", g.Args[argType].Value, g.Args[argValue].Value)
-}
-
 // Applies a parsed grant to the kernel spec.
 //
 // The grant has the form ".kernel TYPE VALUE". TYPE selects the verification
@@ -52,21 +39,31 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	value := g.Args[argValue].Value
 	switch typ {
 	case typeConfig:
-		s.spec.Features = append(s.spec.Features, value)
+		s.spec.Features = appendUnique(s.spec.Features, value)
 	case typeModule:
-		s.spec.Modules = append(s.spec.Modules, value)
+		s.spec.Modules = appendUnique(s.spec.Modules, value)
 	case typeVersion:
-		s.spec.Versions = append(s.spec.Versions, value)
+		s.spec.Versions = appendUnique(s.spec.Versions, value)
 	case typeBoot:
-		s.spec.BootParams = append(s.spec.BootParams, value)
+		s.spec.BootParams = appendUnique(s.spec.BootParams, value)
 	case typeLSM:
-		s.spec.LSMs = append(s.spec.LSMs, value)
+		s.spec.LSMs = appendUnique(s.spec.LSMs, value)
 	case typeHW:
-		s.spec.HWFeatures = append(s.spec.HWFeatures, value)
+		s.spec.HWFeatures = appendUnique(s.spec.HWFeatures, value)
 	default:
 		return crex.Newf(ErrInvalidGrant, "unknown kernel grant type %q (expected config, module, version, boot, lsm, or hw)", typ)
 	}
 	return nil
+}
+
+// Appends value to dst if not already present.
+func appendUnique(dst []string, value string) []string {
+	for _, existing := range dst {
+		if existing == value {
+			return dst
+		}
+	}
+	return append(dst, value)
 }
 
 // Validates the structural shape of a kernel grant.

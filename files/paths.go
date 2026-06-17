@@ -40,6 +40,13 @@ const (
 	// Standard filename for OCI image tarballs produced by runtime and service builds.
 	ImageFile = "image.tar"
 
+	// Filename for the compiled non-OCI affordance artifact.
+	//
+	// Holds the encoded affordance sections (MAC, network, file capabilities,
+	// kernel, volume) that are attached to the image as an affordance artifact
+	// for the runtime enforcement plugin.
+	AffordanceFile = "affordance.json"
+
 	// Standard filename for the JavaScript bundle produced by widget builds.
 	WidgetMainFile = "index.js"
 

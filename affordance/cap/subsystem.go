@@ -29,18 +29,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameCap
 }
 
-// Returns the deduplication key for a cap grant.
-//
-// The key is the capability name (args[0]). This means .cap net_admin and
-// .cap net_admin full are treated as conflicts: the same capability may not
-// appear in more than one grant regardless of mode.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) == 0 {
-		return ""
-	}
-	return g.Args[0].Value
-}
-
 // Applies a parsed grant to the wired-in section.
 //
 // The grant has the form ".cap NAME [MODE]" where NAME is a Linux capability

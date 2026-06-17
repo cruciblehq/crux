@@ -96,21 +96,6 @@ func TestBuildRejectsUnknownSyscall(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsFirstArg(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("read")}}
-	if got := sub.Key(&g); got != "read" {
-		t.Fatalf("Key() = %q, want %q", got, "read")
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestBuildRejectsEmptyArgs(t *testing.T) {
 	sub, _ := newSub()
 	err := sub.Build(&agl.Model{Subsystem: "seccomp"})

@@ -1,8 +1,6 @@
 package fcap
 
 import (
-	"fmt"
-
 	"github.com/cruciblehq/crux/affordance/agl"
 	"github.com/cruciblehq/crux/affordance/capset"
 	"github.com/cruciblehq/crux/affordance/subsystem"
@@ -31,19 +29,6 @@ func New(spec *Spec) *Subsystem {
 // Returns the fcap subsystem identifier.
 func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameFcap
-}
-
-// Returns the deduplication key for an fcap grant.
-//
-// The key is the capability name and absolute path joined by ":". Mode is
-// intentionally excluded so that granting the same capability on the same
-// file with a different mode (e.g. permitted vs inheritable) is still
-// treated as a conflict.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) < 3 {
-		return ""
-	}
-	return fmt.Sprintf("%s:%s", g.Args[0].Value, g.Args[2].Value)
 }
 
 // Applies a parsed grant to the wired-in section.

@@ -32,17 +32,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameDevice
 }
 
-// Returns the deduplication key for a device grant.
-//
-// The key is the device node path. Two grants for the same path are treated
-// as a conflict because a path can only hold one device node.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) <= argPath {
-		return ""
-	}
-	return g.Args[argPath].Value
-}
-
 // Applies a parsed grant to the wired-in devices slice.
 //
 // The grant has the form ".device TYPE PATH MAJOR MINOR [mode=OCTAL]
@@ -58,8 +47,45 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	if err != nil {
 		return err
 	}
+	return s.upsertDevice(dev)
+}
+
+// Merges a device declaration into the wired-in device list.
+//
+// Identical declarations are no-ops. A path already declared with different
+// values is rejected.
+func (s *Subsystem) upsertDevice(dev specs.LinuxDevice) error {
+	for _, existing := range *s.devices {
+		if existing.Path != dev.Path {
+			continue
+		}
+		if deviceEqual(existing, dev) {
+			return nil
+		}
+		return crex.Newf(ErrInvalidGrant, "device path %q already declared with different values", dev.Path)
+	}
 	*s.devices = append(*s.devices, dev)
 	return nil
+}
+
+// Whether a and b describe the same device node.
+func deviceEqual(a, b specs.LinuxDevice) bool {
+	if a.Path != b.Path || a.Type != b.Type || a.Major != b.Major || a.Minor != b.Minor {
+		return false
+	}
+	if (a.FileMode == nil) != (b.FileMode == nil) || (a.UID == nil) != (b.UID == nil) || (a.GID == nil) != (b.GID == nil) {
+		return false
+	}
+	if a.FileMode != nil && *a.FileMode != *b.FileMode {
+		return false
+	}
+	if a.UID != nil && *a.UID != *b.UID {
+		return false
+	}
+	if a.GID != nil && *a.GID != *b.GID {
+		return false
+	}
+	return true
 }
 
 // Validates the structural shape of a device grant.

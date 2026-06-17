@@ -14,10 +14,10 @@
 // carry optional modifiers, and the optional where clause is a predicate
 // evaluated against a hook's runtime arguments (supported only by .mac).
 //
-// The builder iterates grants in order, calls [subsystem.Subsystem.Key] to
-// compute a deduplication key, rejects a grant whose key was already seen for
-// that subsystem, and otherwise calls [subsystem.Subsystem.Build] to fold the
-// grant into the spec.
+// The builder iterates grants in order and calls [subsystem.Subsystem.Build]
+// to fold each grant into the spec. Repeated declarations are resolved by the
+// target subsystem, which may treat them as a no-op, merge them, or reject
+// them as a conflict depending on the subsystem's semantics.
 //
 // The following subsystems are currently implemented:
 //

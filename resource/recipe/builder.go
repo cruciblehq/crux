@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	aff "github.com/cruciblehq/crux/affordance"
+	"github.com/cruciblehq/crux/codec"
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
@@ -50,16 +52,17 @@ func NewBuilder(src registry.Source, workdir string, client *compute.Client) *Bu
 func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, output string) (string, error) {
 	stageImages := make(map[string]string)
 	var currentCtr *compute.Container
+	var finalSpec *aff.Spec
 
 	for i := range recipe.Stages {
 		if currentCtr != nil {
 			currentCtr.Destroy(ctx)
 		}
-		var err error
-		currentCtr, err = b.runStage(ctx, i+1, &recipe.Stages[i], stageImages)
+		ctr, spec, err := b.runStage(ctx, i+1, &recipe.Stages[i], stageImages)
 		if err != nil {
 			return "", err
 		}
+		currentCtr, finalSpec = ctr, spec
 	}
 	defer currentCtr.Destroy(ctx)
 
@@ -67,7 +70,7 @@ func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint
 		return "", err
 	}
 
-	return b.exportImage(ctx, currentCtr, output)
+	return b.exportImage(ctx, currentCtr, finalSpec, output)
 }
 
 // Sets the image entrypoint on the container before it is committed.
@@ -89,11 +92,14 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr *compute.Container, ent
 	return nil
 }
 
-// Exports the final image as an OCI tar archive.
+// Exports the final image as an OCI tar archive and emits the affordance artifact.
 //
-// The image is exported to [files.ImageFile] within the output directory.
-// Returns the output directory path on success.
-func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, output string) (string, error) {
+// The image is exported to [files.ImageFile] within the output directory. The
+// compiled affordance sections are written to [files.AffordanceFile] for the
+// publish step to attach. When an image declares only OCI-level affordances
+// the non-OCI sections are still emitted with the baseline. Returns the output
+// directory path on success.
+func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, spec *aff.Spec, output string) (string, error) {
 	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
 		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
 	}
@@ -113,5 +119,28 @@ func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, outpu
 		return "", crex.Wrap(ErrBuild, err)
 	}
 
+	if err := writeAffordance(spec, output); err != nil {
+		return "", err
+	}
+
 	return output, nil
+}
+
+// Writes the compiled non-OCI affordance sections to [files.AffordanceFile].
+//
+// The OCI section is dropped because it ships to the runtime through the OCI
+// config; the remaining sections are encoded. Always emitted so the runtime
+// enforcement plugin receives the baseline for every service image.
+func writeAffordance(spec *aff.Spec, output string) error {
+	artifact := *spec
+	artifact.OCI = nil
+	payload, err := codec.Encode(&artifact, codec.JSON)
+	if err != nil {
+		return crex.Wrap(ErrBuild, err)
+	}
+	path := filepath.Join(output, files.AffordanceFile)
+	if err := os.WriteFile(path, payload, files.DefaultFileMode); err != nil {
+		return crex.Wrap(oci.ErrFileSystemOperation, err)
+	}
+	return nil
 }

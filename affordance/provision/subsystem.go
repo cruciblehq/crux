@@ -17,12 +17,13 @@ import (
 // [Spec]. The blueprint builder reads the spec to bin-pack services onto
 // compute units and select instance types.
 type Subsystem struct {
-	spec *Spec // Pointer to the unified spec's provision section.
+	spec     *Spec             // Pointer to the unified spec's provision section.
+	declared map[string]uint64 // Resource values already declared by grants.
 }
 
 // Returns a Subsystem that writes into spec.
 func New(spec *Spec) *Subsystem {
-	return &Subsystem{spec: spec}
+	return &Subsystem{spec: spec, declared: make(map[string]uint64)}
 }
 
 // Returns the provision subsystem identifier.
@@ -30,54 +31,58 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameProvision
 }
 
-// Returns the deduplication key for a provision grant.
-//
-// The key is the resource name from args[0] (e.g. "cpu", "memory", "disk").
-// Duplicate resource declarations are treated as a conflict; grants are not
-// additive for the same resource type.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) == 0 {
-		return ""
-	}
-	return g.Args[0].Value
-}
-
 // Applies a single .provision grant to the accumulated spec.
 //
 // Grants are of the form ".provision RESOURCE VALUE". RESOURCE is one of "cpu",
 // "memory", or "disk". VALUE is a quantity appropriate for that resource. Each
-// resource may appear at most once. Duplicate declarations of the same resource
-// must be rejected before reaching this method. The builder's Spec is mutated
-// in-place with the new provision values.
+// resource may appear at most once. Duplicate declarations with the same value
+// are no-ops; conflicting declarations are rejected. The builder's Spec is
+// mutated in-place with the new provision values.
 func (s *Subsystem) Build(g *agl.Model) error {
 	if err := check(g); err != nil {
 		return err
 	}
 	resource := g.Args[0].Value
-	value := g.Args[1]
+	parsed, err := parseResourceValue(resource, g.Args[1])
+	if err != nil {
+		return err
+	}
+	return s.applyResource(resource, parsed)
+}
+
+// Applies one parsed resource declaration to the accumulated provision spec.
+//
+// Identical redeclarations are no-ops. Conflicting redeclarations are
+// rejected.
+func (s *Subsystem) applyResource(resource string, parsed uint64) error {
+	if existing, ok := s.declared[resource]; ok {
+		if existing == parsed {
+			return nil
+		}
+		return crex.Newf(ErrInvalidGrant, "%s already declared with a different value", resource)
+	}
+	s.declared[resource] = parsed
 	switch resource {
 	case ResourceCPU:
-		v, err := parseCPU(value)
-		if err != nil {
-			return err
-		}
-		s.spec.CPU = v
+		s.spec.CPU = parsed
 	case ResourceMemory:
-		v, err := parseBytes(value)
-		if err != nil {
-			return err
-		}
-		s.spec.Memory = v
+		s.spec.Memory = parsed
 	case ResourceDisk:
-		v, err := parseBytes(value)
-		if err != nil {
-			return err
-		}
-		s.spec.Disk = v
-	default:
-		return crex.Newf(ErrInvalidGrant, "unknown resource %q in provision grant", resource)
+		s.spec.Disk = parsed
 	}
 	return nil
+}
+
+// Parses the numeric value for one provision resource.
+func parseResourceValue(resource string, value agl.Arg) (uint64, error) {
+	switch resource {
+	case ResourceCPU:
+		return parseCPU(value)
+	case ResourceMemory, ResourceDisk:
+		return parseBytes(value)
+	default:
+		return 0, crex.Newf(ErrInvalidGrant, "unknown resource %q in provision grant", resource)
+	}
 }
 
 // Validates the structural shape of a provision grant.

@@ -25,17 +25,6 @@ func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameVolume
 }
 
-// Returns the deduplication key for a volume grant.
-//
-// The key is the destination path. Two grants for the same destination are
-// treated as a conflict because a path can only hold one volume mount.
-func (s *Subsystem) Key(g *agl.Model) string {
-	if len(g.Args) < 1 {
-		return ""
-	}
-	return g.Args[0].Value
-}
-
 // Applies a parsed grant to the accumulated spec.
 //
 // The grant has the form ".volume DESTINATION [r|rw]". DESTINATION is an
@@ -51,11 +40,30 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	if err != nil {
 		return crex.Wrap(ErrInvalidGrant, err)
 	}
-	readOnly := len(g.Args) < 2 || g.Args[1].Value == accessRead
-	s.spec.Mounts = append(s.spec.Mounts, Mount{
-		Destination: dest,
-		ReadOnly:    readOnly,
-	})
+	return s.upsertMount(buildMount(dest, g.Args))
+}
+
+// Builds a mount entry from parsed volume grant arguments.
+func buildMount(dest string, args []agl.Arg) Mount {
+	readOnly := len(args) < 2 || args[1].Value == accessRead
+	return Mount{Destination: dest, ReadOnly: readOnly}
+}
+
+// Merges a mount declaration into the accumulated spec.
+//
+// Identical declarations are no-ops. A destination already declared with
+// different options is rejected.
+func (s *Subsystem) upsertMount(mount Mount) error {
+	for _, existing := range s.spec.Mounts {
+		if existing.Destination != mount.Destination {
+			continue
+		}
+		if existing == mount {
+			return nil
+		}
+		return crex.Newf(ErrInvalidGrant, "volume destination %q already declared with different options", mount.Destination)
+	}
+	s.spec.Mounts = append(s.spec.Mounts, mount)
 	return nil
 }
 

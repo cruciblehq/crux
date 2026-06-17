@@ -187,21 +187,6 @@ func TestNameReturnsMAC(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsHookName(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{{Type: agl.ArgName, Value: "file_open"}}}
-	if got := sub.Key(&g); got != "file_open" {
-		t.Fatalf("Key() = %q, want %q", got, "file_open")
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestBuildWithNotWhere(t *testing.T) {
 	sub, s := newSub()
 	if err := buildSrc(t, sub, `.mac file_open where not file.path = "/x"`); err != nil {

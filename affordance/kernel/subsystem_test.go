@@ -125,14 +125,6 @@ func TestBuildRejectsMissingArg(t *testing.T) {
 	}
 }
 
-func TestKey(t *testing.T) {
-	sub, _ := newSub()
-	g := parse(t, ".kernel config FUSE_FS")
-	if got := sub.Key(g); got != "config:FUSE_FS" {
-		t.Errorf("Key = %q, want %q", got, "config:FUSE_FS")
-	}
-}
-
 func TestName(t *testing.T) {
 	sub, _ := newSub()
 	if got := sub.Name(); got != subsystem.NameKernel {
@@ -147,14 +139,6 @@ func TestBuildBoot(t *testing.T) {
 	}
 	if len(vm.BootParams) != 1 || vm.BootParams[0] != "quiet" {
 		t.Errorf("BootParams = %v, want [quiet]", vm.BootParams)
-	}
-}
-
-func TestKeyEmptyWhenNoValue(t *testing.T) {
-	sub, _ := newSub()
-	g := &agl.Model{Args: []agl.Arg{{Type: agl.ArgName, Value: "config"}}}
-	if got := sub.Key(g); got != "" {
-		t.Fatalf("Key() = %q, want empty string", got)
 	}
 }
 

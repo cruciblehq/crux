@@ -1,7 +1,7 @@
 package net
 
 import (
-	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/cruciblehq/crux/affordance/agl"
@@ -17,9 +17,8 @@ const (
 
 // Implementation of the container network subsystem.
 //
-// Holds a pointer to the accumulated [Spec]. Each Build call appends
-// one ingress or egress declaration. The deduplication key prevents the same
-// declaration from appearing more than once.
+// Holds a pointer to the accumulated [Spec]. Each Build call appends one
+// ingress or egress declaration. Repeating the same declaration is a no-op.
 type Subsystem struct {
 	spec *Spec // Write target for accumulated grants.
 }
@@ -32,24 +31,6 @@ func New(spec *Spec) *Subsystem {
 // Returns the net subsystem identifier.
 func (s *Subsystem) Name() subsystem.Name {
 	return subsystem.NameNet
-}
-
-// Returns the deduplication key for a net grant.
-//
-// For ingress grants the key encodes the operation, protocol, and port. For
-// egress grants it also encodes the destination. The key is derived from the
-// parsed grant so that equivalent declarations collapse regardless of how the
-// optional port was written. Malformed grants yield an empty key and are
-// reported by Build.
-func (s *Subsystem) Key(g *agl.Model) string {
-	p, err := parseGrant(g)
-	if err != nil {
-		return ""
-	}
-	if p.op == opIngress {
-		return fmt.Sprintf("ingress:%s:%d", p.proto, p.port)
-	}
-	return fmt.Sprintf("egress:%s:%d:%s", p.proto, p.port, p.dest)
 }
 
 // Applies a parsed grant to the accumulated spec.
@@ -77,18 +58,29 @@ func (s *Subsystem) Build(g *agl.Model) error {
 	}
 	switch p.op {
 	case opIngress:
-		s.spec.Ingress = append(s.spec.Ingress, IngressRule{
-			Protocol: p.proto,
-			Port:     p.port,
-		})
+		s.applyIngressRule(IngressRule{Protocol: p.proto, Port: p.port})
 	case opEgress:
-		s.spec.Egress = append(s.spec.Egress, EgressRule{
-			Protocol:    p.proto,
-			Port:        p.port,
-			Destination: p.dest,
-		})
+		s.applyEgressRule(EgressRule{Protocol: p.proto, Port: p.port, Destination: p.dest})
 	}
 	return nil
+}
+
+// Merges an ingress rule into the accumulated spec.
+//
+// Identical redeclarations are no-ops.
+func (s *Subsystem) applyIngressRule(rule IngressRule) {
+	if !slices.Contains(s.spec.Ingress, rule) {
+		s.spec.Ingress = append(s.spec.Ingress, rule)
+	}
+}
+
+// Merges an egress rule into the accumulated spec.
+//
+// Identical redeclarations are no-ops.
+func (s *Subsystem) applyEgressRule(rule EgressRule) {
+	if !slices.Contains(s.spec.Egress, rule) {
+		s.spec.Egress = append(s.spec.Egress, rule)
+	}
 }
 
 // Parsed positional arguments of a net grant.

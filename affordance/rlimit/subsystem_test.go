@@ -99,21 +99,6 @@ func TestNameReturnsRlimit(t *testing.T) {
 	}
 }
 
-func TestKeyReturnsResourceName(t *testing.T) {
-	sub, _ := newSub()
-	g := agl.Model{Args: []agl.Arg{nameArg("nofile"), intArg("1024")}}
-	if got := sub.Key(&g); got != "nofile" {
-		t.Fatalf("Key() = %q, want %q", got, "nofile")
-	}
-}
-
-func TestKeyEmptyWhenNoArgs(t *testing.T) {
-	sub, _ := newSub()
-	if got := sub.Key(&agl.Model{}); got != "" {
-		t.Fatalf("Key() = %q, want empty", got)
-	}
-}
-
 func TestApplyUpdatesInPlace(t *testing.T) {
 	rl := []specs.POSIXRlimit{{Type: "RLIMIT_NOFILE", Soft: 0, Hard: 0}}
 	sub := New(&rl)

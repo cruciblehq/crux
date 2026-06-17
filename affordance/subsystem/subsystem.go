@@ -38,18 +38,10 @@ type Subsystem interface {
 	// ".cap") so that the orchestrator can route to the correct subsystem.
 	Name() Name
 
-	// Returns the deduplication key for a grant.
-	//
-	// The builder uses this key to detect and reject duplicate grants before
-	// calling Build. Two grants with the same key for the same subsystem are
-	// treated as a conflict. An empty return value opts the subsystem out of
-	// builder-level deduplication; the subsystem is then responsible for its
-	// own conflict detection.
-	Key(g *agl.Model) string
-
 	// Folds a single parsed grant into the wired-in section.
 	//
 	// Subsystems must check the grant's syntax and semantics and return an
-	// error if the grant is invalid or cannot be applied.
+	// error if the grant is invalid or cannot be applied. Subsystems decide
+	//  whether a repeated grant is a no-op, a merge, or a conflict.
 	Build(g *agl.Model) error
 }
