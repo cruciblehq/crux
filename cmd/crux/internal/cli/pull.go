@@ -15,7 +15,7 @@ import (
 // Represents the 'crux pull' command.
 type PullCmd struct {
 	Registry  string   `help:"Hub registry URL (default: http://hub.cruciblehq.xyz:8080)."`
-	Type      string   `arg:"" help:"Resource type (widget, service)."`
+	Type      string   `arg:"" help:"Resource type (e.g., widget, service)."`
 	Reference []string `arg:"" help:"Resource reference (e.g., crucible/login 1.0.0)."`
 }
 

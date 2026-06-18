@@ -23,6 +23,7 @@ func TestManifestValidateAllResourceTypes(t *testing.T) {
 		typ ResourceType
 		cfg any
 	}{
+		{TypeMachine, &Machine{}},
 		{TypeRuntime, &Runtime{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}}},
 		{TypeService, &Service{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}, Entrypoint: []string{"/bin/run"}}},
 		{TypeWidget, &Widget{Main: "index.js"}},
@@ -202,6 +203,13 @@ func TestManifestDecodeService(t *testing.T) {
 	}
 }
 
+func TestManifestDecodeMachine(t *testing.T) {
+	m := decodeManifest(t, TypeMachine, nil)
+	if _, ok := m.Config.(*Machine); !ok {
+		t.Fatalf("config = %T, want *Machine", m.Config)
+	}
+}
+
 func TestManifestDecodeTemplate(t *testing.T) {
 	m := decodeManifest(t, TypeTemplate, nil)
 	if _, ok := m.Config.(*Template); !ok {
@@ -237,6 +245,7 @@ func TestManifestEncodeAllResourceTypes(t *testing.T) {
 		typ ResourceType
 		cfg any
 	}{
+		{TypeMachine, &Machine{}},
 		{TypeRuntime, &Runtime{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}}},
 		{TypeService, &Service{Recipe: Recipe{Stages: []Stage{{Steps: []Step{{Run: "x"}}}}}, Entrypoint: []string{"/bin/run"}}},
 		{TypeTemplate, &Template{}},

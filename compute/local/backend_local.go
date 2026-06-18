@@ -38,7 +38,7 @@ const (
 	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
 )
 
-// Ensures the machine disk image is available in the local cache.
+// Ensures the default machine disk image is available in the local cache.
 //
 // Downloads from the Crucible registry if not already cached. Returns the
 // local filesystem path to the image file.

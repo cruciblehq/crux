@@ -20,8 +20,9 @@ func NewBackend() *Backend {
 
 // Ensures the machine disk image is available locally and returns its path.
 //
-// Downloads the image from the Crucible registry if it is not already cached.
-// The returned path can be passed directly to [provider.Backend.UploadImage].
+// Resolves the default machine image from the local cache and downloads it
+// from the Crucible registry if missing. The returned path can be passed
+// directly to [provider.Backend.UploadImage].
 func EnsureMachineImage(ctx context.Context) (string, error) {
 	return ensureMachineImage(ctx)
 }

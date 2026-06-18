@@ -63,6 +63,8 @@ func (m *Manifest) Validate() error {
 func (m *Manifest) validateConfig() error {
 	var match bool
 	switch m.Resource.Type {
+	case TypeMachine:
+		_, match = m.Config.(*Machine)
 	case TypeRuntime:
 		_, match = m.Config.(*Runtime)
 	case TypeService:
@@ -125,6 +127,8 @@ func (m *Manifest) Decode(c *codec.Codec, raw any) error {
 
 	var target any
 	switch m.Resource.Type {
+	case TypeMachine:
+		target = &Machine{}
 	case TypeRuntime:
 		target = &Runtime{}
 	case TypeService:

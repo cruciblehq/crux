@@ -27,6 +27,11 @@
 //
 //	b.Start(ctx, "my-instance")
 //
+// The machine disk image is pulled as a machine resource from the Crucible
+// registry and cached locally before provisioning. The extracted archive must
+// contain architecture-specific qcow2 files named after Lima's conventions,
+// such as aarch64.qcow2 and x86_64.qcow2.
+//
 // Note: Lima (limactl) is used for VM lifecycle management, but it requires a
 // ~30 MB download on first use and the use of SSH with ControlMaster for host-
 // guest communication, which introduces timing-sensitive connection setup and

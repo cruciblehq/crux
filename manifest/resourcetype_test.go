@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseResourceTypeKnown(t *testing.T) {
-	for _, s := range []string{"runtime", "service", "template", "widget", "affordance", "blueprint"} {
+	for _, s := range []string{"machine", "runtime", "service", "template", "widget", "affordance", "blueprint"} {
 		got, err := ParseResourceType(s)
 		if err != nil {
 			t.Errorf("ParseResourceType(%q): %v", s, err)
