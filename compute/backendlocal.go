@@ -35,6 +35,12 @@ func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error)
 	const description = "cannot stage machine image"
 	const recoveryDiskSpace = "Free up disk space, then try again."
 
+	// Local provisioning consumes an image path during a later call to Provision,
+	// so this path must remain valid after Upload returns.
+	if f, ok := r.(*os.File); ok {
+		return bl.local.UploadImage(ctx, f.Name())
+	}
+
 	f, err := files.CreateTemp("upload-*.img")
 	if err != nil {
 		return "", crex.SystemError(description, "failed to create a temporary file for the image upload").
@@ -43,7 +49,6 @@ func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error)
 			Err()
 	}
 	name := f.Name()
-	defer os.Remove(name)
 	if _, err := io.Copy(f, r); err != nil {
 		f.Close()
 		return "", crex.SystemError(description, "failed to write the image to a temporary file").

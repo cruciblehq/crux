@@ -25,6 +25,7 @@ import (
 
 // Machine image coordinates.
 const (
+	machineType        = "machine"                        // Registry resource type for the machine image.
 	machineNamespace   = "crucible"                       // Registry namespace for the machine image.
 	machineName        = "machine-default"                // Registry resource name for the machine image.
 	machineVersion     = "0.1.0"                          // Pinned machine image version.
@@ -297,7 +298,7 @@ func fetchMachineImage(ctx context.Context) error {
 			Err()
 	}
 
-	id := reference.NewIdentifier(machineName, machineRegistryURL, machineNamespace, machineName)
+	id := reference.NewIdentifier(machineType, machineRegistryURL, machineNamespace, machineName)
 	ref, err := reference.New(id, machineVersion, nil)
 	if err != nil {
 		return crex.SystemError(description, "the machine image reference is invalid").
