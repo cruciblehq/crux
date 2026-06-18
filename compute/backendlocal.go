@@ -32,10 +32,13 @@ func newBackendLocal() Backend {
 // Writes r to a temporary file and passes the path to the underlying local
 // backend implementation. The temporary file is removed after upload.
 func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error) {
+	const description = "cannot stage machine image"
+	const recoveryDiskSpace = "Free up disk space, then try again."
+
 	f, err := files.CreateTemp("upload-*.img")
 	if err != nil {
-		return "", crex.SystemError("cannot stage machine image", "failed to create a temporary file for the image upload").
-			Recovery("Free up disk space, then try again.").
+		return "", crex.SystemError(description, "failed to create a temporary file for the image upload").
+			Recovery(recoveryDiskSpace).
 			Cause(err).
 			Err()
 	}
@@ -43,14 +46,14 @@ func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error)
 	defer os.Remove(name)
 	if _, err := io.Copy(f, r); err != nil {
 		f.Close()
-		return "", crex.SystemError("cannot stage machine image", "failed to write the image to a temporary file").
-			Recovery("Free up disk space, then try again.").
+		return "", crex.SystemError(description, "failed to write the image to a temporary file").
+			Recovery(recoveryDiskSpace).
 			Cause(err).
 			Err()
 	}
 	if err := f.Close(); err != nil {
-		return "", crex.SystemError("cannot stage machine image", "failed to finalize the temporary image file").
-			Recovery("Free up disk space, then try again.").
+		return "", crex.SystemError(description, "failed to finalize the temporary image file").
+			Recovery(recoveryDiskSpace).
 			Cause(err).
 			Err()
 	}

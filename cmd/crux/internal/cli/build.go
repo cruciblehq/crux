@@ -117,5 +117,17 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 			Err()
 	}
 
-	return resource.Build(ctx, *man, src, RootCmd.Context, c.Environment, output)
+	result, err := resource.Build(ctx, *man, src, RootCmd.Context, c.Environment, output)
+	if err != nil {
+		switch {
+		case errors.Is(err, resource.ErrUnsupportedType):
+			return nil, crex.UserError("cannot build resource", "the resource type is not supported by the build command").
+				Recovery("Use a buildable type.").
+				Reclassify(err)
+		default:
+			return nil, err
+		}
+	}
+
+	return result, nil
 }

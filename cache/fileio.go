@@ -46,13 +46,15 @@ func extractDirAtomic(r io.Reader, dir string) error {
 
 // Reads and parses a version metadata file.
 func readMeta(metaPath string) (*Version, error) {
+	const recoveryCacheClear = "Run 'crux cache clear' and try again."
+
 	data, err := os.ReadFile(metaPath)
 	if os.IsNotExist(err) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, crex.SystemError("cannot read cache", "failed to read the cache metadata file").
-			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Recovery(recoveryCacheClear).
 			Cause(err).
 			Err()
 	}
@@ -60,7 +62,7 @@ func readMeta(metaPath string) (*Version, error) {
 	var ver Version
 	if err := json.Unmarshal(data, &ver); err != nil {
 		return nil, crex.SystemError("cannot read cache", "the cache metadata file is corrupt").
-			Recovery("Run 'crux cache clear' to remove the corrupt entry and try again.").
+			Recovery(recoveryCacheClear).
 			Cause(err).
 			Err()
 	}
@@ -86,7 +88,7 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 	data, err := json.Marshal(ver)
 	if err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to encode the cache metadata").
-			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Recovery("Run 'crux cache clear' and try again.").
 			Cause(err).
 			Err()
 	}

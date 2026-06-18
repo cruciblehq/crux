@@ -68,25 +68,28 @@ func localPlanOptions() compute.Options {
 // of fn; callers should keep fn short and avoid blocking I/O inside it.
 // No write occurs if fn returns an error.
 func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) error) error {
+	const description = "cannot access local state"
+	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
+
 	dir := files.LocalDir()
 	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
-		return crex.SystemError("cannot access local state", "failed to create the local state directory").
-			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+		return crex.SystemError(description, "failed to create the local state directory").
+			Recoveryf(recoveryWriteAccess, dir).
 			Cause(err).
 			Err()
 	}
 
 	lf, err := os.OpenFile(filepath.Join(dir, localLockFile), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
-		return crex.SystemError("cannot access local state", "failed to open the local state lock").
-			Recoveryf("Make sure you have write access to %s, then try again.", dir).
+		return crex.SystemError(description, "failed to open the local state lock").
+			Recoveryf(recoveryWriteAccess, dir).
 			Cause(err).
 			Err()
 	}
 	defer lf.Close()
 
 	if err := files.LockWithContext(ctx, lf); err != nil {
-		return crex.SystemError("cannot access local state", "failed to lock the local state").
+		return crex.SystemError(description, "failed to lock the local state").
 			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", filepath.Join(dir, localLockFile)).
 			Cause(err).
 			Err()

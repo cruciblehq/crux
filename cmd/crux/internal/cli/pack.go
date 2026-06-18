@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
+	"github.com/cruciblehq/crux/crex"
 	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource"
 )
 
@@ -23,6 +26,11 @@ func (c *PackCmd) Run(ctx context.Context) error {
 
 	result, err := resource.Pack(ctx, files.BuildDir(RootCmd.Context), files.Package(RootCmd.Context))
 	if err != nil {
+		if errors.Is(err, registry.ErrFileSystemOperation) {
+			return crex.SystemError("cannot package resource", "the package output directory could not be created").
+				Recoveryf("Make sure you have write access to %s, then try again.", files.Package(RootCmd.Context)).
+				Reclassify(err)
+		}
 		return err
 	}
 

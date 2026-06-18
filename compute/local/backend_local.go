@@ -26,8 +26,8 @@ import (
 // Machine image coordinates.
 const (
 	machineNamespace   = "crucible"                       // Registry namespace for the machine image.
-	machineName        = "machine"                        // Registry resource name for the machine image.
-	machineVersion     = "0.1.8"                          // Pinned machine image version.
+	machineName        = "machine-default"                // Registry resource name for the machine image.
+	machineVersion     = "0.1.0"                          // Pinned machine image version.
 	machineRegistryURL = "http://hub.cruciblehq.xyz:8080" // Registry URL for the machine image.
 	machineExtension   = ".qcow2"                         // Disk image file extension.
 )
@@ -71,7 +71,7 @@ func ensureMachineImage(ctx context.Context) (string, error) {
 func uploadImage(_ context.Context, path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
-			Recovery("Run 'crux local reset' to re-download the machine image.").
+			Recovery("Download the machine image again and retry.").
 			Cause(crex.Wrap(ErrImageUpload, err)).
 			Err()
 	}
@@ -109,7 +109,7 @@ func start(ctx context.Context, _ string) error {
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
 		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
-			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Recovery("Recreate the local virtual machine and retry.").
 			Cause(crex.Wrap(ErrHostStart, err)).
 			Err()
 	}
@@ -129,7 +129,7 @@ func stop(ctx context.Context, _ string) error {
 
 	if err := limactlRun(ctx, "stop", limaInstanceName); err != nil {
 		return crex.SystemError("cannot stop local environment", "the local virtual machine failed to stop").
-			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Recovery("Retry after recreating the local environment.").
 			Cause(crex.Wrap(ErrHostStop, err)).
 			Err()
 	}
@@ -202,7 +202,7 @@ func waitForContainerd(ctx context.Context) error {
 		}
 		if time.Now().After(deadline) {
 			return crex.SystemErrorf("local runtime not ready", "containerd did not become ready within %s", containerdReadyTimeout).
-				Recovery("Run 'crux local reset' to recreate the local environment.").
+				Recovery("Recreate the local runtime and retry.").
 				Cause(ErrHostStart).
 				Err()
 		}
@@ -242,31 +242,33 @@ func isContainerdReady(ctx context.Context) bool {
 // configures kernel-level requirements; a zero value applies no additional
 // requirements.
 func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel.Spec) error {
+	const description = "cannot create local environment"
+
 	configPath, err := generateLimaConfig(imagePath, kernelSpec)
 	if err != nil {
-		return crex.SystemError("cannot create local environment", "failed to generate the virtual machine configuration").
-			Recovery("Run 'crux local reset' and try again.").
+		return crex.SystemError(description, "failed to generate the virtual machine configuration").
+			Recovery("Regenerate the local virtual machine configuration and retry.").
 			Cause(crex.Wrap(ErrHostCreate, err)).
 			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "create", "--name="+limaInstanceName, configPath); err != nil {
-		return crex.SystemError("cannot create local environment", "the local virtual machine could not be created").
-			Recovery("Run 'crux local reset' and try again.").
+		return crex.SystemError(description, "the local virtual machine could not be created").
+			Recovery("Retry after recreating the local virtual machine.").
 			Cause(crex.Wrap(ErrHostCreate, err)).
 			Err()
 	}
 
 	if err := removeInstanceSocket(); err != nil {
-		return crex.SystemError("cannot create local environment", "failed to reset the local runtime socket").
-			Recovery("Run 'crux local reset' and try again.").
+		return crex.SystemError(description, "failed to reset the local runtime socket").
+			Recovery("Reset the local runtime state and retry.").
 			Cause(crex.Wrap(ErrHostCreate, err)).
 			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
 		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
-			Recovery("Run 'crux local reset' to recreate the local environment.").
+			Recovery("Retry after recreating the local environment.").
 			Cause(crex.Wrap(ErrHostStart, err)).
 			Err()
 	}
@@ -285,9 +287,11 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 // image is built and published by the Crucible team. It's an Alpine image
 // with containerd installed and used as the base for provisioning the VM.
 func fetchMachineImage(ctx context.Context) error {
+	const description = "cannot download machine image"
+
 	src, err := registry.NewSource(machineRegistryURL, machineNamespace)
 	if err != nil {
-		return crex.SystemError("cannot download machine image", "the registry source could not be initialized").
+		return crex.SystemError(description, "the registry source could not be initialized").
 			Recovery("Check your network connection and try again.").
 			Cause(err).
 			Err()
@@ -296,14 +300,14 @@ func fetchMachineImage(ctx context.Context) error {
 	id := reference.NewIdentifier(machineName, machineRegistryURL, machineNamespace, machineName)
 	ref, err := reference.New(id, machineVersion, nil)
 	if err != nil {
-		return crex.SystemError("cannot download machine image", "the machine image reference is invalid").
+		return crex.SystemError(description, "the machine image reference is invalid").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(err).
 			Err()
 	}
 
 	if _, err := src.Pull(ctx, ref); err != nil {
-		return crex.SystemError("cannot download machine image", "the machine image could not be retrieved from the registry").
+		return crex.SystemError(description, "the machine image could not be retrieved from the registry").
 			Recovery("Check your network connection and try again.").
 			Cause(err).
 			Err()

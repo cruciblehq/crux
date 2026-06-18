@@ -48,7 +48,31 @@ func (c *PushCmd) Run(ctx context.Context) error {
 	}
 
 	if err := resource.Push(ctx, src, *man, files.Package(RootCmd.Context)); err != nil {
-		return err
+		const description = "cannot push package"
+		switch {
+		case errors.Is(err, registry.ErrVersionExists):
+			return crex.UserError(description, "the resource version already exists in the registry").
+				Recovery("Bump resource.version in crucible.yaml, then run 'crux pack' and 'crux push' again.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrNamespaceNotFound):
+			return crex.UserError(description, "the target namespace does not exist in the registry").
+				Recovery("Create the namespace in the registry, then try again.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrInvalidIdentifier):
+			return crex.UserError(description, "the resource name in crucible.yaml is invalid").
+				Recovery("Use the format 'namespace/resource' in resource.name, then try again.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrFileSystemOperation):
+			return crex.SystemError(description, "the package archive could not be read from disk").
+				Recoveryf("Run 'crux pack' to create %s, then try again.", files.Package(RootCmd.Context)).
+				Reclassify(err)
+		case errors.Is(err, registry.ErrRegistryOperation):
+			return crex.SystemError(description, "the registry could not accept the package upload").
+				Recovery("Check your network connection and try again.").
+				Reclassify(err)
+		default:
+			return err
+		}
 	}
 
 	slog.Info("package pushed successfully")

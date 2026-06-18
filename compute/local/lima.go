@@ -59,6 +59,9 @@ const (
 	limaStatusStopped = "Stopped" // Lima instance is stopped.
 )
 
+// Shared recovery guidance for local Lima command failures.
+const recoveryRestartLocalEnvironment = "Restart the local environment and try again."
+
 // Process exit codes returned by limaExec.
 const (
 	exitCodeSuccess = 0  // Command exited cleanly.
@@ -122,6 +125,8 @@ func limaURL() string {
 // it downloads the release tarball for the host OS and architecture, extracts
 // it, and verifies the limactl binary is present.
 func ensureLima(ctx context.Context) error {
+	const description = "cannot download Lima"
+
 	if _, err := os.Stat(files.LimactlBin()); err == nil {
 		return nil
 	}
@@ -133,7 +138,7 @@ func ensureLima(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, limaURL(), nil)
 	if err != nil {
-		return crex.SystemError("cannot download Lima", "failed to build the download request").
+		return crex.SystemError(description, "failed to build the download request").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(crex.Wrap(ErrLimaDownload, err)).
 			Err()
@@ -141,7 +146,7 @@ func ensureLima(ctx context.Context) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return crex.SystemError("cannot download Lima", "the download request failed").
+		return crex.SystemError(description, "the download request failed").
 			Recovery("Check your network connection and try again.").
 			Cause(crex.Wrap(ErrLimaDownload, err)).
 			Err()
@@ -149,7 +154,7 @@ func ensureLima(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return crex.SystemErrorf("cannot download Lima", "the download server returned status %d", resp.StatusCode).
+		return crex.SystemErrorf(description, "the download server returned status %d", resp.StatusCode).
 			Recovery("Check your network connection and try again.").
 			Cause(crex.Newf(ErrLimaDownload, "unexpected status %d from %s", resp.StatusCode, limaURL())).
 			Err()
@@ -203,7 +208,7 @@ func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string
 			return exitErr.ExitCode(), nil
 		}
 		return exitCodeError, crex.SystemError("cannot run command in local environment", "the command could not be started in the virtual machine").
-			Recovery("Run 'crux local restart' and try again.").
+			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrHostExec, err)).
 			Err()
 	}
@@ -224,7 +229,7 @@ func limaList(ctx context.Context) ([]string, error) {
 	cmd.Env = limaEnv()
 	if err := cmd.Run(); err != nil {
 		return nil, crex.SystemError("cannot list local environments", "limactl failed to list instances").
-			Recovery("Run 'crux local restart' and try again.").
+			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrLimaCtl, err)).
 			Err()
 	}
@@ -245,7 +250,7 @@ func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
 	cmd.Env = limaEnv()
 	if err := cmd.Run(); err != nil {
 		return crex.SystemError("cannot copy files to local environment", "extracting the archive in the virtual machine failed").
-			Recovery("Run 'crux local restart' and try again.").
+			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrHostExec, err)).
 			Err()
 	}

@@ -55,15 +55,31 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
-		if errors.Is(err, registry.ErrNoVersions) ||
-			errors.Is(err, registry.ErrNoMatchingVersion) ||
-			errors.Is(err, registry.ErrTypeMismatch) {
+		const description = "cannot pull resource"
+		switch {
+		case errors.Is(err, registry.ErrNoVersions), errors.Is(err, registry.ErrNoMatchingVersion), errors.Is(err, registry.ErrTypeMismatch):
 			return crex.UserError("resource not found", raw).
 				Recovery("Check the resource reference and version, then try again.").
-				Cause(err).
-				Err()
+				Reclassify(err)
+		case errors.Is(err, registry.ErrNoArchive):
+			return crex.UserError(description, "the requested resource version has no uploaded archive").
+				Recovery("Choose a different version, or republish the resource with an archive.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrResolveVersion):
+			return crex.SystemError(description, "the registry could not resolve the requested resource version").
+				Recovery("Check your network connection and try again.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrDownload):
+			return crex.SystemError(description, "the resource archive could not be downloaded from the registry").
+				Recovery("Check your network connection and try again.").
+				Reclassify(err)
+		case errors.Is(err, registry.ErrCacheOperation):
+			return crex.SystemError(description, "the local cache could not store or extract the resource archive").
+				Recovery("Run 'crux cache clear' and try again.").
+				Reclassify(err)
+		default:
+			return err
 		}
-		return err
 	}
 
 	slog.Info("resource pulled",

@@ -49,7 +49,7 @@ func Execute(ctx context.Context) error {
 		RootCmd.Context = abs
 	}
 
-	return kongCtx.Run()
+	return ensureCLIError(kongCtx.Run())
 }
 
 // Configures the global logger based on CLI flags.

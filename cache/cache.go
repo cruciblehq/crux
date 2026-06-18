@@ -55,9 +55,12 @@ func Open() (*Cache, error) {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func OpenAt(root string) (*Cache, error) {
+	const description = "cannot open cache"
+	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
+
 	if err := os.MkdirAll(root, files.DefaultDirMode); err != nil {
-		return nil, crex.SystemError("cannot open cache", "failed to create the cache directory").
-			Recoveryf("Make sure you have write access to %s, then try again.", root).
+		return nil, crex.SystemError(description, "failed to create the cache directory").
+			Recoveryf(recoveryWriteAccess, root).
 			Cause(err).
 			Err()
 	}
@@ -65,15 +68,15 @@ func OpenAt(root string) (*Cache, error) {
 	lockPath := filepath.Join(root, lockFilename)
 	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, files.DefaultFileMode)
 	if err != nil {
-		return nil, crex.SystemError("cannot open cache", "failed to create the cache lock file").
-			Recoveryf("Make sure you have write access to %s, then try again.", root).
+		return nil, crex.SystemError(description, "failed to create the cache lock file").
+			Recoveryf(recoveryWriteAccess, root).
 			Cause(err).
 			Err()
 	}
 
 	if err := files.Lock(lf); err != nil {
 		lf.Close()
-		return nil, crex.SystemError("cannot open cache", "failed to acquire the cache lock").
+		return nil, crex.SystemError(description, "failed to acquire the cache lock").
 			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", lockPath).
 			Cause(err).
 			Err()
@@ -289,7 +292,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	exists, err := files.PathExists(dir)
 	if err != nil {
 		return "", crex.SystemError("cannot read cache", "failed to check the extracted cache entry").
-			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Recovery("Run 'crux cache clear' and try again.").
 			Cause(err).
 			Err()
 	}
@@ -306,7 +309,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 
 	if err := extractDirAtomic(f, dir); err != nil {
 		return "", crex.SystemError("cannot extract cache entry", "failed to extract the cached archive").
-			Recovery("The cached archive may be corrupt; run 'crux cache clear' and try again.").
+			Recovery("The cache may be corrupt. Run 'crux cache clear' and try again.").
 			Cause(err).
 			Err()
 	}
@@ -332,7 +335,7 @@ func (c *Cache) list() ([]*Version, error) {
 			return nil, nil
 		}
 		return nil, crex.SystemError("cannot list cache", "failed to read the cache directory").
-			Recovery("Run 'crux cache clear' to reset the cache and try again.").
+			Recovery("Run 'crux cache clear' and try again.").
 			Cause(err).
 			Err()
 	}
@@ -379,7 +382,7 @@ func (c *Cache) clear() error {
 		os.RemoveAll(c.extractedRoot()),
 	); err != nil {
 		return crex.SystemError("cannot clear cache", "failed to remove cached files").
-			Recoveryf("Make sure you have write access to %s, then try again.", c.root).
+			Recoveryf("Make sure you can write to %s, then try again.", c.root).
 			Cause(err).
 			Err()
 	}
@@ -430,7 +433,7 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 	)
 	if err != nil {
 		err = crex.SystemError("cannot remove cache entry", "failed to delete cached files").
-			Recoveryf("Make sure you have write access to %s, then try again.", c.root).
+			Recoveryf("Make sure you can modify %s, then try again.", c.root).
 			Cause(err).
 			Err()
 	}

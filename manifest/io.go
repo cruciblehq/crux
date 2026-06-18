@@ -22,11 +22,13 @@ func As[T any](m *Manifest) (T, error) {
 func Read(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read manifest", "the manifest file could not be read").
+			Reclassify(err)
 	}
 	var m Manifest
 	if err := codec.Unmarshal(data, &m, codec.YAML); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read manifest", "the manifest file is invalid or malformed").
+			Reclassify(crex.Wrap(ErrDecodeFailed, err))
 	}
 	return &m, nil
 }
@@ -58,9 +60,14 @@ func ReadAsAt[T any](dir string) (T, error) {
 func Write(m *Manifest, path string) error {
 	data, err := codec.Encode(m, codec.YAML)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot write manifest", "the manifest could not be encoded").
+			Reclassify(crex.Wrap(ErrEncodeFailed, err))
 	}
-	return os.WriteFile(path, data, files.DefaultFileMode)
+	if err := os.WriteFile(path, data, files.DefaultFileMode); err != nil {
+		return crex.SystemError("cannot write manifest", "the manifest file could not be written").
+			Reclassify(err)
+	}
+	return nil
 }
 
 // Encodes a manifest and writes it to dir/crucible.yaml.
@@ -72,11 +79,13 @@ func WriteAt(m *Manifest, dir string) error {
 func ReadPlan(path string) (*Plan, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read plan", "the plan file could not be read").
+			Reclassify(err)
 	}
 	var p Plan
 	if err := codec.Unmarshal(data, &p, codec.YAML); err != nil {
-		return nil, err
+		return nil, crex.SystemError("cannot read plan", "the plan file is invalid or malformed").
+			Reclassify(crex.Wrap(ErrDecodeFailed, err))
 	}
 	return &p, nil
 }
@@ -90,9 +99,14 @@ func ReadPlanAt(dir string) (*Plan, error) {
 func WritePlan(p *Plan, path string) error {
 	data, err := codec.Encode(p, codec.YAML)
 	if err != nil {
-		return err
+		return crex.SystemError("cannot write plan", "the plan could not be encoded").
+			Reclassify(crex.Wrap(ErrEncodeFailed, err))
 	}
-	return os.WriteFile(path, data, files.DefaultFileMode)
+	if err := os.WriteFile(path, data, files.DefaultFileMode); err != nil {
+		return crex.SystemError("cannot write plan", "the plan file could not be written").
+			Reclassify(err)
+	}
+	return nil
 }
 
 // Encodes a plan and writes it to dir/plan.yaml.

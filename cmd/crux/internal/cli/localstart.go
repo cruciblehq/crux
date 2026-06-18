@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -10,6 +11,28 @@ import (
 	"github.com/cruciblehq/crux/compute/local"
 	"github.com/cruciblehq/crux/crex"
 )
+
+// Returns a start-specific structured error when this command has enough
+// context to improve user guidance.
+func localStartError(err error) error {
+	const description = "cannot start local environment"
+	switch {
+	case errors.Is(err, local.ErrHostNotCreated):
+		return crex.UserError(description, "the local environment has not been provisioned").
+			Recovery("Run 'crux local start' to provision the local environment first.").
+			Reclassify(err)
+	case errors.Is(err, local.ErrHostNotRunning):
+		return crex.UserError(description, "the local environment is not running").
+			Recovery("Run 'crux local start' to start the local environment first.").
+			Reclassify(err)
+	case errors.Is(err, local.ErrHostAlreadyProvisioned):
+		return crex.UserError(description, "the local environment is already provisioned").
+			Recovery("Run 'crux local start' to use the existing environment, or 'crux local reset' to recreate it.").
+			Reclassify(err)
+	default:
+		return err
+	}
+}
 
 // Represents the 'crux local start' command.
 type LocalStartCmd struct{}
@@ -27,7 +50,7 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 
 	state, err := b.Status(ctx, name)
 	if err != nil {
-		return err
+		return localStartError(err)
 	}
 
 	switch state {
@@ -46,14 +69,14 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 		defer f.Close()
 		imageID, err := b.Upload(ctx, f)
 		if err != nil {
-			return err
+			return localStartError(err)
 		}
 		if err := b.Provision(ctx, imageID, name, localPlanOptions()); err != nil {
-			return err
+			return localStartError(err)
 		}
 	case compute.StateStopped:
 		if err := b.Start(ctx, name); err != nil {
-			return err
+			return localStartError(err)
 		}
 	case compute.StateRunning:
 		slog.Info("local environment already running")

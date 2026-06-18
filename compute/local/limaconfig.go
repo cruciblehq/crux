@@ -99,6 +99,8 @@ func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
 // limactl when provisioning the VM. If the file already exists it will be
 // overwritten. Returns the path to the file that was generated.
 func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error) {
+	const description = "cannot configure local environment"
+
 	data, err := buildLimaConfig(imagePath, kernelSpec)
 	if err != nil {
 		return "", err
@@ -106,7 +108,7 @@ func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error
 
 	configPath := files.LimaConfig()
 	if err := os.MkdirAll(filepath.Dir(configPath), files.DefaultDirMode); err != nil {
-		return "", crex.SystemError("cannot configure local environment", "failed to create the configuration directory").
+		return "", crex.SystemError(description, "failed to create the configuration directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", filepath.Dir(configPath)).
 			Cause(crex.Wrap(ErrHostConfig, err)).
 			Err()
@@ -114,7 +116,7 @@ func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error
 
 	f, err := os.Create(configPath)
 	if err != nil {
-		return "", crex.SystemError("cannot configure local environment", "failed to write the configuration file").
+		return "", crex.SystemError(description, "failed to write the configuration file").
 			Recoveryf("Make sure you have write access to %s, then try again.", configPath).
 			Cause(crex.Wrap(ErrHostConfig, err)).
 			Err()
@@ -122,7 +124,7 @@ func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error
 	defer f.Close()
 
 	if err := limaConfigTemplate.Execute(f, data); err != nil {
-		return "", crex.SystemError("cannot configure local environment", "failed to render the configuration file").
+		return "", crex.SystemError(description, "failed to render the configuration file").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(crex.Wrap(ErrHostConfig, err)).
 			Err()

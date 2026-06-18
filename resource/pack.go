@@ -51,7 +51,7 @@ func ensureOutputDir(outputPath string) error {
 // assumed to already be in their final form.
 func createArchive(outputPath string, buildDir string) error {
 	if err := archive.Create(buildDir, outputPath); err != nil {
-		return crex.UserError("failed to create package archive", "could not write the archive to disk").
+		return crex.SystemError("failed to create package archive", "could not write the archive to disk").
 			Recovery("Check that you have write permissions for the output path.").
 			Cause(err).
 			Err()
