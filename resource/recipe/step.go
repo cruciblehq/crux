@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/resource/oci"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Shell used to execute a Run step when neither the step nor the stage

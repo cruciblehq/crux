@@ -4,13 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 func TestNewBuilder(t *testing.T) {
-	src, err := registry.NewSource("http://reg", "ns")
+	src, err := hub.NewSource("http://reg", "ns")
 	if err != nil {
 		t.Fatal(err)
 	}

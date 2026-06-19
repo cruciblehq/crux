@@ -9,9 +9,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
+	"github.com/adrg/xdg"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
+
+// Default client name used by cache paths.
+const defaultClientName = "crux"
 
 const (
 
@@ -47,7 +51,12 @@ type Cache struct {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func Open() (*Cache, error) {
-	return OpenAt(files.RegistryCacheDir())
+	return OpenAt(defaultRootDir())
+}
+
+// Path to the default registry cache root directory.
+func defaultRootDir() string {
+	return filepath.Join(xdg.CacheHome, defaultClientName, "registry")
 }
 
 // Opens a cache at the specified directory.
@@ -58,7 +67,7 @@ func OpenAt(root string) (*Cache, error) {
 	const description = "cannot open cache"
 	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
 
-	if err := os.MkdirAll(root, files.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(root, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError(description, "failed to create the cache directory").
 			Recoveryf(recoveryWriteAccess, root).
 			Cause(err).
@@ -66,7 +75,7 @@ func OpenAt(root string) (*Cache, error) {
 	}
 
 	lockPath := filepath.Join(root, lockFilename)
-	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, files.DefaultFileMode)
+	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, file.DefaultFileMode)
 	if err != nil {
 		return nil, crex.SystemError(description, "failed to create the cache lock file").
 			Recoveryf(recoveryWriteAccess, root).
@@ -74,7 +83,7 @@ func OpenAt(root string) (*Cache, error) {
 			Err()
 	}
 
-	if err := files.Lock(lf); err != nil {
+	if err := file.Lock(lf); err != nil {
 		lf.Close()
 		return nil, crex.SystemError(description, "failed to acquire the cache lock").
 			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", lockPath).
@@ -95,7 +104,7 @@ func (c *Cache) Close() error {
 
 	if c.lock != nil {
 		err := errors.Join(
-			files.Unlock(c.lock),
+			file.Unlock(c.lock),
 			c.lock.Close(),
 		)
 		c.lock = nil
@@ -112,7 +121,7 @@ func (c *Cache) Has(namespace, resource, version string) (bool, error) {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return files.PathExists(meta)
+	return file.PathExists(meta)
 }
 
 // Retrieves version metadata from the cache.
@@ -157,7 +166,7 @@ func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) 
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return files.PathExists(dir)
+	return file.PathExists(dir)
 }
 
 // Returns the path to the extracted contents of a cached archive.
@@ -289,7 +298,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	}
 
 	// Already extracted.
-	exists, err := files.PathExists(dir)
+	exists, err := file.PathExists(dir)
 	if err != nil {
 		return "", crex.SystemError("cannot read cache", "failed to check the extracted cache entry").
 			Recovery("Run 'crux cache clear' and try again.").
@@ -329,7 +338,7 @@ func (c *Cache) put(namespace, resource, version string, archive io.Reader) (*Ve
 func (c *Cache) list() ([]*Version, error) {
 	root := c.archivesRoot()
 
-	namespaces, err := files.ListSubdirs(root)
+	namespaces, err := file.ListSubdirs(root)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -349,7 +358,7 @@ func (c *Cache) list() ([]*Version, error) {
 
 // Returns all versions within a single namespace directory.
 func listNamespace(root, ns string) []*Version {
-	resources, err := files.ListSubdirs(filepath.Join(root, ns))
+	resources, err := file.ListSubdirs(filepath.Join(root, ns))
 	if err != nil {
 		slog.Error("failed to list resources", "namespace", ns, "error", err)
 		return nil
@@ -357,7 +366,7 @@ func listNamespace(root, ns string) []*Version {
 
 	var versions []*Version
 	for _, res := range resources {
-		versionDirs, err := files.ListSubdirs(filepath.Join(root, ns, res))
+		versionDirs, err := file.ListSubdirs(filepath.Join(root, ns, res))
 		if err != nil {
 			slog.Error("failed to list versions", "namespace", ns, "resource", res, "error", err)
 			continue
@@ -395,7 +404,7 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(dir, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to create the cache entry directory").
 			Recoveryf("Make sure you have write access to %s and enough free disk space, then try again.", dir).
 			Cause(err).
@@ -403,7 +412,7 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 	}
 
 	archPath := filepath.Join(dir, archiveFilename)
-	digest, size, err := files.WriteAtomic(r, dir, archPath)
+	digest, size, err := file.WriteAtomic(r, dir, archPath)
 	if err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to write the cached archive").
 			Recovery("Free up disk space, then try again.").
@@ -445,7 +454,7 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 		filepath.Dir(eDir),
 		filepath.Dir(filepath.Dir(eDir)),
 	} {
-		if pErr := files.RemoveDirIfEmpty(dir); pErr != nil {
+		if pErr := file.RemoveDirIfEmpty(dir); pErr != nil {
 			slog.Error("failed to prune empty directory", "dir", dir, "error", pErr)
 		}
 	}

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 func writeWidgetManifest(t *testing.T, dir string) {

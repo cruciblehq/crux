@@ -1,6 +1,6 @@
 package resource
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrUnsupportedType      = crex.New("unsupported resource type")

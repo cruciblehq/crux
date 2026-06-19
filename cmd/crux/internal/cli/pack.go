@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/registry"
 	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Represents the 'crux pack' command.
@@ -22,13 +22,13 @@ type PackCmd struct{}
 // created package.
 func (c *PackCmd) Run(ctx context.Context) error {
 
-	slog.Info("packaging resource...", "output", files.Package(RootCmd.Context))
+	slog.Info("packaging resource...", "output", file.Package(RootCmd.Context))
 
-	result, err := resource.Pack(ctx, files.BuildDir(RootCmd.Context), files.Package(RootCmd.Context))
+	result, err := resource.Pack(ctx, file.BuildDir(RootCmd.Context), file.Package(RootCmd.Context))
 	if err != nil {
 		if errors.Is(err, registry.ErrFileSystemOperation) {
 			return crex.SystemError("cannot package resource", "the package output directory could not be created").
-				Recoveryf("Make sure you have write access to %s, then try again.", files.Package(RootCmd.Context)).
+				Recoveryf("Make sure you have write access to %s, then try again.", file.Package(RootCmd.Context)).
 				Reclassify(err)
 		}
 		return err

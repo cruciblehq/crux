@@ -2,16 +2,22 @@ package compute
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Name of the local VM instance managed by crux.
-const LocalInstance = files.DefaultClientName
+const LocalInstance = "crux"
+
+// Permission mode for the temp directory, reachable only by the current user.
+const tempDirMode os.FileMode = 0o700
 
 // Local port of the compute backend.
 //
@@ -41,7 +47,7 @@ func (bl *BackendLocal) Upload(ctx context.Context, r io.Reader) (string, error)
 		return bl.local.UploadImage(ctx, f.Name())
 	}
 
-	f, err := files.CreateTemp("upload-*.img")
+	f, err := createTemp("upload-*.img")
 	if err != nil {
 		return "", crex.SystemError(description, "failed to create a temporary file for the image upload").
 			Recovery(recoveryDiskSpace).
@@ -115,7 +121,7 @@ func (bl *BackendLocal) Connect(ctx context.Context, name string) (*Client, erro
 	if err != nil {
 		return nil, err
 	}
-	return newClient(socketPath, files.DefaultClientName)
+	return newClient(socketPath, LocalInstance)
 }
 
 // Converts a [local.State] value to a [State].
@@ -128,4 +134,40 @@ func localStateToState(s local.State) State {
 	default:
 		return StateNotProvisioned
 	}
+}
+
+// Path to the directory for temporary local compute files.
+func tempDir() string {
+	name := LocalInstance
+	if uid := os.Getuid(); uid >= 0 {
+		name = fmt.Sprintf("%s-%s", name, strconv.Itoa(uid))
+	}
+	return filepath.Join(os.TempDir(), name)
+}
+
+// Creates a temporary file for local compute staging.
+func createTemp(pattern string) (*os.File, error) {
+	dir := tempDir()
+	if err := os.MkdirAll(dir, tempDirMode); err != nil {
+		return nil, err
+	}
+	if err := verifyTempDir(dir); err != nil {
+		return nil, err
+	}
+	return os.CreateTemp(dir, pattern)
+}
+
+// Verifies that dir is a real directory rather than a symlink.
+func verifyTempDir(dir string) error {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return crex.Newf(file.ErrUnsafeTempDir, "%q is a symlink or not a directory", dir)
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return os.Chmod(dir, tempDirMode)
+	}
+	return nil
 }

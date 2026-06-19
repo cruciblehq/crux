@@ -20,10 +20,10 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/crypto"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/crypto"
 )
 
 // Container runtime limits and defaults.
@@ -383,7 +383,7 @@ func buildExecProcess(base *specs.Spec, command string, opts *RuntimeOptions) *s
 	if len(opts.Env) > 0 {
 		env := make([]string, 0, len(opts.Env))
 		for k, v := range opts.Env {
-			env = append(env, k+"="+v)
+			env = append(env, fmt.Sprintf("%s=%s", k, v))
 		}
 		proc.Env = MergeEnv(proc.Env, env)
 	}

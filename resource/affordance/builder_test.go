@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cruciblehq/crux/affordance/rlimit"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/spec/affordance/rlimit"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -83,7 +83,7 @@ func TestBuildAllowsRepeatedMACHooks(t *testing.T) {
 		{Source: `.mac file_open where file.path like "/var/lib/agent/**"`},
 		{Source: `.mac file_open where task.uid = 0`},
 	}
-	src := registry.Source{}
+	src := hub.Source{}
 	for _, grant := range grants {
 		if err := b.Build(ctx, grant, src); err != nil {
 			t.Fatalf("Build(%q): %v", grant.Source, err)
@@ -98,7 +98,7 @@ func TestBuildDeduplicatesRepeatedSeccompGrant(t *testing.T) {
 	b := NewBuilder()
 	ctx := context.Background()
 	grant := manifest.Grant{Source: `.seccomp ioctl tty`}
-	src := registry.Source{}
+	src := hub.Source{}
 	if err := b.Build(ctx, grant, src); err != nil {
 		t.Fatalf("first Build: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestBuildRepeatedRlimitSameValueNoOp(t *testing.T) {
 	b := NewBuilder()
 	ctx := context.Background()
 	grant := manifest.Grant{Source: `.rlimit nofile 1024 1024`}
-	src := registry.Source{}
+	src := hub.Source{}
 	if err := b.Build(ctx, grant, src); err != nil {
 		t.Fatalf("first Build: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestBuildRepeatedRlimitSameValueNoOp(t *testing.T) {
 func TestBuildRepeatedRlimitDifferentValueConflicts(t *testing.T) {
 	b := NewBuilder()
 	ctx := context.Background()
-	src := registry.Source{}
+	src := hub.Source{}
 	if err := b.Build(ctx, manifest.Grant{Source: `.rlimit nofile 1024 1024`}, src); err != nil {
 		t.Fatalf("first Build: %v", err)
 	}

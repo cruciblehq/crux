@@ -3,14 +3,14 @@ package resource
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/affordance"
 	"github.com/cruciblehq/crux/resource/blueprint"
 	"github.com/cruciblehq/crux/resource/runtime"
 	"github.com/cruciblehq/crux/resource/service"
 	"github.com/cruciblehq/crux/resource/widget"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Holds the output of a successful [Build] call.
@@ -27,7 +27,7 @@ type BuildResult struct {
 // paths in copy steps are resolved relative to it for runtime and service
 // builds. env selects the blueprint environment and is ignored by other types.
 // The output directory is created by the caller and guaranteed to be empty.
-func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdir, env, output string) (*BuildResult, error) {
+func Build(ctx context.Context, m manifest.Manifest, src hub.Source, workdir, env, output string) (*BuildResult, error) {
 	switch m.Resource.Type {
 	case manifest.TypeRuntime:
 		return buildRuntime(ctx, &m, src, workdir, output)
@@ -45,7 +45,7 @@ func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdi
 }
 
 // Builds a runtime resource and writes the resolved manifest to the build dir.
-func buildRuntime(ctx context.Context, m *manifest.Manifest, src registry.Source, workdir, output string) (*BuildResult, error) {
+func buildRuntime(ctx context.Context, m *manifest.Manifest, src hub.Source, workdir, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Runtime](m)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func buildRuntime(ctx context.Context, m *manifest.Manifest, src registry.Source
 }
 
 // Builds a service resource and writes the resolved manifest to the build dir.
-func buildService(ctx context.Context, m *manifest.Manifest, src registry.Source, workdir, output string) (*BuildResult, error) {
+func buildService(ctx context.Context, m *manifest.Manifest, src hub.Source, workdir, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Service](m)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func buildWidget(ctx context.Context, m *manifest.Manifest, output string) (*Bui
 
 // Builds an affordance resource, compiling every grant in every scope, then
 // writes the resolved manifest to output.
-func buildAffordance(ctx context.Context, m *manifest.Manifest, src registry.Source, output string) (*BuildResult, error) {
+func buildAffordance(ctx context.Context, m *manifest.Manifest, src hub.Source, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Affordance](m)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func buildAffordance(ctx context.Context, m *manifest.Manifest, src registry.Sou
 }
 
 // Builds a blueprint resource and writes the resolved manifest to output.
-func buildBlueprint(ctx context.Context, m *manifest.Manifest, src registry.Source, env, output string) (*BuildResult, error) {
+func buildBlueprint(ctx context.Context, m *manifest.Manifest, src hub.Source, env, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Blueprint](m)
 	if err != nil {
 		return nil, err

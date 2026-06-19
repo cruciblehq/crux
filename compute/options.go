@@ -3,8 +3,8 @@ package compute
 import (
 	"io"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // Resource requirements for provisioning a compute host.

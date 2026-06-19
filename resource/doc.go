@@ -1,12 +1,12 @@
 // Package resource handles artifact operations for Crucible resources.
 //
 // The package is organized in two layers. The manifest layer exposes four
-// operations keyed off the manifest resource type: [Build] compiles a resource,
-// [Verify] checks a build directory, [Pack] produces a distributable archive,
-// and [Push] uploads it to the registry. [Build] unwraps the typed config from
-// the manifest, dispatches to the matching type builder, and writes the
-// resolved manifest alongside the artifacts. Some resource types, such as
-// machine, currently participate only in packaging and registry operations and
+// operations for the manifest resource type: [Build] compiles a resource,
+// [Verify] checks a build directory, [Pack] produces an archive, and [Push]
+// uploads it to the registry. [Build] unwraps the typed config from the
+// manifest, dispatches to the matching type builder, and writes the resolved
+// manifest alongside the artifacts. Some resource types, such as machine,
+// currently participate only in packaging and registry operations and
 // intentionally do not have a builder yet. Lifecycle operations (start, stop,
 // exec, etc.) are handled directly via the runtime.
 //
@@ -20,7 +20,7 @@
 //
 // Callers read the manifest themselves and pass it to each operation:
 //
-//	src, err := registry.NewSource("http://hub.cruciblehq.xyz:8080", "acme")
+//	src, err := hub.NewSource("http://hub.cruciblehq.xyz:8080", "acme")
 //	man, err := manifest.Read("crucible.yaml")
 //
 //	result, err := resource.Build(ctx, *man, src, filepath.Dir("crucible.yaml"), "", "build")

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/recipe"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Builds a Crucible runtime resource from its configuration.
@@ -15,8 +15,8 @@ import (
 // runtime has no entrypoint, so the produced image keeps the entrypoint of its
 // final stage.
 type Builder struct {
-	src     registry.Source // Registry access for pulling base images and resolving affordances.
-	workdir string          // Manifest directory, used as the root for resolving copy step sources.
+	src     hub.Source // Registry access for pulling base images and resolving affordances.
+	workdir string     // Manifest directory, used as the root for resolving copy step sources.
 }
 
 // Returns a new Builder.
@@ -24,7 +24,7 @@ type Builder struct {
 // source provides registry access for pulling base images and resolving
 // affordance references. workdir is the directory containing the manifest and
 // is the root for resolving copy step sources.
-func NewBuilder(src registry.Source, workdir string) *Builder {
+func NewBuilder(src hub.Source, workdir string) *Builder {
 	return &Builder{src: src, workdir: workdir}
 }
 

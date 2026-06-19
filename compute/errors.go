@@ -1,6 +1,6 @@
 package compute
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrUnknownProvider = crex.New("unknown provider")

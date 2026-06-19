@@ -3,7 +3,7 @@ package compute
 import (
 	"sync"
 
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 var (

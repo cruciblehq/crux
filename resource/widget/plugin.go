@@ -10,7 +10,7 @@ import (
 
 	es "github.com/evanw/esbuild/pkg/api"
 
-	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 const (
@@ -107,7 +107,7 @@ func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolve
 			path = jsPath
 		}
 	} else if info.IsDir() {
-		path = files.WidgetMain(path)
+		path = file.WidgetMain(path)
 	}
 
 	return es.OnResolveResult{

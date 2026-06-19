@@ -11,21 +11,40 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
+	"github.com/adrg/xdg"
+	"github.com/cruciblehq/utils-go/archive"
+	"github.com/cruciblehq/utils-go/crex"
 )
+
+// Default client name used for local runtime paths.
+const defaultClientName = "crux"
 
 // Lima configuration.
 const (
 	limaVersion      = "2.0.3" // Lima version to use for the crux VM.
 	limaInstanceName = "crux"  // Lima instance name used for the crux VM.
 )
+
+// Path to the vendored Lima installation directory.
+func limaDir() string {
+	return filepath.Join(xdg.DataHome, defaultClientName, "lima")
+}
+
+// Path to the vendored limactl binary.
+func limactlBin() string {
+	return filepath.Join(limaDir(), "bin", "limactl")
+}
+
+// Path to the VM data directory.
+func vmDir() string {
+	return filepath.Join(xdg.DataHome, defaultClientName, "vm")
+}
 
 // Download URL template for Lima releases. Uses placeholders for version,
 // OS, and architecture.
@@ -127,7 +146,7 @@ func limaURL() string {
 func ensureLima(ctx context.Context) error {
 	const description = "cannot download Lima"
 
-	if _, err := os.Stat(files.LimactlBin()); err == nil {
+	if _, err := os.Stat(limactlBin()); err == nil {
 		return nil
 	}
 
@@ -164,7 +183,7 @@ func ensureLima(ctx context.Context) error {
 		"version", limaVersion,
 	)
 
-	return extractLima(resp.Body, files.LimaDir())
+	return extractLima(resp.Body, limaDir())
 }
 
 // Extracts the Lima distribution from a gzipped tar archive.
@@ -180,7 +199,7 @@ func extractLima(r io.Reader, dest string) error {
 			Err()
 	}
 
-	if _, err := os.Stat(files.LimactlBin()); err != nil {
+	if _, err := os.Stat(limactlBin()); err != nil {
 		return crex.SystemError("cannot install Lima", "the Lima archive did not contain limactl").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(crex.Newf(ErrLimaDownload, "limactl not found in archive")).
@@ -197,7 +216,7 @@ func extractLima(r io.Reader, dest string) error {
 func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
 	shellArgs := append([]string{"shell", limaInstanceName, command}, args...)
 
-	cmd := exec.CommandContext(ctx, files.LimactlBin(), shellArgs...)
+	cmd := exec.CommandContext(ctx, limactlBin(), shellArgs...)
 	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -223,7 +242,7 @@ func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string
 // instances have been provisioned.
 func limaList(ctx context.Context) ([]string, error) {
 	var stdout bytes.Buffer
-	cmd := exec.CommandContext(ctx, files.LimactlBin(), "list", "--format={{.Name}}")
+	cmd := exec.CommandContext(ctx, limactlBin(), "list", "--format={{.Name}}")
 	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdout = &stdout
 	cmd.Env = limaEnv()
@@ -244,7 +263,7 @@ func limaList(ctx context.Context) ([]string, error) {
 // which uses the existing SSH connection. Entries in the archive are applied
 // as absolute paths, preserving permissions, ownership, and timestamps.
 func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
-	cmd := exec.CommandContext(ctx, files.LimactlBin(), "shell", name, "tar", "-x", "-C", "/")
+	cmd := exec.CommandContext(ctx, limactlBin(), "shell", name, "tar", "-x", "-C", "/")
 	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdin = r
 	cmd.Env = limaEnv()
@@ -264,7 +283,7 @@ func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
 // Lima reported without the output reaching the user's terminal.
 func limactlRun(ctx context.Context, args ...string) error {
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, files.LimactlBin(), args...)
+	cmd := exec.CommandContext(ctx, limactlBin(), args...)
 	cmd.WaitDelay = commandWaitDelay
 	cmd.Stderr = &stderr
 	cmd.Env = limaEnv()
@@ -295,7 +314,7 @@ func limactlRunNoTTY(ctx context.Context, args ...string) error {
 // an empty string if the instance does not exist.
 func limaInstanceStatus(ctx context.Context) string {
 	var stdout bytes.Buffer
-	cmd := exec.CommandContext(ctx, files.LimactlBin(), "list", "--format={{.Status}}", limaInstanceName)
+	cmd := exec.CommandContext(ctx, limactlBin(), "list", "--format={{.Status}}", limaInstanceName)
 	cmd.WaitDelay = commandWaitDelay
 	cmd.Stdout = &stdout
 	cmd.Env = limaEnv()
@@ -313,11 +332,11 @@ func limaInstanceStatus(ctx context.Context) string {
 // are preserved from the current process so that limactl can find system
 // tools and resolve user directories. USER and TMPDIR are also preserved.
 func limaEnv() []string {
-	env := []string{"LIMA_HOME=" + files.VMDir()}
+	env := []string{fmt.Sprintf("LIMA_HOME=%s", vmDir())}
 
 	appendIfSet := func(key string) {
 		if val := os.Getenv(key); val != "" {
-			env = append(env, key+"="+val)
+			env = append(env, fmt.Sprintf("%s=%s", key, val))
 		}
 	}
 

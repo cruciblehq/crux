@@ -11,17 +11,20 @@ type captureHandler struct {
 	records *[]slog.Record
 }
 
-func (h captureHandler) Enabled(context.Context, slog.Level) bool { return true }
-
+func (h captureHandler) Enabled(context.Context, slog.Level) bool {
+	return true
+}
 func (h captureHandler) Handle(_ context.Context, r slog.Record) error {
 	*h.records = append(*h.records, r)
 	return nil
 }
 
-func (h captureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
-
-func (h captureHandler) WithGroup(string) slog.Handler { return h }
-
+func (h captureHandler) WithAttrs([]slog.Attr) slog.Handler {
+	return h
+}
+func (h captureHandler) WithGroup(string) slog.Handler {
+	return h
+}
 func TestStreamWriter(t *testing.T) {
 	var records []slog.Record
 	prev := slog.Default()

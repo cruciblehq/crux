@@ -7,11 +7,12 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Represents the 'crux push' command.
@@ -28,7 +29,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 
 	slog.Info("pushing package...", "registry", registryURL)
 
-	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
+	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -47,7 +48,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := resource.Push(ctx, src, *man, files.Package(RootCmd.Context)); err != nil {
+	if err := resource.Push(ctx, src, *man, file.Package(RootCmd.Context)); err != nil {
 		const description = "cannot push package"
 		switch {
 		case errors.Is(err, registry.ErrVersionExists):
@@ -64,7 +65,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 				Reclassify(err)
 		case errors.Is(err, registry.ErrFileSystemOperation):
 			return crex.SystemError(description, "the package archive could not be read from disk").
-				Recoveryf("Run 'crux pack' to create %s, then try again.", files.Package(RootCmd.Context)).
+				Recoveryf("Run 'crux pack' to create %s, then try again.", file.Package(RootCmd.Context)).
 				Reclassify(err)
 		case errors.Is(err, registry.ErrRegistryOperation):
 			return crex.SystemError(description, "the registry could not accept the package upload").

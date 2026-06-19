@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 func TestErrService(t *testing.T) {

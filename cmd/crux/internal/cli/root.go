@@ -8,7 +8,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Represents the root command for the Crux CLI.
@@ -20,8 +20,8 @@ var RootCmd struct {
 
 	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
 	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
-	Push    PushCmd    `cmd:"" help:"Push a resource package to the Hub registry."`
-	Pull    PullCmd    `cmd:"" help:"Pull a resource from the Hub registry to local cache."`
+	Push    PushCmd    `cmd:"" help:"Push a resource package to the registry."`
+	Pull    PullCmd    `cmd:"" help:"Pull a resource from the registry to local cache."`
 	Import  ImportCmd  `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
 	Local   LocalCmd   `cmd:"" help:"Manage the local environment."`

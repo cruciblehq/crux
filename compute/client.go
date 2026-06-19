@@ -22,8 +22,8 @@ import (
 	imgspecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/crypto"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/crypto"
 )
 
 // Number of random bytes in generated step, snapshot, and exec identifiers.

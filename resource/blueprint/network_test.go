@@ -3,8 +3,8 @@ package blueprint
 import (
 	"testing"
 
-	"github.com/cruciblehq/crux/affordance/net"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/affordance/net"
+	"github.com/cruciblehq/spec/manifest"
 )
 
 func TestDeriveNetworks(t *testing.T) {

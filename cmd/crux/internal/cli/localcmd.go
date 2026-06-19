@@ -6,14 +6,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/adrg/xdg"
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Name of the lock file used to serialise concurrent blueprint mutations.
 const localLockFile = "blueprint.lock"
+
+// Path to the local blueprint state directory.
+func localStateDir() string {
+	return filepath.Join(xdg.DataHome, "crux", "local")
+}
 
 // Manages the local Crucible environment.
 //
@@ -46,7 +52,7 @@ func localBlueprint() (*manifest.Blueprint, error) {
 // decoded. The caller should treat zero values as "no additional requirements"
 // and let the backend apply its own defaults.
 func localPlanOptions() compute.Options {
-	plan, err := manifest.ReadPlanAt(files.BuildDir(files.LocalDir()))
+	plan, err := manifest.ReadPlanAt(file.BuildDir(localStateDir()))
 	if err != nil {
 		return compute.Options{}
 	}
@@ -71,8 +77,8 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 	const description = "cannot access local state"
 	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
 
-	dir := files.LocalDir()
-	if err := os.MkdirAll(dir, files.DefaultDirMode); err != nil {
+	dir := localStateDir()
+	if err := os.MkdirAll(dir, file.DefaultDirMode); err != nil {
 		return crex.SystemError(description, "failed to create the local state directory").
 			Recoveryf(recoveryWriteAccess, dir).
 			Cause(err).
@@ -88,13 +94,13 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 	}
 	defer lf.Close()
 
-	if err := files.LockWithContext(ctx, lf); err != nil {
+	if err := file.LockWithContext(ctx, lf); err != nil {
 		return crex.SystemError(description, "failed to lock the local state").
 			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", filepath.Join(dir, localLockFile)).
 			Cause(err).
 			Err()
 	}
-	defer files.Unlock(lf)
+	defer file.Unlock(lf)
 
 	m, bp, err := openLocalBlueprint()
 	if err != nil {
@@ -117,7 +123,7 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 // Opens the local blueprint from disk, falling back to an empty in-memory
 // blueprint if no blueprint has been written yet.
 func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
-	dir := files.LocalDir()
+	dir := localStateDir()
 	m, err := manifest.ReadAt(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

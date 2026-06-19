@@ -1,6 +1,6 @@
 package cache
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrNotFound       = crex.New("entry not found in cache")

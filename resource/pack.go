@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/archive"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Holds the output of a successful [Pack] call.
@@ -39,7 +39,7 @@ func ensureOutputDir(outputPath string) error {
 	if outputDir == "." || outputDir == "" {
 		return nil
 	}
-	if err := os.MkdirAll(outputDir, files.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(outputDir, file.DefaultDirMode); err != nil {
 		return crex.Wrap(registry.ErrFileSystemOperation, err)
 	}
 	return nil

@@ -10,8 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/spec/affordance/kernel"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -92,7 +91,7 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	if cfg.GuestSocket != guestContainerdSocket {
 		t.Errorf("GuestSocket: got %q, want %q", cfg.GuestSocket, guestContainerdSocket)
 	}
-	if want := files.ContainerdSocket(limaInstanceName); cfg.HostSocket != want {
+	if want := containerdSocketPath(limaInstanceName); cfg.HostSocket != want {
 		t.Errorf("HostSocket: got %q, want %q", cfg.HostSocket, want)
 	}
 }

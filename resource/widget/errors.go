@@ -1,6 +1,6 @@
 package widget
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrInvalidPath = crex.New("invalid build path")

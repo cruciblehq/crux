@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	goruntime "runtime"
+	"runtime"
 
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
@@ -24,7 +24,7 @@ type ImportCmd struct {
 func (c *ImportCmd) Run(ctx context.Context) error {
 	platform := c.Platform
 	if platform == "" {
-		platform = fmt.Sprintf("linux/%s", goruntime.GOARCH)
+		platform = fmt.Sprintf("linux/%s", runtime.GOARCH)
 	}
 
 	p, err := v1.ParsePlatform(platform)

@@ -1,6 +1,6 @@
 package blueprint
 
-import "github.com/cruciblehq/crux/manifest"
+import "github.com/cruciblehq/spec/manifest"
 
 // Derives cloud-level network entries from per-container network specs.
 //

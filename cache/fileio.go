@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cruciblehq/crux/archive"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
+	"github.com/cruciblehq/utils-go/archive"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Opens a file, returning ErrNotFound if it doesn't exist.
@@ -27,7 +27,7 @@ func openFile(path string) (*os.File, error) {
 // into place.
 func extractDirAtomic(r io.Reader, dir string) error {
 	parent := filepath.Dir(dir)
-	if err := os.MkdirAll(parent, files.DefaultDirMode); err != nil {
+	if err := os.MkdirAll(parent, file.DefaultDirMode); err != nil {
 		return err
 	}
 
@@ -92,7 +92,7 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 			Cause(err).
 			Err()
 	}
-	if err := os.WriteFile(metPath, data, files.DefaultFileMode); err != nil {
+	if err := os.WriteFile(metPath, data, file.DefaultFileMode); err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to write the cache metadata file").
 			Recovery("Free up disk space, then try again.").
 			Cause(err).

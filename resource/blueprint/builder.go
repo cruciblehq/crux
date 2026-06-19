@@ -3,26 +3,26 @@ package blueprint
 import (
 	"context"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/affordance/provision"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/affordance"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/spec/affordance/provision"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Builds a Crucible blueprint resource from its configuration.
 type Builder struct {
-	src registry.Source // Registry access for resolving service references and affordances.
-	env string          // Environment selector for the blueprint.
+	src hub.Source // Registry access for resolving service references and affordances.
+	env string     // Environment selector for the blueprint.
 }
 
 // Returns a new Builder.
 //
 // source provides registry access for resolving service references and their
 // affordances. env selects the blueprint environment to resolve.
-func NewBuilder(src registry.Source, env string) *Builder {
+func NewBuilder(src hub.Source, env string) *Builder {
 	return &Builder{src: src, env: env}
 }
 
@@ -58,7 +58,7 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, output str
 // perimeter is derived from the per-container network specs. computeHost is set
 // as the Host of the single local compute unit. Returns the assembled plan, or
 // an error from environment lookup or any service resolution.
-func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src registry.Source, computeHost string) (*manifest.Plan, error) {
+func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src hub.Source, computeHost string) (*manifest.Plan, error) {
 	p := &manifest.Plan{
 		Version: manifest.PlanVersion,
 		Infrastructure: manifest.Infrastructure{
@@ -131,7 +131,7 @@ type serviceResult struct {
 //
 // Pulls the service manifest, validates the environment variables, and compiles
 // affordances from the runtime and the service into a runtime spec.
-func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src registry.Source) (serviceResult, error) {
+func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src hub.Source) (serviceResult, error) {
 	ref, err := src.Parse(string(manifest.TypeService), service.Ref)
 	if err != nil {
 		return serviceResult{}, errService(service.ID, err)
@@ -206,7 +206,7 @@ func validateEnvironment(schema *manifest.Schema, env *manifest.Environment) err
 // from its runtime into a compiled container, kernel spec, and provision spec.
 //
 // Runtime grants are processed before service-level grants.
-func collectGrants(ctx context.Context, serviceID string, output *manifest.Stage, src registry.Source) (manifest.Container, kernel.Spec, *provision.Spec, error) {
+func collectGrants(ctx context.Context, serviceID string, output *manifest.Stage, src hub.Source) (manifest.Container, kernel.Spec, *provision.Spec, error) {
 	var scopes []manifest.GrantScope
 	if output.From != "" {
 		rt, err := resolveRuntime(ctx, serviceID, output.From, src)
@@ -294,7 +294,7 @@ func deriveComputeKernel(computeID string, assignments map[string]string, result
 }
 
 // Pulls a service resource and extracts its manifest config.
-func resolveService(ctx context.Context, id string, ref *reference.Reference, src registry.Source) (*manifest.Service, error) {
+func resolveService(ctx context.Context, id string, ref *reference.Reference, src hub.Source) (*manifest.Service, error) {
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
 		return nil, errService(id, err)
@@ -307,7 +307,7 @@ func resolveService(ctx context.Context, id string, ref *reference.Reference, sr
 }
 
 // Pulls a runtime resource and extracts its manifest config.
-func resolveRuntime(ctx context.Context, serviceID string, from string, src registry.Source) (*manifest.Runtime, error) {
+func resolveRuntime(ctx context.Context, serviceID string, from string, src hub.Source) (*manifest.Runtime, error) {
 	ref, err := src.Parse(string(manifest.TypeRuntime), from)
 	if err != nil {
 		return nil, errServiceRuntime(serviceID, err)

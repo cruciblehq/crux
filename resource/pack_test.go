@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cruciblehq/crux/archive"
+	"github.com/cruciblehq/utils-go/archive"
 )
 
 func TestPack(t *testing.T) {
@@ -26,7 +26,7 @@ func TestPack(t *testing.T) {
 		t.Fatalf("PackResult.Output = %q, want %q", res.Output, output)
 	}
 
-	// The archive round-trips back to the original files.
+	// The archive round-trips back to the original paths.
 	extracted := filepath.Join(t.TempDir(), "out")
 	if err := archive.Extract(output, extracted); err != nil {
 		t.Fatalf("extract: %v", err)

@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
 )
 
 func TestPushMissingPackage(t *testing.T) {
-	src, err := registry.NewSource("http://reg", "ns")
+	src, err := hub.NewSource("http://reg", "ns")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/cio"
 
-	"github.com/cruciblehq/crux/crypto"
+	"github.com/cruciblehq/utils-go/crypto"
 )
 
 const (

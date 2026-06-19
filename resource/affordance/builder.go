@@ -4,24 +4,24 @@ import (
 	"context"
 	"strings"
 
-	aff "github.com/cruciblehq/crux/affordance"
-	"github.com/cruciblehq/crux/affordance/agl"
-	"github.com/cruciblehq/crux/affordance/cap"
-	"github.com/cruciblehq/crux/affordance/cgroup"
-	"github.com/cruciblehq/crux/affordance/device"
-	"github.com/cruciblehq/crux/affordance/fcap"
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/affordance/mac"
-	"github.com/cruciblehq/crux/affordance/mount"
-	"github.com/cruciblehq/crux/affordance/net"
-	"github.com/cruciblehq/crux/affordance/provision"
-	"github.com/cruciblehq/crux/affordance/rlimit"
-	"github.com/cruciblehq/crux/affordance/seccomp"
-	"github.com/cruciblehq/crux/affordance/subsystem"
-	"github.com/cruciblehq/crux/affordance/volume"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	aff "github.com/cruciblehq/spec/affordance"
+	"github.com/cruciblehq/spec/affordance/agl"
+	"github.com/cruciblehq/spec/affordance/cap"
+	"github.com/cruciblehq/spec/affordance/cgroup"
+	"github.com/cruciblehq/spec/affordance/device"
+	"github.com/cruciblehq/spec/affordance/fcap"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/spec/affordance/mac"
+	"github.com/cruciblehq/spec/affordance/mount"
+	"github.com/cruciblehq/spec/affordance/net"
+	"github.com/cruciblehq/spec/affordance/provision"
+	"github.com/cruciblehq/spec/affordance/rlimit"
+	"github.com/cruciblehq/spec/affordance/seccomp"
+	"github.com/cruciblehq/spec/affordance/subsystem"
+	"github.com/cruciblehq/spec/affordance/volume"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Compiles an [aff.Spec] from affordance grants.
@@ -103,7 +103,7 @@ func (b *Builder) Kernel() *kernel.Spec {
 // they are substituted into the pulled grants before recursing. Domain grants
 // are dispatched to the matching subsystem. Returns [ErrResolution] for pull
 // failures, parse errors, or unknown subsystem names.
-func (b *Builder) Build(ctx context.Context, g manifest.Grant, src registry.Source) error {
+func (b *Builder) Build(ctx context.Context, g manifest.Grant, src hub.Source) error {
 	if g.IsRef() {
 		a, _, err := pull(ctx, src, g.RefTarget())
 		if err != nil {
@@ -156,8 +156,8 @@ func substituteGrant(g manifest.Grant, params map[string]string) manifest.Grant 
 
 // Fetches an affordance resource and returns its config and content digest.
 //
-// Resolves target as an affordance reference and pulls it via [registry.Source.Pull].
-func pull(ctx context.Context, src registry.Source, target string) (*manifest.Affordance, string, error) {
+// Resolves target as an affordance reference and pulls it via [hub.Source.Pull].
+func pull(ctx context.Context, src hub.Source, target string) (*manifest.Affordance, string, error) {
 	ref, err := src.Parse(string(manifest.TypeAffordance), target)
 	if err != nil {
 		return nil, "", err

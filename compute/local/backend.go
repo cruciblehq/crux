@@ -4,13 +4,13 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
+	"github.com/cruciblehq/spec/affordance/kernel"
 )
 
 // The local compute backend.
 //
 // All lifecycle methods call the platform-specific implementation defined in
-// the corresponding build-tagged source files.
+// the corresponding build-tagged source paths.
 type Backend struct{}
 
 // Returns a new local backend.

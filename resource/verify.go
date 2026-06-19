@@ -4,9 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Verifies that a build directory contains the expected artifacts.
@@ -18,15 +18,15 @@ import (
 func Verify(buildDir string, t manifest.ResourceType) error {
 	switch t {
 	case manifest.TypeRuntime:
-		return verify(buildDir, t, files.ImageFile)
+		return verify(buildDir, t, file.ImageFile)
 	case manifest.TypeService:
-		return verify(buildDir, t, files.ImageFile)
+		return verify(buildDir, t, file.ImageFile)
 	case manifest.TypeWidget:
-		return verify(buildDir, t, files.WidgetMainFile)
+		return verify(buildDir, t, file.WidgetMainFile)
 	case manifest.TypeAffordance:
 		return verify(buildDir, t, "")
 	case manifest.TypeBlueprint:
-		return verify(buildDir, t, files.PlanFile)
+		return verify(buildDir, t, file.PlanFile)
 	default:
 		return crex.Newf(ErrUnsupportedType, "resource type %q is not supported", t)
 	}
@@ -60,7 +60,7 @@ func verify(buildDir string, resourceType manifest.ResourceType, artifactFile st
 // right resource type before checking type-specific artifacts. Returns the
 // manifest if its type matches the expected type.
 func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.Manifest, error) {
-	manifestPath := files.Manifest(buildDir)
+	manifestPath := file.Manifest(buildDir)
 	if _, err := os.Stat(manifestPath); err != nil {
 		return nil, crex.Wrap(ErrManifestNotFound, err)
 	}

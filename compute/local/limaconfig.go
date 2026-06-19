@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
+	"github.com/adrg/xdg"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 const (
@@ -29,6 +30,16 @@ const (
 	// containerd socket path inside the Lima VM (guest).
 	guestContainerdSocket = "/run/containerd/containerd.sock"
 )
+
+// Path to the containerd Unix socket for an instance.
+func containerdSocketPath(name string) string {
+	return filepath.Join(xdg.CacheHome, defaultClientName, "instances", name, "containerd.sock")
+}
+
+// Path to the Lima YAML configuration file for the shared crux VM.
+func limaConfigPath() string {
+	return filepath.Join(vmDir(), "lima.yaml")
+}
 
 // Lima YAML configuration template.
 //
@@ -86,7 +97,7 @@ func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
 		UserUID:     os.Getuid(),
 		ImagePath:   imagePath,
 		GuestSocket: guestContainerdSocket,
-		HostSocket:  files.ContainerdSocket(limaInstanceName),
+		HostSocket:  containerdSocketPath(limaInstanceName),
 	}
 
 	return data, nil
@@ -106,8 +117,8 @@ func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error
 		return "", err
 	}
 
-	configPath := files.LimaConfig()
-	if err := os.MkdirAll(filepath.Dir(configPath), files.DefaultDirMode); err != nil {
+	configPath := limaConfigPath()
+	if err := os.MkdirAll(filepath.Dir(configPath), file.DefaultDirMode); err != nil {
 		return "", crex.SystemError(description, "failed to create the configuration directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", filepath.Dir(configPath)).
 			Cause(crex.Wrap(ErrHostConfig, err)).

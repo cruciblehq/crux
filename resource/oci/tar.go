@@ -13,7 +13,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go"
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Writes a minimal OCI image tar representing a scratch (empty) image.
@@ -118,7 +118,7 @@ func writeTarEntry(tw *tar.Writer, name string, data []byte) error {
 // Writes host files at srcPath into a tar archive destined for destDir.
 //
 // Directories are walked recursively; symlinks are followed by Lstat and
-// written as regular files. The destination paths inside the tar are formed by
+// written as regular paths. The destination paths inside the tar are formed by
 // joining destDir with the relative path from srcPath.
 func WriteCopyTar(w io.Writer, srcPath, destDir string) error {
 	tw := tar.NewWriter(w)

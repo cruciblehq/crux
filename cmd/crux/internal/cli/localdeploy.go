@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/blueprint"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Represents the 'crux local deploy' command.
@@ -35,13 +36,13 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 	if registryURL == "" {
 		registryURL = internal.DefaultRegistryURL
 	}
-	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
+	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
 
-	output := files.BuildDir(files.LocalDir())
-	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
+	output := file.BuildDir(localStateDir())
+	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
 			Cause(crex.Wrap(registry.ErrFileSystemOperation, err)).
@@ -52,6 +53,6 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("local plan written", "path", files.Plan(output))
+	slog.Info("local plan written", "path", file.Plan(output))
 	return nil
 }

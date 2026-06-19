@@ -9,7 +9,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // An io.ReadCloser over a layer blob (possibly compressed).

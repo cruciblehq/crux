@@ -1,6 +1,6 @@
 package affordance
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrResolution       = crex.New("affordance resolution failed")

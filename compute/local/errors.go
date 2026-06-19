@@ -1,6 +1,6 @@
 package local
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var (
 	ErrUnsupportedPlatform    = crex.New("unsupported platform")

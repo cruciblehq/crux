@@ -8,7 +8,7 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Represents the 'crux local stop' command.

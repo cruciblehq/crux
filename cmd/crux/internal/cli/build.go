@@ -7,12 +7,13 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/watch"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
+	"github.com/cruciblehq/utils-go/watch"
 )
 
 // Represents the 'crux build' command.
@@ -90,7 +91,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 
 // Resolves the builder, creates the output directory, and builds the resource.
 func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.BuildResult, error) {
-	src, err := registry.NewSource(registryURL, internal.DefaultNamespace)
+	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +110,8 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 			Err()
 	}
 
-	output := files.BuildDir(RootCmd.Context)
-	if err := os.MkdirAll(output, files.DefaultDirMode); err != nil {
+	output := file.BuildDir(RootCmd.Context)
+	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
 			Cause(crex.Wrap(registry.ErrFileSystemOperation, err)).

@@ -1,6 +1,6 @@
 package blueprint
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 // Wraps err with a service-scoped build error.
 func errService(id string, err error) error {

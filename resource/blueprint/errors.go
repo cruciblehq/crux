@@ -1,5 +1,5 @@
 package blueprint
 
-import "github.com/cruciblehq/crux/crex"
+import "github.com/cruciblehq/utils-go/crex"
 
 var ErrBuildPlan = crex.New("blueprint build failed")

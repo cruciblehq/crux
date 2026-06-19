@@ -4,8 +4,8 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
@@ -50,7 +50,7 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Widget, dist string) 
 // JSX support. Logging is disabled as we handle it ourselves. The Crucible UI
 // library is marked as external to avoid bundling it, and the JSX factory and
 // fragment are set to use Crucible's implementations. The project can include
-// JavaScript (.js/.jsx) and/or TypeScript (.ts/.tsx) files. esbuild performs
+// JavaScript (.js/.jsx) and/or TypeScript (.ts/.tsx) paths. esbuild performs
 // no type checking, even when TypeScript is used. To enforce type safety, tsc
 // should be invoked separately. File syntax is inferred from extensions. If a
 // tsconfig.json is present, esbuild respects only a subset of its options:

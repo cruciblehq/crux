@@ -6,13 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	aff "github.com/cruciblehq/crux/affordance"
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/manifest"
 	"github.com/cruciblehq/crux/resource/affordance"
 	"github.com/cruciblehq/crux/resource/oci"
+	aff "github.com/cruciblehq/spec/affordance"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Persistent mutable build state within a single stage.
@@ -86,7 +86,7 @@ func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts co
 		return nil, err
 	}
 
-	imgPath := filepath.Join(result.Extracted, files.ImageFile)
+	imgPath := filepath.Join(result.Extracted, file.ImageFile)
 	f, err := os.Open(imgPath)
 	if err != nil {
 		return nil, crex.Wrap(oci.ErrFileSystemOperation, err)

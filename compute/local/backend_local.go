@@ -5,6 +5,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -12,15 +13,15 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/adrg/xdg"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/files"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Machine image coordinates.
@@ -38,6 +39,11 @@ const (
 	containerdReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd to start.
 	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
 )
+
+// Path to extracted contents of a cached registry resource version.
+func registryExtractedVersionDir(namespace, resource, version string) string {
+	return filepath.Join(xdg.CacheHome, defaultClientName, "registry", "extracted", namespace, resource, version)
+}
 
 // Ensures the default machine disk image is available in the local cache.
 //
@@ -224,7 +230,7 @@ func isContainerdReady(ctx context.Context) bool {
 	defer cancel()
 
 	conn, err := grpc.NewClient(
-		"unix://"+files.ContainerdSocket(limaInstanceName),
+		fmt.Sprintf("unix://%s", containerdSocketPath(limaInstanceName)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -253,7 +259,7 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 			Err()
 	}
 
-	if err := limactlRunNoTTY(ctx, "create", "--name="+limaInstanceName, configPath); err != nil {
+	if err := limactlRunNoTTY(ctx, "create", fmt.Sprintf("--name=%s", limaInstanceName), configPath); err != nil {
 		return crex.SystemError(description, "the local virtual machine could not be created").
 			Recovery("Retry after recreating the local virtual machine.").
 			Cause(crex.Wrap(ErrHostCreate, err)).
@@ -281,7 +287,7 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 	return nil
 }
 
-// Downloads and caches the machine disk image from the Crucible registry.
+// Downloads and caches the machine disk image from the registry.
 //
 // Pulls the pinned machine version and extracts it into the local registry
 // cache. After this returns, [cachedMachineImagePath] should resolve. The
@@ -290,7 +296,7 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 func fetchMachineImage(ctx context.Context) error {
 	const description = "cannot download machine image"
 
-	src, err := registry.NewSource(machineRegistryURL, machineNamespace)
+	src, err := hub.NewSource(machineRegistryURL, machineNamespace)
 	if err != nil {
 		return crex.SystemError(description, "the registry source could not be initialized").
 			Recovery("Check your network connection and try again.").
@@ -324,7 +330,7 @@ func fetchMachineImage(ctx context.Context) error {
 func cachedMachineImagePath() (string, error) {
 	arch := machineArch()
 	path := filepath.Join(
-		files.RegistryExtractedVersionDir(machineNamespace, machineName, machineVersion),
+		registryExtractedVersionDir(machineNamespace, machineName, machineVersion),
 		arch+machineExtension,
 	)
 	if _, err := os.Stat(path); err != nil {
@@ -351,7 +357,7 @@ func machineArch() string {
 // start fails with "address already in use". Removing the directory before
 // start ensures Lima can always bind a fresh listener.
 func removeInstanceSocket() error {
-	socketDir := filepath.Dir(files.ContainerdSocket(limaInstanceName))
+	socketDir := filepath.Dir(containerdSocketPath(limaInstanceName))
 	if err := os.RemoveAll(socketDir); err != nil {
 		return crex.Wrap(ErrHostStart, err)
 	}
@@ -380,7 +386,7 @@ func destroyHost(ctx context.Context) error {
 	// start can bind a fresh listener.
 	if err := removeInstanceSocket(); err != nil {
 		return crex.SystemError("cannot destroy local environment", "failed to remove the local runtime socket").
-			Recoveryf("Make sure you can delete %s, then try again.", filepath.Dir(files.ContainerdSocket(limaInstanceName))).
+			Recoveryf("Make sure you can delete %s, then try again.", filepath.Dir(containerdSocketPath(limaInstanceName))).
 			Cause(crex.Wrap(ErrHostDestroy, err)).
 			Err()
 	}
@@ -398,7 +404,7 @@ func hostExec(ctx context.Context, stdout, stderr io.Writer, command string, arg
 
 // Returns the containerd socket path for the named instance.
 func containerdSocket(_ context.Context, name string) (string, error) {
-	return files.ContainerdSocket(name), nil
+	return containerdSocketPath(name), nil
 }
 
 // Queries the current state of the host VM.

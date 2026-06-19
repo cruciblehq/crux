@@ -7,10 +7,10 @@ import (
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
-	"github.com/cruciblehq/crux/reference"
-	"github.com/cruciblehq/crux/registry"
+	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Represents the 'crux cache remove' command.
@@ -30,7 +30,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 			Err()
 	}
 
-	src, err := registry.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	src, err := hub.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 }
 
 // Removes cache entries matching a reference.
-func removeReference(c *cache.Cache, src registry.Source, resType manifest.ResourceType, refStr string) error {
+func removeReference(c *cache.Cache, src hub.Source, resType manifest.ResourceType, refStr string) error {
 	ref, err := src.Parse(string(resType), refStr)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).

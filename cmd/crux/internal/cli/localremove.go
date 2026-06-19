@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cruciblehq/crux/crex"
-	"github.com/cruciblehq/crux/manifest"
+	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Represents the 'crux local remove' command.

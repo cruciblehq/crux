@@ -8,10 +8,9 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
-
-	"github.com/cruciblehq/crux/files"
 )
 
 func TestExtractLima(t *testing.T) {
@@ -95,11 +94,9 @@ func TestLimaURL(t *testing.T) {
 
 func TestLimaEnv_ContainsLimaHome(t *testing.T) {
 	env := limaEnv()
-	want := "LIMA_HOME=" + files.VMDir()
-	for _, e := range env {
-		if e == want {
-			return
-		}
+	want := "LIMA_HOME=" + vmDir()
+	if slices.Contains(env, want) {
+		return
 	}
 	t.Errorf("limaEnv missing %q; got %v", want, env)
 }

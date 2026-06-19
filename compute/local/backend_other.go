@@ -6,8 +6,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/affordance/kernel"
-	"github.com/cruciblehq/crux/crex"
+	"github.com/cruciblehq/spec/affordance/kernel"
+	"github.com/cruciblehq/utils-go/crex"
 )
 
 // System error returned by every local compute operation on platforms where the
