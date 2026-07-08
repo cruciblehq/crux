@@ -124,10 +124,12 @@ answering the following questions:
 
 1. What wasn't clear about the onboarding experience?
 2. What wasn't clear about service structure and functionality?
-3. What do you think would be the most important feature additions to make services more expressive?
+3. What do you think would be the most important feature additions to make
+services more expressive?
 4. Did the Crux CLI behave as expected during every stage?
 5. Did the tooling feedback and error messages provide enough guidance?
-6. Was filling in the service metadata boring or error prone? How would you change this experience?
+6. Was filling in the service metadata boring or error prone? How would you
+change this experience?
 7. What aspects of the developer experience felt confusing, slow, or broken?
 
 We expect honest feedback — please send us a bit of tough love!
