@@ -65,11 +65,10 @@ func defaultRootDir() string {
 // The caller must call Close when done with the cache.
 func OpenAt(root string) (*Cache, error) {
 	const description = "cannot open cache"
-	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
 
 	if err := os.MkdirAll(root, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError(description, "failed to create the cache directory").
-			Recoveryf(recoveryWriteAccess, root).
+			Recoveryf("Make sure you have write access to %q, then try again.", root).
 			Cause(err).
 			Err()
 	}
@@ -78,7 +77,7 @@ func OpenAt(root string) (*Cache, error) {
 	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, file.DefaultFileMode)
 	if err != nil {
 		return nil, crex.SystemError(description, "failed to create the cache lock file").
-			Recoveryf(recoveryWriteAccess, root).
+			Recoveryf("Make sure you have write access to %q, then try again.", root).
 			Cause(err).
 			Err()
 	}
@@ -86,7 +85,7 @@ func OpenAt(root string) (*Cache, error) {
 	if err := file.Lock(lf); err != nil {
 		lf.Close()
 		return nil, crex.SystemError(description, "failed to acquire the cache lock").
-			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", lockPath).
+			Recoveryf("Another process may be holding the lock at %q; wait for it to finish and try again.", lockPath).
 			Cause(err).
 			Err()
 	}
@@ -344,7 +343,7 @@ func (c *Cache) list() ([]*Version, error) {
 			return nil, nil
 		}
 		return nil, crex.SystemError("cannot list cache", "failed to read the cache directory").
-			Recovery("Run 'crux cache clear' and try again.").
+			Recovery("Clear the cache and try again.").
 			Cause(err).
 			Err()
 	}

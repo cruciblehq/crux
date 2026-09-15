@@ -4,8 +4,9 @@
 // downloads from remote registries. All operations are protected by a file
 // lock and an in-process mutex to allow safe concurrent access.
 //
-// The cache root is a subdirectory of the XDG cache directory (e.g.
-// ~/Library/Caches/crux/registry on macOS, ~/.cache/crux/registry on Linux).
+// The cache root is a subdirectory of the <cache-root> XDG cache directory
+// (e.g. ~/Library/Caches/crux/registry on macOS, ~/.cache/crux/registry on
+// Linux).
 //
 //	<cache-root>/
 //	  cache.lock                                  File lock
