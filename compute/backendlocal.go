@@ -16,6 +16,11 @@ import (
 // Name of the local VM instance managed by crux.
 const localInstanceName = "crux"
 
+// Returns the default instance identifier used by the local backend.
+func DefaultLocalInstanceID() string {
+	return localInstanceName
+}
+
 // Permission mode for the temp directory, reachable only by the current user.
 const tempDirMode os.FileMode = 0o700
 
