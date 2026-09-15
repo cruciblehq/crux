@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"io"
+	"net/url"
 
 	"github.com/cruciblehq/spec/affordance/kernel"
 )
@@ -23,8 +24,8 @@ func NewBackend() *Backend {
 // Resolves the default machine image from the local cache and downloads it
 // from the Crucible registry if missing. The returned path can be passed
 // directly to [provider.Backend.UploadImage].
-func EnsureMachineImage(ctx context.Context) (string, error) {
-	return ensureMachineImage(ctx)
+func EnsureMachineImage(ctx context.Context, registryURL *url.URL) (string, error) {
+	return ensureMachineImage(ctx, registryURL)
 }
 
 // Uploads a disk image to the local provider, validating it is accessible.

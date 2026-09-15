@@ -5,6 +5,7 @@ package local
 import (
 	"context"
 	"io"
+	"net/url"
 
 	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/cruciblehq/utils-go/crex"
@@ -17,7 +18,7 @@ var errUnsupportedPlatform = crex.SystemError("unsupported platform", "the local
 	Cause(ErrUnsupportedPlatform).
 	Err()
 
-func ensureMachineImage(_ context.Context) (string, error) {
+func ensureMachineImage(_ context.Context, _ *url.URL) (string, error) {
 	return "", errUnsupportedPlatform
 }
 

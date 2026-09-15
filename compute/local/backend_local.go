@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,17 +25,16 @@ import (
 	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Machine image coordinates.
+// Default machine image info.
 const (
-	machineType        = "machine"                        // Registry resource type for the machine image.
-	machineNamespace   = "crucible"                       // Registry namespace for the machine image.
-	machineName        = "machine-default"                // Registry resource name for the machine image.
-	machineVersion     = "0.1.0"                          // Pinned machine image version.
-	machineRegistryURL = "http://hub.cruciblehq.xyz:8080" // Registry URL for the machine image.
-	machineExtension   = ".qcow2"                         // Disk image file extension.
+	machineType      = "machine"         // Registry resource type for the machine image.
+	machineNamespace = "crucible"        // Registry namespace for the machine image.
+	machineName      = "machine-default" // Registry resource name for the machine image.
+	machineVersion   = "0.1.0"           // Pinned machine image version.
+	machineExtension = ".qcow2"          // Disk image file extension.
 )
 
-// Containerd readiness polling.
+// Containerd readiness timeout and polling interval.
 const (
 	containerdReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd to start.
 	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
@@ -47,9 +47,9 @@ func registryExtractedVersionDir(namespace, resource, version string) string {
 
 // Ensures the default machine disk image is available in the local cache.
 //
-// Downloads from the Crucible registry if not already cached. Returns the
-// local filesystem path to the image file.
-func ensureMachineImage(ctx context.Context) (string, error) {
+// Downloads from a given registry if not already cached. Returns the local
+// filesystem path to the image file.
+func ensureMachineImage(ctx context.Context, registryURL *url.URL) (string, error) {
 	path, err := cachedMachineImagePath()
 	if errors.Is(err, ErrMachineImageMissing) {
 		slog.Info("machine image not in cache, downloading...",
@@ -57,7 +57,7 @@ func ensureMachineImage(ctx context.Context) (string, error) {
 			"name", machineName,
 			"version", machineVersion,
 		)
-		if err := fetchMachineImage(ctx); err != nil {
+		if err := fetchMachineImage(ctx, registryURL); err != nil {
 			return "", err
 		}
 		path, err = cachedMachineImagePath()
@@ -70,11 +70,10 @@ func ensureMachineImage(ctx context.Context) (string, error) {
 
 // Local implementation of [provider.Backend.UploadImage].
 //
-// When this function is called, other providers copy the image file to remote
-// storage and return an image ID. The local provider uses the image directly
-// from the local filesystem, so this function only verifies the file exists
-// and is accessible. The returned path is used as the image ID passed to Lima
-// during provisioning.
+// The local provider uses the image directly from the local filesystem, so this
+// function only verifies the file exists and is accessible. The returned path
+// is used as the image ID passed to Lima during provisioning. Other providers
+// copy the image file to remote storage and return an image ID.
 func uploadImage(_ context.Context, path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
@@ -199,8 +198,9 @@ func copyArchive(ctx context.Context, name string, r io.Reader) error {
 
 // Blocks until containerd is accepting connections.
 //
-// Polls via gRPC Health.Check every two seconds. Returns an error if the
-// context is cancelled or the fifteen-minute deadline is exceeded.
+// Polls via gRPC Health.Check every [containerdPollInterval] seconds. Returns
+// an error if the context is cancelled or the [containerdReadyTimeout] deadline
+// is exceeded.
 func waitForContainerd(ctx context.Context) error {
 	deadline := time.Now().Add(containerdReadyTimeout)
 	for {
@@ -293,10 +293,15 @@ func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel
 // cache. After this returns, [cachedMachineImagePath] should resolve. The
 // image is built and published by the Crucible team. It's an Alpine image
 // with containerd installed and used as the base for provisioning the VM.
-func fetchMachineImage(ctx context.Context) error {
+func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 	const description = "cannot download machine image"
+	if registryURL == nil {
+		return crex.ProgrammingError(description, "the machine image registry URL is required").
+			Err()
+	}
 
-	src, err := hub.NewSource(machineRegistryURL, machineNamespace)
+	registry := registryURL.String()
+	src, err := hub.NewSource(registry, machineNamespace)
 	if err != nil {
 		return crex.SystemError(description, "the registry source could not be initialized").
 			Recovery("Check your network connection and try again.").
@@ -304,7 +309,7 @@ func fetchMachineImage(ctx context.Context) error {
 			Err()
 	}
 
-	id := reference.NewIdentifier(machineType, machineRegistryURL, machineNamespace, machineName)
+	id := reference.NewIdentifier(machineType, registry, machineNamespace, machineName)
 	ref, err := reference.New(id, machineVersion, nil)
 	if err != nil {
 		return crex.SystemError(description, "the machine image reference is invalid").
@@ -376,14 +381,14 @@ func destroyHost(ctx context.Context) error {
 
 	if err := limactlRun(ctx, "delete", "--force", limaInstanceName); err != nil {
 		return crex.SystemError("cannot destroy local environment", "the local virtual machine could not be deleted").
-			Recovery("Try again, or stop the local environment first with 'crux local stop'.").
+			Recovery("Try again, or stop the local environment first.").
 			Cause(crex.Wrap(ErrHostDestroy, err)).
 			Err()
 	}
 
 	// limactl delete does not stop the VM first, so the forwarded socket may
 	// be left on disk. Remove the instance socket directory so a subsequent
-	// start can bind a fresh listener.
+	// start can bind a new listener.
 	if err := removeInstanceSocket(); err != nil {
 		return crex.SystemError("cannot destroy local environment", "failed to remove the local runtime socket").
 			Recoveryf("Make sure you can delete %s, then try again.", filepath.Dir(containerdSocketPath(limaInstanceName))).

@@ -46,3 +46,15 @@ func TestUploadImage_MissingFile(t *testing.T) {
 		t.Errorf("expected ErrImageUpload, got %v", err)
 	}
 }
+
+func TestCachedMachineImagePath_MissingImage(t *testing.T) {
+	if _, err := cachedMachineImagePath(); !errors.Is(err, ErrMachineImageMissing) {
+		t.Fatalf("cachedMachineImagePath() error = %v, want ErrMachineImageMissing", err)
+	}
+}
+
+func TestFetchMachineImage_RequiresRegistryURL(t *testing.T) {
+	if err := fetchMachineImage(context.Background(), nil); err == nil {
+		t.Fatal("fetchMachineImage(nil) = nil, want non-nil error")
+	}
+}

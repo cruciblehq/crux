@@ -29,11 +29,10 @@ containerd:
   system: false
   user: false
 
-# virtiofs is the native filesystem transport for vz VMs: lower latency and
-# better POSIX semantics than 9p, with no FUSE dependency in the guest. The
-# host directory is shared directly into the VM and visible on both sides,
-# but the kernel socket state does not cross the VM boundary; Lima tunnels
-# the containerd socket connection over SSH (see portForwards).
+# virtiofs is the native filesystem transport for vz VMs. The host directory is
+# shared directly into the VM and visible on both sides, but the kernel socket
+# state does not cross the VM boundary; Lima tunnels the containerd socket
+# connection over SSH (see portForwards).
 mountType: virtiofs
 
 # This script runs inside the VM on every boot, before Lima marks the instance

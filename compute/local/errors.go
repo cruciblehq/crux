@@ -17,4 +17,5 @@ var (
 	ErrHostConfig             = crex.New("failed to generate host configuration")
 	ErrLimaDownload           = crex.New("failed to download lima")
 	ErrLimaCtl                = crex.New("limactl command failed")
+	ErrStorage                = crex.New("storage operation failed")
 )

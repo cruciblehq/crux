@@ -247,7 +247,7 @@ func limaList(ctx context.Context) ([]string, error) {
 	cmd.Stdout = &stdout
 	cmd.Env = limaEnv()
 	if err := cmd.Run(); err != nil {
-		return nil, crex.SystemError("cannot list local environments", "limactl failed to list instances").
+		return nil, crex.SystemError("cannot list local instances", "limactl failed to list instances").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrLimaCtl, err)).
 			Err()
