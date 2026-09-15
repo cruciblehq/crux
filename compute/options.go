@@ -3,20 +3,8 @@ package compute
 import (
 	"io"
 
-	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
-
-// Resource requirements for provisioning a compute host.
-//
-// Each backend maps these requirements to its native compute class. The local
-// backend uses fixed resource allocation and ignores the sizing fields.
-type Options struct {
-	CPUs   int         // Minimum virtual CPUs required; zero means no minimum.
-	Memory int         // Minimum memory in GiB required; zero means no minimum.
-	Disk   int         // Minimum disk size in GiB required; zero means no minimum.
-	Kernel kernel.Spec // Kernel requirements applied at provisioning time.
-}
 
 // Controls how a container process is executed.
 //

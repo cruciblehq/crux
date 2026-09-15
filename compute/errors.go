@@ -8,4 +8,6 @@ var (
 	ErrImport          = crex.New("image import failed")
 	ErrNoImages        = crex.New("no images in archive")
 	ErrContainer       = crex.New("container operation failed")
+	ErrStorage         = crex.New("storage operation failed")
+	ErrNetwork         = crex.New("network operation failed")
 )
