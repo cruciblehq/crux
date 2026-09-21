@@ -51,19 +51,15 @@ func localBlueprint() (*manifest.Blueprint, error) {
 // Returns a zero-value Options if no plan was written yet or if it cannot be
 // decoded. The caller should treat zero values as "no additional requirements"
 // and let the backend apply its own defaults.
-func localPlanOptions() compute.Options {
+func localPlanOptions() compute.ComputeOptions {
 	plan, err := manifest.ReadPlanAt(file.BuildDir(localStateDir()))
 	if err != nil {
-		return compute.Options{}
+		return compute.ComputeOptions{}
 	}
-	c, ok := plan.Infrastructure.Computes["default"]
-	if !ok {
-		return compute.Options{}
+	if _, ok := plan.Infrastructure.Computes["default"]; !ok {
+		return compute.ComputeOptions{}
 	}
-	if c.Kernel == nil {
-		return compute.Options{}
-	}
-	return compute.Options{Kernel: *c.Kernel}
+	return compute.ComputeOptions{}
 }
 
 // Acquires an exclusive lock on the blueprint file, reads it, calls fn, and

@@ -14,15 +14,15 @@ import (
 // Drives the shared recipe pipeline against the local compute backend, wiring
 // the configured entrypoint into the produced image.
 type Builder struct {
-	src     hub.Source // Registry access for pulling base images and resolving affordances.
+	src     hub.Source // Registry access for pulling base images.
 	workdir string     // Manifest directory, used as the root for resolving copy step sources.
 }
 
 // Returns a new Builder.
 //
-// source provides registry access for pulling base images and resolving
-// affordance references. workdir is the directory containing the manifest and
-// is the root for resolving copy step sources.
+// source provides registry access for pulling base images. workdir is the
+// directory containing the manifest and is the root for resolving copy step
+// sources.
 func NewBuilder(src hub.Source, workdir string) *Builder {
 	return &Builder{src: src, workdir: workdir}
 }
@@ -36,7 +36,7 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Service, output strin
 	if err != nil {
 		return "", err
 	}
-	client, err := backend.Connect(ctx, compute.LocalInstance)
+	client, err := backend.Compute().Connect(ctx, compute.DefaultLocalInstanceID())
 	if err != nil {
 		return "", err
 	}

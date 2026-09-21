@@ -13,8 +13,7 @@ import (
 //
 // Every resource type requires a valid manifest matching t. Types that emit a
 // signature artifact also require that file: runtimes and services produce an
-// image, widgets a main bundle, and blueprints a plan. Affordances have no
-// additional artifact.
+// image, widgets a main bundle, and blueprints a plan.
 func Verify(buildDir string, t manifest.ResourceType) error {
 	switch t {
 	case manifest.TypeRuntime:
@@ -23,8 +22,6 @@ func Verify(buildDir string, t manifest.ResourceType) error {
 		return verify(buildDir, t, file.ImageFile)
 	case manifest.TypeWidget:
 		return verify(buildDir, t, file.WidgetMainFile)
-	case manifest.TypeAffordance:
-		return verify(buildDir, t, "")
 	case manifest.TypeBlueprint:
 		return verify(buildDir, t, file.PlanFile)
 	default:

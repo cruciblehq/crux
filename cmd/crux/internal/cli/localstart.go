@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
@@ -47,15 +48,21 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 	}
 
 	name := internal.DefaultInstanceName
+	registryURL, err := url.Parse(internal.DefaultRegistryURL)
+	if err != nil {
+		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
+			Cause(err).
+			Err()
+	}
 
-	state, err := b.Status(ctx, name)
+	state, err := b.Compute().Status(ctx, name)
 	if err != nil {
 		return localStartError(err)
 	}
 
 	switch state {
 	case compute.StateNotProvisioned:
-		imagePath, err := local.EnsureMachineImage(ctx)
+		imagePath, err := local.EnsureMachineImage(ctx, registryURL)
 		if err != nil {
 			return err
 		}
@@ -67,15 +74,15 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 				Err()
 		}
 		defer f.Close()
-		imageID, err := b.Upload(ctx, f)
+		imageID, err := b.Compute().UploadImage(ctx, f)
 		if err != nil {
 			return localStartError(err)
 		}
-		if err := b.Provision(ctx, imageID, name, localPlanOptions()); err != nil {
+		if _, err := b.Compute().Provision(ctx, imageID, localPlanOptions()); err != nil {
 			return localStartError(err)
 		}
 	case compute.StateStopped:
-		if err := b.Start(ctx, name); err != nil {
+		if err := b.Compute().Start(ctx, name); err != nil {
 			return localStartError(err)
 		}
 	case compute.StateRunning:

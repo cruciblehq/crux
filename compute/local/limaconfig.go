@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	"github.com/adrg/xdg"
-	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -76,10 +75,8 @@ type limaConfig struct {
 // which Lima uses to create a matching guest user. The VM boots from the
 // machine disk image at imagePath. containerd runs as a system service inside
 // the VM; Lima's portForwards section tunnels the guest socket to the host so
-// crux can dial it. The kernel spec carries the kernel requirements, but the
-// local backend does not apply boot-time configuration from it, so the
-// parameter is intentionally ignored. Does not touch the filesystem.
-func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
+// crux can dial it. Does not touch the filesystem.
+func buildLimaConfig(imagePath string) (limaConfig, error) {
 	u, err := user.Current()
 	if err != nil {
 		return limaConfig{}, crex.SystemError("cannot configure local environment", "failed to determine the current host user").
@@ -109,10 +106,10 @@ func buildLimaConfig(imagePath string, _ kernel.Spec) (limaConfig, error) {
 // [limaConfigTemplate]. The file is written to disk so it can be read by
 // limactl when provisioning the VM. If the file already exists it will be
 // overwritten. Returns the path to the file that was generated.
-func generateLimaConfig(imagePath string, kernelSpec kernel.Spec) (string, error) {
+func generateLimaConfig(imagePath string) (string, error) {
 	const description = "cannot configure local environment"
 
-	data, err := buildLimaConfig(imagePath, kernelSpec)
+	data, err := buildLimaConfig(imagePath)
 	if err != nil {
 		return "", err
 	}

@@ -6,17 +6,16 @@
 // uploads it to the registry. [Build] unwraps the typed config from the
 // manifest, dispatches to the matching type builder, and writes the resolved
 // manifest alongside the artifacts. Some resource types, such as machine,
-// currently participate only in packaging and registry operations and
-// intentionally do not have a builder yet. Lifecycle operations (start, stop,
-// exec, etc.) are handled directly via the runtime.
+// currently participate only in packaging and registry operations and do not
+// have a builder yet. Lifecycle operations (start, stop, exec, etc.) are all
+// handled directly via the runtime.
 //
 // The type builder layer lives in subpackages, one per resource type, each
 // taking a typed config rather than a manifest: [runtime], [service], [widget],
-// [affordance], and [blueprint]. The runtime and service builders both compose
-// the shared [recipe] engine, which in turn uses [oci] to write image tars.
-// Resource types without a builder stay in the manifest layer only. Callers
-// with a typed config may use a type builder directly, skipping the manifest
-// layer.
+// and [blueprint]. The runtime and service builders both compose the shared
+// [recipe] engine, which in turn uses [oci] to write image tars. Resource
+// types without a builder stay in the manifest layer only. Callers with a
+// typed config may use a type builder directly, skipping the manifest layer.
 //
 // Callers read the manifest themselves and pass it to each operation:
 //

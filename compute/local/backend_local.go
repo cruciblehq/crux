@@ -20,7 +20,6 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/cruciblehq/crux/hub"
-	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/cruciblehq/spec/reference"
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -89,14 +88,14 @@ func uploadImage(_ context.Context, path string) (string, error) {
 // imageID is the local filesystem path to a QCOW2 disk image, as returned by
 // [uploadImage]. Returns [ErrHostAlreadyProvisioned] if an instance already
 // exists. The VM is created and started.
-func provision(ctx context.Context, _, imageID string, kernelSpec kernel.Spec) error {
+func provision(ctx context.Context, _, imageID string) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
 	if hostStatus(ctx) != StateNotProvisioned {
 		return ErrHostAlreadyProvisioned
 	}
-	return createAndStartHost(ctx, imageID, kernelSpec)
+	return createAndStartHost(ctx, imageID)
 }
 
 // Starts the VM.
@@ -245,13 +244,11 @@ func isContainerdReady(ctx context.Context) bool {
 // Creates the Lima instance from the given disk image and starts it.
 //
 // Lima 2.x create does not auto-start; an explicit start call is required.
-// imagePath is the local filesystem path to a QCOW2 disk image. kernelSpec
-// configures kernel-level requirements; a zero value applies no additional
-// requirements.
-func createAndStartHost(ctx context.Context, imagePath string, kernelSpec kernel.Spec) error {
+// imagePath is the local filesystem path to a QCOW2 disk image.
+func createAndStartHost(ctx context.Context, imagePath string) error {
 	const description = "cannot create local environment"
 
-	configPath, err := generateLimaConfig(imagePath, kernelSpec)
+	configPath, err := generateLimaConfig(imagePath)
 	if err != nil {
 		return crex.SystemError(description, "failed to generate the virtual machine configuration").
 			Recovery("Regenerate the local virtual machine configuration and retry.").

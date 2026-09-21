@@ -117,7 +117,7 @@ func (s *computeLocalShim) RemoveImage(ctx context.Context, id string) error {
 // Provisions a new instance from a previously uploaded image.
 func (s *computeLocalShim) Provision(ctx context.Context, img string, opts ComputeOptions) (string, error) {
 	id := localInstanceName
-	if err := s.local.Provision(ctx, id, img, opts.Kernel); err != nil {
+	if err := s.local.Provision(ctx, id, img); err != nil {
 		return "", err
 	}
 	return id, nil

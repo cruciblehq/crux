@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -26,7 +25,7 @@ func uploadImage(_ context.Context, _ string) (string, error) {
 	return "", errUnsupportedPlatform
 }
 
-func provision(_ context.Context, _, _ string, _ kernel.Spec) error {
+func provision(_ context.Context, _, _ string) error {
 	return errUnsupportedPlatform
 }
 

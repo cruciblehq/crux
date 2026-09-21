@@ -24,7 +24,7 @@ func (c *LocalDestroyCmd) Run(ctx context.Context) error {
 	}
 	name := internal.DefaultInstanceName
 
-	if err := b.Deprovision(ctx, name); err != nil {
+	if err := b.Compute().Deprovision(ctx, name); err != nil {
 		const description = "cannot destroy local environment"
 		switch {
 		case errors.Is(err, local.ErrHostNotCreated):

@@ -8,6 +8,7 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/blueprint"
+	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -49,7 +50,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := blueprint.NewBuilder(src, c.Environment).Build(ctx, bp, output); err != nil {
+	if err := blueprint.NewBuilder(src, c.Environment, manifest.Compute{}).Build(ctx, bp, output); err != nil {
 		return err
 	}
 

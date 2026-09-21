@@ -4,8 +4,6 @@ import (
 	"context"
 	"io"
 	"net/url"
-
-	"github.com/cruciblehq/spec/affordance/kernel"
 )
 
 // The local compute backend.
@@ -34,8 +32,8 @@ func (b *Backend) UploadImage(ctx context.Context, path string) (string, error) 
 }
 
 // Provisions a compute host instance from a previously uploaded image.
-func (b *Backend) Provision(ctx context.Context, name, imageID string, kernelSpec kernel.Spec) error {
-	return provision(ctx, name, imageID, kernelSpec)
+func (b *Backend) Provision(ctx context.Context, name, imageID string) error {
+	return provision(ctx, name, imageID)
 }
 
 // Tears down the instance and removes all state.

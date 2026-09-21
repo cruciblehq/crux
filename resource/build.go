@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cruciblehq/crux/hub"
-	"github.com/cruciblehq/crux/resource/affordance"
 	"github.com/cruciblehq/crux/resource/blueprint"
 	"github.com/cruciblehq/crux/resource/runtime"
 	"github.com/cruciblehq/crux/resource/service"
@@ -35,8 +34,6 @@ func Build(ctx context.Context, m manifest.Manifest, src hub.Source, workdir, en
 		return buildService(ctx, &m, src, workdir, output)
 	case manifest.TypeWidget:
 		return buildWidget(ctx, &m, output)
-	case manifest.TypeAffordance:
-		return buildAffordance(ctx, &m, src, output)
 	case manifest.TypeBlueprint:
 		return buildBlueprint(ctx, &m, src, env, output)
 	default:
@@ -82,32 +79,13 @@ func buildWidget(ctx context.Context, m *manifest.Manifest, output string) (*Bui
 	return writeResult(m, output)
 }
 
-// Builds an affordance resource, compiling every grant in every scope, then
-// writes the resolved manifest to output.
-func buildAffordance(ctx context.Context, m *manifest.Manifest, src hub.Source, output string) (*BuildResult, error) {
-	cfg, err := manifest.As[*manifest.Affordance](m)
-	if err != nil {
-		return nil, err
-	}
-	b := affordance.NewBuilder()
-	for _, scope := range cfg.Scopes {
-		for _, g := range scope.Grants {
-			if err := b.Build(ctx, g, src); err != nil {
-				return nil, err
-			}
-		}
-	}
-	m.Config = &manifest.Affordance{Schema: cfg.Schema, Scopes: cfg.Scopes}
-	return writeResult(m, output)
-}
-
 // Builds a blueprint resource and writes the resolved manifest to output.
 func buildBlueprint(ctx context.Context, m *manifest.Manifest, src hub.Source, env, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Blueprint](m)
 	if err != nil {
 		return nil, err
 	}
-	if err := blueprint.NewBuilder(src, env).Build(ctx, cfg, output); err != nil {
+	if err := blueprint.NewBuilder(src, env, manifest.Compute{}).Build(ctx, cfg, output); err != nil {
 		return nil, err
 	}
 	return writeResult(m, output)

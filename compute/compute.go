@@ -3,8 +3,6 @@ package compute
 import (
 	"context"
 	"io"
-
-	"github.com/cruciblehq/spec/affordance/kernel"
 )
 
 // Resource requirements for provisioning a compute instance.
@@ -12,10 +10,9 @@ import (
 // Each provider maps these requirements to its native compute class. The local
 // provider uses fixed resource allocation and ignores the sizing fields.
 type ComputeOptions struct {
-	CPUs   int         `codec:"cpus,omitempty"`   // Minimum virtual CPUs required; zero means no minimum.
-	Memory int         `codec:"memory,omitempty"` // Minimum memory in GiB required; zero means no minimum.
-	Disk   int         `codec:"disk,omitempty"`   // Minimum disk size in GiB required; zero means no minimum.
-	Kernel kernel.Spec `codec:"kernel,omitempty"` // Kernel requirements applied at provisioning time.
+	CPUs   int `codec:"cpus,omitempty"`   // Minimum virtual CPUs required; zero means no minimum.
+	Memory int `codec:"memory,omitempty"` // Minimum memory in GiB required; zero means no minimum.
+	Disk   int `codec:"disk,omitempty"`   // Minimum disk size in GiB required; zero means no minimum.
 }
 
 // Manages the lifecycle of compute instances.

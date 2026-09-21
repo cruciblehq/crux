@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cruciblehq/crux/hub"
-	"github.com/cruciblehq/spec/affordance/kernel"
 	"github.com/cruciblehq/spec/manifest"
 )
 
@@ -15,7 +14,7 @@ func TestNewBuilder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b := NewBuilder(src, "prod")
+	b := NewBuilder(src, "prod", manifest.Compute{})
 	if b == nil {
 		t.Fatal("NewBuilder returned nil")
 	}
@@ -24,6 +23,25 @@ func TestNewBuilder(t *testing.T) {
 	}
 	if b.env != "prod" {
 		t.Errorf("env = %q, want prod", b.env)
+	}
+	if b.compute.Type != manifest.ComputeTypeLocal {
+		t.Errorf("compute.Type = %q, want %q", b.compute.Type, manifest.ComputeTypeLocal)
+	}
+	localCfg, ok := b.compute.Config.(*manifest.ComputeLocal)
+	if !ok {
+		t.Fatalf("compute.Config = %T, want *manifest.ComputeLocal", b.compute.Config)
+	}
+	if localCfg.Host != localComputeHost {
+		t.Errorf("compute host = %q, want %q", localCfg.Host, localComputeHost)
+	}
+
+	custom := NewBuilder(src, "prod", manifest.Compute{Type: manifest.ComputeTypeLocal, Config: &manifest.ComputeLocal{Host: "example.com"}})
+	customCfg, ok := custom.compute.Config.(*manifest.ComputeLocal)
+	if !ok {
+		t.Fatalf("custom compute.Config = %T, want *manifest.ComputeLocal", custom.compute.Config)
+	}
+	if customCfg.Host != "example.com" {
+		t.Errorf("custom host = %q, want example.com", customCfg.Host)
 	}
 }
 
@@ -99,20 +117,5 @@ func TestBinPack(t *testing.T) {
 	empty := binPack(results, map[string]manifest.Compute{})
 	if empty["a"] != "" || empty["b"] != "" {
 		t.Fatalf("binPack empty computes = %v, want empty assignments", empty)
-	}
-}
-
-func TestDeriveComputeKernel(t *testing.T) {
-	results := []serviceResult{
-		{serviceID: "a", kernel: kernel.Spec{Features: []string{"NETFILTER"}}},
-		{serviceID: "b", kernel: kernel.Spec{Features: []string{"FUSE_FS"}}},
-	}
-	assignments := map[string]string{"a": "c1", "b": "c2"}
-
-	spec := deriveComputeKernel("c1", assignments, results)
-
-	// Only the service assigned to c1 contributes its kernel requirements.
-	if len(spec.Features) != 1 || spec.Features[0] != "NETFILTER" {
-		t.Fatalf("c1 features = %v, want [NETFILTER]", spec.Features)
 	}
 }

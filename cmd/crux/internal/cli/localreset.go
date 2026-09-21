@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"os"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
@@ -47,12 +48,18 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 	}
 
 	name := internal.DefaultInstanceName
+	registryURL, err := url.Parse(internal.DefaultRegistryURL)
+	if err != nil {
+		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
+			Cause(err).
+			Err()
+	}
 
-	if err := b.Deprovision(ctx, name); err != nil {
+	if err := b.Compute().Deprovision(ctx, name); err != nil {
 		return localResetError(err)
 	}
 
-	imagePath, err := local.EnsureMachineImage(ctx)
+	imagePath, err := local.EnsureMachineImage(ctx, registryURL)
 	if err != nil {
 		return localResetError(err)
 	}
@@ -64,11 +71,11 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 			Err()
 	}
 	defer f.Close()
-	imageID, err := b.Upload(ctx, f)
+	imageID, err := b.Compute().UploadImage(ctx, f)
 	if err != nil {
 		return localResetError(err)
 	}
-	if err := b.Provision(ctx, imageID, name, localPlanOptions()); err != nil {
+	if _, err := b.Compute().Provision(ctx, imageID, localPlanOptions()); err != nil {
 		return localResetError(err)
 	}
 

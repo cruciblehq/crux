@@ -28,7 +28,7 @@ func (c *LocalExecCmd) Run(ctx context.Context) error {
 
 	cmd := stripArgSeparator(c.Command)
 
-	exitCode, err := b.Exec(ctx, name, os.Stdout, os.Stderr, cmd[0], cmd[1:]...)
+	exitCode, err := b.Compute().Exec(ctx, name, os.Stdout, os.Stderr, cmd[0], cmd[1:]...)
 	if err != nil {
 		const description = "cannot run command in local environment"
 		switch {

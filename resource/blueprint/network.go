@@ -15,8 +15,9 @@ func deriveNetworks(p *manifest.Plan) {
 	nets := make(map[string]*manifest.Network, len(p.Infrastructure.Computes))
 
 	// Initialise an entry for every compute referenced by a deployment. This
-	/// ensures that computes with no network grants still get a cloud perimeter
-	// entry, making the deny-all baseline explicit for plan validation.
+	// ensures that computes without container network declarations still get a
+	// cloud perimeter entry, making the deny-all baseline explicit for plan
+	// validation.
 	for i := range p.Deployments {
 		id := p.Deployments[i].Compute
 		if _, ok := nets[id]; !ok {

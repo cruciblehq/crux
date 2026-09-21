@@ -46,11 +46,11 @@ func (c *LocalRestartCmd) Run(ctx context.Context) error {
 	}
 	name := internal.DefaultInstanceName
 
-	if err := b.Stop(ctx, name); err != nil {
+	if err := b.Compute().Stop(ctx, name); err != nil {
 		return localRestartError(err)
 	}
 
-	if err := b.Start(ctx, name); err != nil {
+	if err := b.Compute().Start(ctx, name); err != nil {
 		return localRestartError(err)
 	}
 

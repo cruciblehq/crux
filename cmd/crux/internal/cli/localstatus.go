@@ -22,7 +22,7 @@ func (c *LocalStatusCmd) Run(ctx context.Context) error {
 	}
 	name := internal.DefaultInstanceName
 
-	state, err := b.Status(ctx, name)
+	state, err := b.Compute().Status(ctx, name)
 	if err != nil {
 		const description = "cannot read local environment status"
 		switch {

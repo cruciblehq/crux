@@ -24,7 +24,7 @@ func (c *LocalStopCmd) Run(ctx context.Context) error {
 	}
 	name := internal.DefaultInstanceName
 
-	if err := b.Stop(ctx, name); err != nil {
+	if err := b.Compute().Stop(ctx, name); err != nil {
 		const description = "cannot stop local environment"
 		switch {
 		case errors.Is(err, local.ErrHostNotCreated):

@@ -9,8 +9,6 @@ import (
 	"os/user"
 	"strings"
 	"testing"
-
-	"github.com/cruciblehq/spec/affordance/kernel"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -60,7 +58,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 }
 
 func TestBuildLimaConfig_Defaults(t *testing.T) {
-	cfg, err := buildLimaConfig("/tmp/test.qcow2", kernel.Spec{})
+	cfg, err := buildLimaConfig("/tmp/test.qcow2")
 	if err != nil {
 		t.Fatalf("buildLimaConfig: %v", err)
 	}

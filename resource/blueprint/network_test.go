@@ -3,7 +3,6 @@ package blueprint
 import (
 	"testing"
 
-	"github.com/cruciblehq/spec/affordance/net"
 	"github.com/cruciblehq/spec/manifest"
 )
 
@@ -16,9 +15,9 @@ func TestDeriveNetworks(t *testing.T) {
 			},
 		},
 		Containers: map[string]manifest.Container{
-			"ctr1": {Network: net.Spec{
-				Ingress: []net.IngressRule{{Protocol: "tcp", Port: 8080}},
-				Egress:  []net.EgressRule{{Protocol: "tcp", Port: 443, Destination: "api.example.com"}},
+			"ctr1": {Network: manifest.Network{
+				Ingress: []manifest.IngressRule{{Protocol: "tcp", Port: 8080}},
+				Egress:  []manifest.EgressRule{{Protocol: "tcp", Port: 443, Destination: "api.example.com"}},
 			}},
 		},
 		Deployments: []manifest.Deployment{
