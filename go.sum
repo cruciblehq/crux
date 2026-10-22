@@ -49,6 +49,10 @@ github.com/containerd/ttrpc v1.2.7 h1:qIrroQvuOL9HQ1X6KHe2ohc7p+HP/0VE6XPU7elJRq
 github.com/containerd/ttrpc v1.2.7/go.mod h1:YCXHsb32f+Sq5/72xHubdiJRQY9inL4a4ZQrAbN1q9o=
 github.com/containerd/typeurl/v2 v2.2.3 h1:yNA/94zxWdvYACdYO8zofhrTVuQY73fFU1y++dYSw40=
 github.com/containerd/typeurl/v2 v2.2.3/go.mod h1:95ljDnPfD3bAbDJRugOiShd/DlAAsxGtUBhJxIn7SCk=
+github.com/cruciblehq/spec v0.0.0-20261022174714-928ec66688d9 h1:kEr3siw8X5K10derIUTPhewjy2WBgA05C8EhV7rL4nQ=
+github.com/cruciblehq/spec v0.0.0-20261022174714-928ec66688d9/go.mod h1:1ludNFN/xdLgvCtzWexlreyzpv3y922jniAvZdWmg4k=
+github.com/cruciblehq/utils-go v0.0.0-20260622164141-8aa115724f02 h1:8Zf7t1IQ45pDXPWSnylSd5/kpW4p7mbq5LyMCeJO47s=
+github.com/cruciblehq/utils-go v0.0.0-20260622164141-8aa115724f02/go.mod h1:cx5m5/3cXNBu85+w+dxPyjtHh0Ci9G+djOL7GY/L7CA=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
