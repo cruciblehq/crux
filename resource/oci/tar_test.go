@@ -60,6 +60,10 @@ func TestWriteScratchTar(t *testing.T) {
 		t.Fatalf("want 1 manifest, got %d", len(index.Manifests))
 	}
 
+	if got := index.Manifests[0].Annotations[annotationImageName]; got != scratchImageRef {
+		t.Fatalf("manifest %s annotation = %q, want %q", annotationImageName, got, scratchImageRef)
+	}
+
 	mfstDigest := index.Manifests[0].Digest
 	mfstBytes, ok := entries["blobs/sha256/"+mfstDigest.Hex()]
 	if !ok {

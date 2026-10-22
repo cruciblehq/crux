@@ -16,7 +16,18 @@ import (
 	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Writes a minimal OCI image tar representing a scratch (empty) image.
+// Names for the scratch base image.
+//
+// containerd's default Import only registers a manifest if it carries the
+// "io.containerd.image.name" annotation. The standard ref-name annotation
+// is also set for tools that key on it instead.
+const (
+	annotationImageName = "io.containerd.image.name" // containerd image-name annotation key.
+	scratchImageRef     = "scratch:latest"           // Full name registered for the scratch image.
+	scratchImageTag     = "latest"                   // OCI ref-name tag for the scratch image.
+)
+
+// Writes scratch (empty) OCI image.
 //
 // The archive contains an OCI layout marker, a minimal config blob with no
 // layers, a manifest referencing the config, and an index referencing the
@@ -76,6 +87,10 @@ func writeScratchManifest(tw *tar.Writer, configDigest godigest.Digest, configSi
 }
 
 // Writes the image index referencing the single manifest.
+//
+// The manifest descriptor carries an image-name annotation so containerd's
+// default Import registers a named image. Without it, Import silently discards
+// the unnamed manifest and reports no images.
 func writeScratchIndex(tw *tar.Writer, mfstDigest godigest.Digest, mfstSize int64) error {
 	index, err := json.Marshal(ocispecv1.Index{
 		Versioned: ocispec.Versioned{SchemaVersion: 2},
@@ -85,6 +100,10 @@ func writeScratchIndex(tw *tar.Writer, mfstDigest godigest.Digest, mfstSize int6
 				MediaType: ocispecv1.MediaTypeImageManifest,
 				Digest:    mfstDigest,
 				Size:      mfstSize,
+				Annotations: map[string]string{
+					annotationImageName:         scratchImageRef,
+					ocispecv1.AnnotationRefName: scratchImageTag,
+				},
 			},
 		},
 	})

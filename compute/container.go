@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -111,7 +112,7 @@ func (c *Container) Start(ctx context.Context) error {
 		containerd.WithSnapshotter(c.snapshotter),
 		containerd.WithSnapshot(c.snapshotID),
 		containerd.WithNewSpec(
-			applyOCISpec(c.oci),
+			baseSpecOpt(c.oci),
 			oci.WithImageConfig(c.img),
 			withComputeFields(c.namespace, containerID),
 		),
@@ -439,6 +440,19 @@ func parseID(s string) (uint32, error) {
 		return 0, crex.New("exceeds runc maximum")
 	}
 	return uint32(v), nil
+}
+
+// Choose the base spec option.
+//
+// Returns an OCI spec option that either applies the given compiled security
+// spec if it is compiled, or falls back to the default platform spec. The
+// distinction is made based on whether the compiled security spec has a Linux
+// or Windows section.
+func baseSpecOpt(src specs.Spec) oci.SpecOpts {
+	if src.Linux == nil && src.Windows == nil {
+		return oci.WithDefaultSpecForPlatform("linux/" + runtime.GOARCH)
+	}
+	return applyOCISpec(src)
 }
 
 // Copies src into the blank spec produced by [containerd.WithNewSpec] so the
