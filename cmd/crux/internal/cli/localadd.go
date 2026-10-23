@@ -18,7 +18,7 @@ type LocalAddCmd struct{}
 //
 // Reads the manifest from the directory set by -C (defaults to ".") and adds a
 // service entry to the local blueprint. The local ID is derived from the last
-// component of the resource name (e.g. "myns/my-api" → "my-api").
+// component of the resource name (e.g. "myns/my-api" becomes "my-api").
 func (c *LocalAddCmd) Run(ctx context.Context) error {
 	man, err := manifest.ReadAt(RootCmd.Context)
 	if err != nil {
@@ -58,9 +58,8 @@ func (c *LocalAddCmd) Run(ctx context.Context) error {
 	return nil
 }
 
-// Returns the last path component of a resource name.
-//
-// For example, "myns/my-api" → "my-api".
+// Returns the last component of the path of a resource name (e.g., "my-api"
+// from "myns/my-api").
 func resourceID(name string) string {
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		return name[i+1:]

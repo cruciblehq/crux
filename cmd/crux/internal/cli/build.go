@@ -23,8 +23,6 @@ type BuildCmd struct {
 	Environment string `short:"e" help:"Blueprint environment to build against." default:""`
 }
 
-// Executes the build command.
-//
 // Performs an initial build, and if the Watch flag is set, enters watch mode.
 func (c *BuildCmd) Run(ctx context.Context) error {
 
