@@ -7,6 +7,9 @@ import (
 	speccompute "github.com/cruciblehq/spec/compute"
 )
 
+// Number of random bytes in generated network and volume identifiers.
+const idLen = 8
+
 // Resource requirements for provisioning a compute instance.
 //
 // Each provider maps these requirements to its native compute class. The local

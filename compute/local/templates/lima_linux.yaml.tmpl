@@ -128,13 +128,9 @@ probes:
       wget -q -O /dev/null "http://127.0.0.1:{{ .CruxdPort }}{{ .CruxdHealthPath }}"
     hint: cruxd is not running
 
-# Forward the containerd Unix socket from guest to host. 9p makes the guest
-# filesystem visible on the host but does not bridge socket connections; Lima
-# tunnels the connection over SSH so the host can dial its local path. cruxd's
-# port is forwarded to the same port on the host loopback interface.
+# Forward cruxd's port to the same port on the host loopback interface. crux
+# talks to the machine only through cruxd.
 portForwards:
-  - guestSocket: "{{ .GuestSocket }}"
-    hostSocket: "{{ .HostSocket }}"
   - guestPort: {{ .CruxdPort }}
     hostIP: "127.0.0.1"
     hostPort: {{ .CruxdPort }}

@@ -15,14 +15,12 @@ import (
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
 	data := limaConfig{
-		Arch:        "aarch64",
-		CPUs:        2,
-		Memory:      "2GiB",
-		Disk:        "10GiB",
-		User:        "testuser",
-		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/containerd/containerd.sock",
-		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
+		Arch:      "aarch64",
+		CPUs:      2,
+		Memory:    "2GiB",
+		Disk:      "10GiB",
+		User:      "testuser",
+		ImagePath: "/tmp/vm/machine.qcow2",
 	}
 
 	var buf bytes.Buffer
@@ -38,14 +36,12 @@ func TestConfigTemplate_ImagePath(t *testing.T) {
 
 func TestConfigTemplate_x86(t *testing.T) {
 	data := limaConfig{
-		Arch:        "x86_64",
-		CPUs:        4,
-		Memory:      "4GiB",
-		Disk:        "20GiB",
-		User:        "testuser",
-		ImagePath:   "/tmp/vm/machine.qcow2",
-		GuestSocket: "/run/containerd/containerd.sock",
-		HostSocket:  "/home/testuser/.cache/crux/instances/local/containerd.sock",
+		Arch:      "x86_64",
+		CPUs:      4,
+		Memory:    "4GiB",
+		Disk:      "20GiB",
+		User:      "testuser",
+		ImagePath: "/tmp/vm/machine.qcow2",
 	}
 
 	var buf bytes.Buffer
@@ -87,12 +83,6 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	}
 	if cfg.ImagePath != "/tmp/test.qcow2" {
 		t.Errorf("ImagePath: got %q, want %q", cfg.ImagePath, "/tmp/test.qcow2")
-	}
-	if cfg.GuestSocket != guestContainerdSocket {
-		t.Errorf("GuestSocket: got %q, want %q", cfg.GuestSocket, guestContainerdSocket)
-	}
-	if want := containerdSocketPath(limaInstanceName); cfg.HostSocket != want {
-		t.Errorf("HostSocket: got %q, want %q", cfg.HostSocket, want)
 	}
 	if cfg.MachineDir != "/tmp" {
 		t.Errorf("MachineDir: got %q, want %q", cfg.MachineDir, "/tmp")

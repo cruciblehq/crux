@@ -22,7 +22,7 @@ func run(ctx context.Context, exec ExecFunc, command string, args ...string) err
 		return err
 	}
 	if code != 0 {
-		return crex.Newf(ErrHostExec, "%s %s: exit code %d", command, strings.Join(args, " "), code)
+		return crex.Newf(ErrHostExec, "%q exited with code %d", strings.Join(append([]string{command}, args...), " "), code)
 	}
 	return nil
 }
@@ -35,7 +35,7 @@ func execOutput(ctx context.Context, exec ExecFunc, command string, args ...stri
 		return "", err
 	}
 	if code != 0 {
-		return "", crex.Newf(ErrHostExec, "%s %s: exit code %d", command, strings.Join(args, " "), code)
+		return "", crex.Newf(ErrHostExec, "%q exited with code %d", strings.Join(append([]string{command}, args...), " "), code)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

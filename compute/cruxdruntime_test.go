@@ -229,6 +229,33 @@ func TestRuntimeTransportError(t *testing.T) {
 	}
 }
 
+func TestRuntimeHealth(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc(speccompute.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %q, want %q", r.Method, http.MethodGet)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	rt := serveCruxd(t, mux)
+
+	if err := rt.Health(context.Background()); err != nil {
+		t.Errorf("health: %v", err)
+	}
+}
+
+func TestRuntimeHealthUnavailable(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc(speccompute.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "containerd is not serving", http.StatusServiceUnavailable)
+	})
+	rt := serveCruxd(t, mux)
+
+	if err := rt.Health(context.Background()); !errors.Is(err, ErrCruxd) {
+		t.Errorf("health = %v, want ErrCruxd", err)
+	}
+}
+
 func TestRuntimeUnexpectedContentType(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(speccompute.EndpointLoad, func(w http.ResponseWriter, r *http.Request) {

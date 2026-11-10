@@ -120,6 +120,16 @@ func (r *cruxdRuntime) Load(ctx context.Context, ref speccompute.ImageRef, opts 
 	return &cruxdContainer{runtime: r, id: out.ID}, nil
 }
 
+// Checks that cruxd and the runtime behind it can serve requests.
+func (r *cruxdRuntime) Health(ctx context.Context) error {
+	resp, err := r.request(ctx, http.MethodGet, speccompute.EndpointHealth, nil, "", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return checkResponse(resp, "")
+}
+
 // Releases idle connections to cruxd.
 //
 // Does not affect images or containers on the machine. Always returns nil.
@@ -158,17 +168,27 @@ func (r *cruxdRuntime) send(ctx context.Context, endpoint string, reqType specco
 //
 // The caller must close the response body.
 func (r *cruxdRuntime) post(ctx context.Context, endpoint string, query url.Values, contentType string, body io.Reader) (*http.Response, error) {
+	return r.request(ctx, http.MethodPost, endpoint, query, contentType, body)
+}
+
+// Sends a request with the given method to endpoint.
+//
+// The content type header is set only when contentType is not empty. The
+// caller must close the response body.
+func (r *cruxdRuntime) request(ctx context.Context, method, endpoint string, query url.Values, contentType string, body io.Reader) (*http.Response, error) {
 	u, err := url.Parse(r.base)
 	if err != nil {
 		return nil, crex.Wrap(ErrCruxd, err)
 	}
 	u.Path = endpoint
 	u.RawQuery = query.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), body)
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
 		return nil, crex.Wrap(ErrCruxd, err)
 	}
-	req.Header.Set(speccompute.HeaderContentType, contentType)
+	if contentType != "" {
+		req.Header.Set(speccompute.HeaderContentType, contentType)
+	}
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, crex.Wrap(ErrCruxd, err)

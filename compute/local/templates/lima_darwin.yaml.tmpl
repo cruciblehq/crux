@@ -30,9 +30,7 @@ containerd:
   user: false
 
 # virtiofs is the native filesystem transport for vz VMs. The host directory is
-# shared directly into the VM and visible on both sides, but the kernel socket
-# state does not cross the VM boundary; Lima tunnels the containerd socket
-# connection over SSH (see portForwards).
+# shared directly into the VM and visible on both sides.
 mountType: virtiofs
 
 # The machine resource directory ships the cruxd binary next to the disk image.
@@ -219,14 +217,9 @@ probes:
       wget -q -O /dev/null "http://127.0.0.1:{{ .CruxdPort }}{{ .CruxdHealthPath }}"
     hint: cruxd is not running
 
-# Forward the containerd Unix socket from guest to host. Unix domain sockets
-# on virtiofs are visible on both sides but kernel socket state does not cross
-# the VM boundary; Lima tunnels the connection over SSH so the host can dial
-# its local forwarded path transparently. cruxd's port is forwarded to the
-# same port on the host loopback interface.
+# Forward cruxd's port to the same port on the host loopback interface. crux
+# talks to the machine only through cruxd.
 portForwards:
-  - guestSocket: "{{ .GuestSocket }}"
-    hostSocket: "{{ .HostSocket }}"
   - guestPort: {{ .CruxdPort }}
     hostIP: "127.0.0.1"
     hostPort: {{ .CruxdPort }}

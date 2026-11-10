@@ -18,9 +18,6 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/cruciblehq/crux/hub"
 	speccompute "github.com/cruciblehq/spec/compute"
@@ -42,7 +39,7 @@ const cruxdHost = "127.0.0.1"
 
 // Machine readiness timeout and polling interval.
 const (
-	machineReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd and cruxd to start.
+	machineReadyTimeout = 15 * time.Minute // Maximum time to wait for cruxd to become healthy.
 	machinePollInterval = 2 * time.Second  // Interval between machine readiness polls.
 	cruxdHealthTimeout  = 5 * time.Second  // Maximum time to wait for one cruxd health check.
 )
@@ -164,8 +161,9 @@ func deprovision(ctx context.Context, _ string) error {
 
 // Queries the current state of a compute instance.
 //
-// The state is determined by probing the Lima VM and the containerd and cruxd
-// services inside it, the returned state being the least healthy of them.
+// The state is determined by probing the Lima VM and cruxd's health check,
+// which also covers containerd. The returned state is the least healthy of
+// the two.
 func status(ctx context.Context, _ string) (State, error) {
 	rtState := hostStatus(ctx)
 
@@ -176,7 +174,7 @@ func status(ctx context.Context, _ string) (State, error) {
 		return StateStopped, nil
 	}
 
-	if !isMachineReady(ctx) {
+	if !isCruxdReady(ctx) {
 		return StateStopped, nil
 	}
 	return StateRunning, nil
@@ -203,18 +201,19 @@ func copyArchive(ctx context.Context, name string, r io.Reader) error {
 	return limaCopyArchive(ctx, name, r)
 }
 
-// Blocks until containerd and cruxd are accepting connections.
+// Blocks until cruxd reports itself healthy.
 //
-// Polls every [machinePollInterval]. Returns an error if the context is
-// cancelled or the [machineReadyTimeout] deadline is exceeded.
+// cruxd's health check also covers containerd. Polls every [machinePollInterval].
+// Returns an error if the context is cancelled or the [machineReadyTimeout]
+// deadline is exceeded.
 func waitForMachine(ctx context.Context) error {
 	deadline := time.Now().Add(machineReadyTimeout)
 	for {
-		if isMachineReady(ctx) {
+		if isCruxdReady(ctx) {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return crex.SystemErrorf("local runtime not ready", "containerd and cruxd did not become ready within %s", machineReadyTimeout).
+			return crex.SystemErrorf("local runtime not ready", "cruxd did not become healthy within %s", machineReadyTimeout).
 				Recovery("Recreate the local runtime and retry.").
 				Cause(ErrHostStart).
 				Err()
@@ -225,11 +224,6 @@ func waitForMachine(ctx context.Context) error {
 		case <-time.After(machinePollInterval):
 		}
 	}
-}
-
-// Whether containerd and cruxd are both ready to accept connections.
-func isMachineReady(ctx context.Context) bool {
-	return isContainerdReady(ctx) && isCruxdReady(ctx)
 }
 
 // Whether cruxd answers its health endpoint through the forwarded port.
@@ -258,27 +252,6 @@ func isCruxdReady(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// Whether containerd is ready to accept gRPC connections.
-//
-// Issues a gRPC Health.Check RPC against the forwarded containerd socket.
-// Returns true only when containerd responds with SERVING status.
-func isContainerdReady(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	conn, err := grpc.NewClient(
-		fmt.Sprintf("unix://%s", containerdSocketPath(limaInstanceName)),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return false
-	}
-	defer conn.Close()
-
-	resp, err := grpc_health_v1.NewHealthClient(conn).Check(ctx, &grpc_health_v1.HealthCheckRequest{})
-	return err == nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING
-}
-
 // Creates the Lima instance from the given disk image and starts it.
 //
 // Lima 2.x create does not auto-start; an explicit start call is required.
@@ -297,13 +270,6 @@ func createAndStartHost(ctx context.Context, imagePath string) error {
 	if err := limactlRunNoTTY(ctx, "create", fmt.Sprintf("--name=%s", limaInstanceName), configPath); err != nil {
 		return crex.SystemError(description, "the local virtual machine could not be created").
 			Recovery("Retry after recreating the local virtual machine.").
-			Cause(crex.Wrap(ErrHostCreate, err)).
-			Err()
-	}
-
-	if err := removeInstanceSocket(); err != nil {
-		return crex.SystemError(description, "failed to reset the local runtime socket").
-			Recovery("Reset the local runtime state and retry.").
 			Cause(crex.Wrap(ErrHostCreate, err)).
 			Err()
 	}
@@ -390,20 +356,6 @@ func machineArch() string {
 	}
 }
 
-// Removes the host-side containerd socket directory for the Lima instance.
-//
-// Lima binds a Unix listener to the host socket path at startup. If a previous
-// hostagent did not exit cleanly, the socket file is left on disk and the next
-// start fails with "address already in use". Removing the directory before
-// start ensures Lima can always bind a fresh listener.
-func removeInstanceSocket() error {
-	socketDir := filepath.Dir(containerdSocketPath(limaInstanceName))
-	if err := os.RemoveAll(socketDir); err != nil {
-		return crex.Wrap(ErrHostStart, err)
-	}
-	return nil
-}
-
 // Deletes the host VM and its disk images.
 //
 // Blocks until cleanup is complete. Returns [ErrHostNotCreated] if the VM
@@ -421,16 +373,6 @@ func destroyHost(ctx context.Context) error {
 			Err()
 	}
 
-	// limactl delete does not stop the VM first, so the forwarded socket may
-	// be left on disk. Remove the instance socket directory so a subsequent
-	// start can bind a new listener.
-	if err := removeInstanceSocket(); err != nil {
-		return crex.SystemError("cannot destroy local environment", "failed to remove the local runtime socket").
-			Recoveryf("Make sure you can delete %s, then try again.", filepath.Dir(containerdSocketPath(limaInstanceName))).
-			Cause(crex.Wrap(ErrHostDestroy, err)).
-			Err()
-	}
-
 	return nil
 }
 
@@ -440,11 +382,6 @@ func destroyHost(ctx context.Context) error {
 // and returns the command's exit code.
 func hostExec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
 	return limaGuestExec(ctx, stdout, stderr, command, args...)
-}
-
-// Returns the containerd socket path for the named instance.
-func containerdSocket(_ context.Context, name string) (string, error) {
-	return containerdSocketPath(name), nil
 }
 
 // Returns the host address where cruxd is reachable for the named instance.
