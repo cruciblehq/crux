@@ -15,6 +15,8 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	imgarchive "github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
@@ -24,6 +26,8 @@ import (
 
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/crypto"
+
+	speccompute "github.com/cruciblehq/spec/compute"
 )
 
 // Number of random bytes in generated step, snapshot, and exec identifiers.
@@ -40,6 +44,12 @@ const (
 
 	// Snapshotter used for all container and image operations.
 	overlayfsSnapshotter = "overlayfs"
+
+	// Lifetime of the lease that protects a container's writable snapshot and
+	// build-time content from garbage collection. It is renewed implicitly by
+	// use and deleted when the container is destroyed; the expiration is a
+	// safety net so abandoned leases do not leak indefinitely.
+	leaseDuration = 24 * time.Hour
 )
 
 // Suffix appended to step IDs when naming writable snapshots.
@@ -110,7 +120,8 @@ func newClient(path, namespace string) (*Client, error) {
 // and can be passed to [Client.Load], [Client.Export], [Client.Extract],
 // or [Client.Remove]. The archive must be in OCI tar format as produced
 // by [Client.Export]. The image is unpacked so all layer snapshots exist.
-func (c *Client) Import(ctx context.Context, r io.Reader) (string, error) {
+func (c *Client) Import(ctx context.Context, r io.Reader) (speccompute.ImageRef, error) {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
 	imgs, err := c.conn.Import(ctx, r)
 	if err != nil {
 		return "", crex.Wrap(ErrImport, err)
@@ -129,7 +140,7 @@ func (c *Client) Import(ctx context.Context, r io.Reader) (string, error) {
 		return "", crex.Wrap(ErrImport, err)
 	}
 
-	return img.Name(), nil
+	return speccompute.ImageRef(img.Name()), nil
 }
 
 // Exports the named image as an OCI tar archive.
@@ -137,8 +148,9 @@ func (c *Client) Import(ctx context.Context, r io.Reader) (string, error) {
 // ref must be a reference returned by [Client.Import] or [Container.Commit].
 // The archive includes all layer blobs, manifests, and config descriptors and
 // can be re-imported via [Client.Import].
-func (c *Client) Export(ctx context.Context, ref string, w io.Writer) error {
-	return c.conn.Export(ctx, w, imgarchive.WithImage(c.conn.ImageService(), ref))
+func (c *Client) Export(ctx context.Context, ref speccompute.ImageRef, w io.Writer) error {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+	return c.conn.Export(ctx, w, imgarchive.WithImage(c.conn.ImageService(), string(ref)))
 }
 
 // Extracts a directory tree from the named image as a tar stream.
@@ -148,8 +160,9 @@ func (c *Client) Export(ctx context.Context, ref string, w io.Writer) error {
 // through [path.Clean] before matching. Callers are responsible for resolving
 // path to its final form before calling. The returned [io.ReadCloser] must be
 // closed by the caller.
-func (c *Client) Extract(ctx context.Context, ref string, path string) (io.ReadCloser, error) {
-	img, err := c.conn.GetImage(ctx, ref)
+func (c *Client) Extract(ctx context.Context, ref speccompute.ImageRef, path string) (io.ReadCloser, error) {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+	img, err := c.conn.GetImage(ctx, string(ref))
 	if err != nil {
 		return nil, crex.Wrap(ErrContainer, err)
 	}
@@ -163,11 +176,12 @@ func (c *Client) Extract(ctx context.Context, ref string, path string) (io.ReadC
 // Returns the OCI image config for the named image.
 //
 // The returned [ocispec.ImageConfig] contains the runtime defaults baked into
-// the image, which are the values in effect before [RuntimeOptions] overrides
+// the image, which are the values in effect before [speccompute.Options] overrides
 // them at container start. ref must be a reference returned by [Client.Import]
 // or [Client.Commit].
-func (c *Client) Inspect(ctx context.Context, ref string) (ocispec.ImageConfig, error) {
-	img, err := c.conn.GetImage(ctx, ref)
+func (c *Client) Inspect(ctx context.Context, ref speccompute.ImageRef) (ocispec.ImageConfig, error) {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+	img, err := c.conn.GetImage(ctx, string(ref))
 	if err != nil {
 		return ocispec.ImageConfig{}, crex.Wrap(ErrContainer, err)
 	}
@@ -183,8 +197,9 @@ func (c *Client) Inspect(ctx context.Context, ref string) (ocispec.ImageConfig, 
 // ref must be a reference returned by [Client.Import] or [Container.Commit].
 // The caller is responsible for ensuring no containers are using the image
 // before removing it.
-func (c *Client) Remove(ctx context.Context, ref string) error {
-	return c.conn.ImageService().Delete(ctx, ref)
+func (c *Client) Remove(ctx context.Context, ref speccompute.ImageRef) error {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+	return c.conn.ImageService().Delete(ctx, string(ref))
 }
 
 // Creates a new container from a previously imported image.
@@ -193,8 +208,9 @@ func (c *Client) Remove(ctx context.Context, ref string) error {
 // Allocates a persistent writable snapshot with the image as parent. The
 // container is not started until [Container.Start] is called. The container
 // must be released by calling [Container.Destroy] when no longer needed.
-func (c *Client) Load(ctx context.Context, ref string, opts RuntimeOptions) (*Container, error) {
-	img, err := c.conn.GetImage(ctx, ref)
+func (c *Client) Load(ctx context.Context, ref speccompute.ImageRef, opts speccompute.Options) (*Container, error) {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+	img, err := c.conn.GetImage(ctx, string(ref))
 	if err != nil {
 		return nil, crex.Wrap(ErrContainer, err)
 	}
@@ -204,14 +220,28 @@ func (c *Client) Load(ctx context.Context, ref string, opts RuntimeOptions) (*Co
 		return nil, crex.Wrap(ErrContainer, err)
 	}
 
-	snapshotID, err := c.prepareSnapshot(ctx, img)
+	// A lease keeps the writable snapshot and build-time content alive for the
+	// container's lifetime. The active snapshot prepared below is not referenced
+	// by any container record until Start, so without a lease the garbage
+	// collector can remove it mid-build (and with it its on-disk fs directory),
+	// which later breaks layer application.
+	lease, err := c.conn.LeasesService().Create(ctx, leases.WithRandomID(), leases.WithExpiration(leaseDuration))
 	if err != nil {
+		return nil, crex.Wrapf(ErrContainer, err, "could not create lease")
+	}
+	leaseCtx := leases.WithLease(ctx, lease.ID)
+
+	snapshotID, err := c.prepareSnapshot(leaseCtx, img)
+	if err != nil {
+		_ = c.conn.LeasesService().Delete(ctx, lease)
 		return nil, err
 	}
 
 	ctr := &Container{
 		conn:        c.conn,
 		namespace:   c.namespace,
+		leaseID:     lease.ID,
+		hostNetwork: opts.HostNetwork,
 		img:         img,
 		snapshotID:  snapshotID,
 		snapshotter: overlayfsSnapshotter,

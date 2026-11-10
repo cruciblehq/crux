@@ -1,14 +1,13 @@
 package compute
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	speccompute "github.com/cruciblehq/spec/compute"
 )
 
 func TestParseID(t *testing.T) {
@@ -93,7 +92,7 @@ func baseSpec(shell string, env []string, cwd string) *specs.Spec {
 
 func TestBuildExecProcess_DefaultShell(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/")
-	proc := buildExecProcess(spec, "echo hello", &RuntimeOptions{})
+	proc := buildExecProcess(spec, "echo hello", &speccompute.Options{})
 	if len(proc.Args) != 3 || proc.Args[0] != "/bin/sh" || proc.Args[1] != "-c" || proc.Args[2] != "echo hello" {
 		t.Errorf("unexpected args: %v", proc.Args)
 	}
@@ -104,7 +103,7 @@ func TestBuildExecProcess_DefaultShell(t *testing.T) {
 
 func TestBuildExecProcess_CustomShell(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/")
-	proc := buildExecProcess(spec, "echo hello", &RuntimeOptions{Shell: "/bin/bash"})
+	proc := buildExecProcess(spec, "echo hello", &speccompute.Options{Shell: "/bin/bash"})
 	if proc.Args[0] != "/bin/bash" {
 		t.Errorf("expected /bin/bash, got %s", proc.Args[0])
 	}
@@ -112,7 +111,7 @@ func TestBuildExecProcess_CustomShell(t *testing.T) {
 
 func TestBuildExecProcess_EnvMerge(t *testing.T) {
 	spec := baseSpec("/bin/sh", []string{"A=1", "B=2"}, "/")
-	proc := buildExecProcess(spec, "x", &RuntimeOptions{Env: map[string]string{"A": "99", "C": "3"}})
+	proc := buildExecProcess(spec, "x", &speccompute.Options{Env: map[string]string{"A": "99", "C": "3"}})
 	found := map[string]string{}
 	for _, e := range proc.Env {
 		if k, v, ok := strings.Cut(e, "="); ok {
@@ -132,7 +131,7 @@ func TestBuildExecProcess_EnvMerge(t *testing.T) {
 
 func TestBuildExecProcess_Workdir(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/")
-	proc := buildExecProcess(spec, "x", &RuntimeOptions{Workdir: "/tmp"})
+	proc := buildExecProcess(spec, "x", &speccompute.Options{Workdir: "/tmp"})
 	if proc.Cwd != "/tmp" {
 		t.Errorf("expected Cwd /tmp, got %s", proc.Cwd)
 	}
@@ -140,7 +139,7 @@ func TestBuildExecProcess_Workdir(t *testing.T) {
 
 func TestBuildExecProcess_WorkdirEmpty(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/home")
-	proc := buildExecProcess(spec, "x", &RuntimeOptions{})
+	proc := buildExecProcess(spec, "x", &speccompute.Options{})
 	if proc.Cwd != "/home" {
 		t.Errorf("expected Cwd to be inherited as /home, got %s", proc.Cwd)
 	}
@@ -148,7 +147,7 @@ func TestBuildExecProcess_WorkdirEmpty(t *testing.T) {
 
 func TestBuildExecProcess_User(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/")
-	proc := buildExecProcess(spec, "x", &RuntimeOptions{User: "1000:2000"})
+	proc := buildExecProcess(spec, "x", &speccompute.Options{User: "1000:2000"})
 	if proc.User.UID != 1000 {
 		t.Errorf("expected UID 1000, got %d", proc.User.UID)
 	}
@@ -160,7 +159,7 @@ func TestBuildExecProcess_User(t *testing.T) {
 func TestBuildExecProcess_InvalidUser(t *testing.T) {
 	spec := baseSpec("/bin/sh", nil, "/")
 	spec.Process.User = specs.User{UID: 5, GID: 6}
-	proc := buildExecProcess(spec, "x", &RuntimeOptions{User: "notanumber"})
+	proc := buildExecProcess(spec, "x", &speccompute.Options{User: "notanumber"})
 	// Invalid user spec is silently ignored; original UID/GID unchanged.
 	if proc.User.UID != 5 || proc.User.GID != 6 {
 		t.Errorf("expected original UID/GID to be preserved, got %d/%d", proc.User.UID, proc.User.GID)
@@ -172,66 +171,12 @@ func TestBuildExecProcess_DoesNotMutateBase(t *testing.T) {
 	origArgs := append([]string{}, spec.Process.Args...)
 	origEnv := append([]string{}, spec.Process.Env...)
 
-	buildExecProcess(spec, "x", &RuntimeOptions{Env: map[string]string{"B": "2"}})
+	buildExecProcess(spec, "x", &speccompute.Options{Env: map[string]string{"B": "2"}})
 
 	if !reflect.DeepEqual(spec.Process.Args, origArgs) {
 		t.Error("buildExecProcess mutated base spec args")
 	}
 	if !reflect.DeepEqual(spec.Process.Env, origEnv) {
 		t.Error("buildExecProcess mutated base spec env")
-	}
-}
-
-func TestOverlayHasChanges_EmptyUpperdir(t *testing.T) {
-	dir := t.TempDir()
-	mounts := []mount.Mount{
-		{Type: overlayMountType, Options: []string{overlayUpperdirOpt + dir}},
-	}
-	if overlayHasChanges(mounts) {
-		t.Error("expected no changes in empty upperdir")
-	}
-}
-
-func TestOverlayHasChanges_NonEmptyUpperdir(t *testing.T) {
-	dir := t.TempDir()
-	f, err := os.Create(filepath.Join(dir, "file"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-
-	mounts := []mount.Mount{
-		{Type: overlayMountType, Options: []string{overlayUpperdirOpt + dir}},
-	}
-	if !overlayHasChanges(mounts) {
-		t.Error("expected changes with a file in upperdir")
-	}
-}
-
-func TestOverlayHasChanges_MissingUpperdir(t *testing.T) {
-	mounts := []mount.Mount{
-		{Type: overlayMountType, Options: []string{overlayUpperdirOpt + "/nonexistent/path/xyz"}},
-	}
-	// ReadDir error is treated as conservative true.
-	if !overlayHasChanges(mounts) {
-		t.Error("expected true for missing upperdir (conservative)")
-	}
-}
-
-func TestOverlayHasChanges_NoOverlayMount(t *testing.T) {
-	mounts := []mount.Mount{
-		{Type: "tmpfs", Options: []string{}},
-	}
-	if overlayHasChanges(mounts) {
-		t.Error("expected false when no overlay mount is present")
-	}
-}
-
-func TestOverlayHasChanges_NoUpperdirOption(t *testing.T) {
-	mounts := []mount.Mount{
-		{Type: overlayMountType, Options: []string{"lowerdir=/lower"}},
-	}
-	if overlayHasChanges(mounts) {
-		t.Error("expected false when upperdir option is absent")
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -15,16 +14,19 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/pkg/archive"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/crypto"
+
+	speccompute "github.com/cruciblehq/spec/compute"
 )
 
 // Container runtime limits and defaults.
@@ -56,12 +58,6 @@ const (
 
 	// Path of the rootfs directory within a containerd snapshot mount.
 	rootfsPath = "rootfs"
-
-	// Mount type for overlayfs.
-	overlayMountType = "overlay"
-
-	// Overlayfs mount option prefix for the upper (writable) layer directory.
-	overlayUpperdirOpt = "upperdir="
 )
 
 // An isolation boundary with a persistent writable snapshot.
@@ -77,6 +73,8 @@ const (
 // are no longer needed.
 type Container struct {
 	namespace   string                       // Containerd namespace for all operations.
+	leaseID     string                       // Lease protecting the snapshot and build content from GC.
+	hostNetwork bool                         // Whether the container uses the host network (a relaxation of the restrictive default).
 	conn        *containerd.Client           // Containerd connection borrowed from the creating Client.
 	img         containerd.Image             // Current base image.
 	config      *ocispec.ImageConfig         // OCI config override applied at Commit time; nil means use img's config.
@@ -105,17 +103,29 @@ func (c *Container) Start(ctx context.Context) error {
 		return crex.Newf(ErrContainer, "container already started")
 	}
 
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+
 	containerID := fmt.Sprintf("%s-%s", crypto.RandHex(idLen), containerIDSuffix)
+
+	// The spec is policy-free by default: a restrictive baseline (isolated
+	// network from the default platform spec). Relaxations are applied only
+	// when the container was created with them, keeping container management
+	// independent of what the container is used for.
+	specOpts := []oci.SpecOpts{
+		baseSpecOpt(c.oci),
+		oci.WithImageConfig(c.img),
+		withComputeFields(c.namespace, containerID),
+		withKeepAliveArgs(),
+	}
+	if c.hostNetwork {
+		specOpts = append(specOpts, oci.WithHostNamespace(specs.NetworkNamespace), withResolvConf())
+	}
 
 	ctn, err := c.conn.NewContainer(ctx, containerID,
 		containerd.WithImage(c.img),
 		containerd.WithSnapshotter(c.snapshotter),
 		containerd.WithSnapshot(c.snapshotID),
-		containerd.WithNewSpec(
-			baseSpecOpt(c.oci),
-			oci.WithImageConfig(c.img),
-			withComputeFields(c.namespace, containerID),
-		),
+		containerd.WithNewSpec(specOpts...),
 	)
 	if err != nil {
 		return crex.Wrapf(ErrContainer, err, "could not create container")
@@ -179,27 +189,25 @@ func (c *Container) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Runs a command in the container.
+// Runs a command in the container and returns its exit code.
 //
 // Execs the command into the container's running main process. The command is
 // invoked via opts.Shell (or the default shell) as a single argument. Changes
 // to the filesystem accumulate in the writable snapshot and persist for
 // subsequent [Container.Exec] and [Container.Copy] calls. A non-zero exit code
-// is returned as an error.
-func (c *Container) Exec(ctx context.Context, command string, opts RuntimeOptions) error {
+// is a normal result. The error is reserved for a command that could not be
+// run or waited on.
+func (c *Container) Exec(ctx context.Context, stdout, stderr io.Writer, command string, opts speccompute.Options) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.task == nil {
-		return crex.Newf(ErrContainer, "container not started")
+		return 0, crex.Tag(crex.Newf(ErrContainer, "container not started"), speccompute.ErrNotStarted)
 	}
 
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
 
-	if err := c.runExec(ctx, opts.Stdout, opts.Stderr, command, &opts); err != nil {
-		return err
-	}
-	return nil
+	return c.runExec(ctx, stdout, stderr, command, &opts)
 }
 
 // Applies an uncompressed tar archive to the container's writable snapshot.
@@ -208,34 +216,83 @@ func (c *Container) Exec(ctx context.Context, command string, opts RuntimeOption
 // within the container filesystem, preserving all permissions, ownership, and
 // timestamps. OCI whiteout entries follow standard layer semantics. Changes
 // accumulate in the snapshot. The container's main process is not affected.
+//
+// The tar is written to the content store and applied by the containerd diff
+// service, which mounts the snapshot and applies the layer server-side. This
+// avoids mounting the snapshot on the crux host, which is impossible when crux
+// runs on a different machine or OS than containerd (e.g. macOS driving a Linux
+// VM).
 func (c *Container) Copy(ctx context.Context, r io.Reader) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	mounts, err := c.conn.SnapshotService(c.snapshotter).Mounts(ctx, c.snapshotID)
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+
+	leaseCtx, done, err := c.conn.WithLease(ctx)
+	if err != nil {
+		return crex.Wrapf(ErrContainer, err, "could not create lease")
+	}
+	defer done(ctx)
+
+	mounts, err := c.conn.SnapshotService(c.snapshotter).Mounts(leaseCtx, c.snapshotID)
 	if err != nil {
 		return crex.Wrapf(ErrContainer, err, "could not get snapshot mounts")
 	}
 
-	if err := mount.WithTempMount(ctx, mounts, func(root string) error {
-		_, err := archive.Apply(ctx, root, r)
+	desc, err := writeLayerBlob(leaseCtx, c.conn.ContentStore(), r)
+	if err != nil {
 		return err
-	}); err != nil {
+	}
+
+	if _, err := c.conn.DiffService().Apply(leaseCtx, desc, mounts); err != nil {
 		return crex.Wrapf(ErrContainer, err, "could not apply layer tar")
 	}
 
 	return nil
 }
 
+// Writes an uncompressed tar stream into the content store and returns a layer
+// descriptor referencing it.
+//
+// The digest and size are computed while the stream is written, so the caller
+// need not know them in advance. The descriptor uses the uncompressed OCI layer
+// media type, suitable for server-side application via the diff service. An
+// already-existing blob with the same digest is treated as success.
+func writeLayerBlob(ctx context.Context, cs content.Store, r io.Reader) (ocispec.Descriptor, error) {
+	ref := fmt.Sprintf("crux-copy-layer-%s", crypto.RandHex(idLen))
+	w, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
+	if err != nil {
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "could not open content writer")
+	}
+	defer w.Close()
+
+	n, err := io.Copy(w, r)
+	if err != nil {
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "could not write layer blob")
+	}
+
+	if err := w.Commit(ctx, n, ""); err != nil && !errdefs.IsAlreadyExists(err) {
+		return ocispec.Descriptor{}, crex.Wrapf(ErrContainer, err, "could not commit layer blob")
+	}
+
+	return ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    w.Digest(),
+		Size:      n,
+	}, nil
+}
+
 // Stores cfg as the pending configuration to be applied at [Container.Commit].
 //
 // Does not create an image or affect the writable snapshot. Typically called
 // after [Container.Inspect] to modify specific fields while preserving the
-// rest. The change takes effect when [Container.Commit] is called.
-func (c *Container) Configure(cfg ocispec.ImageConfig) {
+// rest. The change takes effect when [Container.Commit] is called. Always
+// returns nil, since the configuration is only held in memory.
+func (c *Container) Configure(_ context.Context, cfg ocispec.ImageConfig) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.config = &cfg
+	return nil
 }
 
 // Creates a new image from the container's current state.
@@ -247,28 +304,41 @@ func (c *Container) Configure(cfg ocispec.ImageConfig) {
 // configuration. The reference can be passed to [Client.Load], [Client.Export],
 // [Client.Extract], or [Client.Remove]. The live container is not affected.
 // Records a history entry using by as the creator and the current time.
-func (c *Container) Commit(ctx context.Context, by string) (string, error) {
+func (c *Container) Commit(ctx context.Context, by string) (speccompute.ImageRef, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	mounts, err := c.conn.SnapshotService(c.snapshotter).Mounts(ctx, c.snapshotID)
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
+
+	// Ask containerd whether the snapshot has any content of its own to commit.
+	// Usage reports the size of this snapshot's writable layer (the overlay
+	// upperdir, or the whole filesystem for a parentless bind-mounted snapshot),
+	// so it detects changes regardless of how the snapshot is mounted and
+	// without reading any paths from the client host.
+	usage, err := c.conn.SnapshotService(c.snapshotter).Usage(ctx, c.snapshotID)
 	if err != nil {
-		return "", crex.Wrapf(ErrContainer, err, "could not get snapshot mounts")
+		return "", crex.Wrapf(ErrContainer, err, "could not get snapshot usage")
 	}
-	if !overlayHasChanges(mounts) {
+	if usage.Size == 0 {
 		if c.config == nil {
-			return c.img.Name(), nil
+			return speccompute.ImageRef(c.img.Name()), nil
 		}
-		return configureImage(ctx, c.conn, c.img, *c.config, by)
+		ref, err := configureImage(ctx, c.conn, c.img, *c.config, by)
+		return speccompute.ImageRef(ref), err
 	}
-	return commitSnapshotDiff(ctx, c.conn, c.img, c.snapshotID, c.snapshotter, c.config, by)
+	ref, err := commitSnapshotDiff(ctx, c.conn, c.img, c.snapshotID, c.snapshotter, c.config, by)
+	return speccompute.ImageRef(ref), err
 }
 
 // Releases the container's writable snapshot.
 //
 // After Destroy returns, no other methods may be called on the container.
 func (c *Container) Destroy(ctx context.Context) error {
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
 	c.conn.SnapshotService(c.snapshotter).Remove(ctx, c.snapshotID)
+	if c.leaseID != "" {
+		_ = c.conn.LeasesService().Delete(ctx, leases.Lease{ID: c.leaseID})
+	}
 	return nil
 }
 
@@ -286,6 +356,7 @@ func (c *Container) Inspect(ctx context.Context) (ocispec.ImageConfig, error) {
 	if pending != nil {
 		return *pending, nil
 	}
+	ctx = namespaces.WithNamespace(ctx, c.namespace)
 	_, cfg, err := readImageConfig(ctx, c.conn.ContentStore(), img.Target())
 	if err != nil {
 		return ocispec.ImageConfig{}, err
@@ -293,69 +364,47 @@ func (c *Container) Inspect(ctx context.Context) (ocispec.ImageConfig, error) {
 	return cfg.Config, nil
 }
 
-// Whether an overlayfs upper directory contains any entries.
-//
-// Parses the upperdir option from mounts and reads the directory. On error,
-// returns true to conservatively treat the snapshot as changed. Returns false
-// if no overlay mount is present in the slice.
-func overlayHasChanges(mounts []mount.Mount) bool {
-	for _, m := range mounts {
-		if m.Type != overlayMountType {
-			continue
-		}
-		for _, opt := range m.Options {
-			if !strings.HasPrefix(opt, overlayUpperdirOpt) {
-				continue
-			}
-			entries, err := os.ReadDir(strings.TrimPrefix(opt, overlayUpperdirOpt))
-			if err != nil {
-				return true
-			}
-			return len(entries) > 0
-		}
-	}
-	return false
-}
-
-// Execs command into the running task, routing output through an [execIO].
-func (c *Container) runExec(ctx context.Context, stdout, stderr io.Writer, command string, opts *RuntimeOptions) error {
+// Execs command into the running task and returns its exit code, routing
+// output through an [execIO].
+func (c *Container) runExec(ctx context.Context, stdout, stderr io.Writer, command string, opts *speccompute.Options) (int, error) {
 	execID := fmt.Sprintf("%s-%s", crypto.RandHex(idLen), execIDSuffix)
 	eio := newExecIO(stdout, stderr)
 	defer eio.close()
 
 	creator, err := eio.creator()
 	if err != nil {
-		return crex.Wrapf(ErrContainer, err, "could not create log IO")
+		return 0, crex.Wrapf(ErrContainer, err, "could not create log IO")
 	}
 
 	spec, err := c.ctr.Spec(ctx)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, err, "could not get container spec")
+		return 0, crex.Wrapf(ErrContainer, err, "could not get container spec")
 	}
 
 	process, err := c.task.Exec(ctx, execID, buildExecProcess(spec, command, opts), creator)
 	if err != nil {
-		return crex.Wrapf(ErrContainer, err, "could not create exec process")
+		return 0, crex.Wrapf(ErrContainer, err, "could not create exec process")
 	}
 
 	exitCh, err := process.Wait(ctx)
 	if err != nil {
 		process.Delete(ctx)
-		return crex.Wrapf(ErrContainer, err, "could not wait for exec process")
+		return 0, crex.Wrapf(ErrContainer, err, "could not wait for exec process")
 	}
 
 	if err := process.Start(ctx); err != nil {
 		process.Delete(ctx)
-		return crex.Wrapf(ErrContainer, err, "could not start exec process")
+		return 0, crex.Wrapf(ErrContainer, err, "could not start exec process")
 	}
 
+	var code int
 	var execErr error
 	select {
 	case status := <-exitCh:
 		if err := status.Error(); err != nil {
 			execErr = crex.Wrapf(ErrContainer, err, "exec process failed")
-		} else if code := status.ExitCode(); code != 0 {
-			execErr = crex.Newf(ErrContainer, "command exited with code %d", code)
+		} else {
+			code = int(status.ExitCode())
 		}
 	case <-ctx.Done():
 		process.Kill(ctx, syscall.SIGTERM)
@@ -365,13 +414,13 @@ func (c *Container) runExec(ctx context.Context, stdout, stderr io.Writer, comma
 	eio.flush(process.IO())
 	process.Delete(ctx)
 
-	return execErr
+	return code, execErr
 }
 
 // Builds a process spec for exec from the container's base process.
 //
 // Overrides args, env, workdir, and user from command and opts.
-func buildExecProcess(base *specs.Spec, command string, opts *RuntimeOptions) *specs.Process {
+func buildExecProcess(base *specs.Spec, command string, opts *speccompute.Options) *specs.Process {
 	proc := *base.Process
 	proc.Terminal = false
 
@@ -450,9 +499,52 @@ func parseID(s string) (uint32, error) {
 // or Windows section.
 func baseSpecOpt(src specs.Spec) oci.SpecOpts {
 	if src.Linux == nil && src.Windows == nil {
-		return oci.WithDefaultSpecForPlatform("linux/" + runtime.GOARCH)
+		return oci.WithDefaultSpecForPlatform(fmt.Sprintf("linux/%s", runtime.GOARCH))
 	}
 	return applyOCISpec(src)
+}
+
+// Main process used for build containers whose image defines no entrypoint or
+// command. Build steps run via exec, so the main process only needs to stay
+// alive; this blocks indefinitely.
+var defaultKeepAlive = []string{"/bin/sh", "-c", "exec sleep infinity"}
+
+// Sets a blocking main process when the spec has no process args.
+//
+// An image being built up from scratch has no entrypoint or command, which the
+// OCI runtime rejects ("args must not be empty"). Since build steps run through
+// exec rather than the main process, a keep-alive command is sufficient. When
+// the image already defines args, they are left untouched.
+func withKeepAliveArgs() oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		if s.Process == nil {
+			s.Process = &specs.Process{}
+		}
+		if len(s.Process.Args) == 0 {
+			s.Process.Args = append([]string{}, defaultKeepAlive...)
+		}
+		return nil
+	}
+}
+
+// Bind-mounts the host's resolv.conf into the container so build steps can
+// resolve package mirrors and other hosts.
+//
+// Build commands such as "apt-get update" need working DNS. A base image's
+// /etc/resolv.conf is typically empty or points at a resolver that is not
+// present in the build container, so the host's file is mounted over it. The
+// container shares the host network namespace (see [oci.WithHostNamespace]),
+// so the host's resolver is reachable.
+func withResolvConf() oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		s.Mounts = append(s.Mounts, specs.Mount{
+			Destination: "/etc/resolv.conf",
+			Type:        "bind",
+			Source:      "/etc/resolv.conf",
+			Options:     []string{"rbind", "ro"},
+		})
+		return nil
+	}
 }
 
 // Copies src into the blank spec produced by [containerd.WithNewSpec] so the

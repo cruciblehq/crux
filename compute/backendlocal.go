@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/cruciblehq/crux/compute/local"
+	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -162,13 +163,17 @@ func (s *computeLocalShim) Copy(ctx context.Context, id string, r io.Reader) err
 	return s.local.Copy(ctx, id, r)
 }
 
-// Opens a client connection to the container runtime on the instance.
-func (s *computeLocalShim) Connect(ctx context.Context, id string) (*Client, error) {
+// Opens the container runtime on the instance.
+func (s *computeLocalShim) Connect(ctx context.Context, id string) (speccompute.Runtime, error) {
 	socketPath, err := s.local.ContainerdSocket(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return newClient(socketPath, localInstanceName)
+	c, err := newClient(socketPath, localInstanceName)
+	if err != nil {
+		return nil, err
+	}
+	return runtimeAdapter{c}, nil
 }
 
 // Converts a [local.State] value to a [State].

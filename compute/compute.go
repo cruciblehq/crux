@@ -3,6 +3,8 @@ package compute
 import (
 	"context"
 	"io"
+
+	speccompute "github.com/cruciblehq/spec/compute"
 )
 
 // Resource requirements for provisioning a compute instance.
@@ -125,11 +127,11 @@ type Compute interface {
 	// extraction fails.
 	Copy(ctx context.Context, id string, r io.Reader) error
 
-	// Opens a client connection to the container runtime on the instance.
+	// Opens the container runtime on the instance.
 	//
 	// The instance must be running, otherwise an error is returned. The
-	// returned [Client] owns the underlying containerd connection and must be
-	// closed when no longer needed. Multiple clients can be open against the
+	// returned runtime owns its underlying connection and must be closed
+	// when no longer needed. Multiple runtimes can be open against the
 	// same instance concurrently.
-	Connect(ctx context.Context, id string) (*Client, error)
+	Connect(ctx context.Context, id string) (speccompute.Runtime, error)
 }
