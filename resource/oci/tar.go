@@ -2,7 +2,10 @@ package oci
 
 import (
 	"archive/tar"
+	"bufio"
+	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -116,7 +119,7 @@ func writeScratchIndex(tw *tar.Writer, mfstDigest godigest.Digest, mfstSize int6
 // Writes data as a content-addressed blob under blobs/sha256/<digest> and returns the digest.
 func writeBlob(tw *tar.Writer, data []byte) (godigest.Digest, error) {
 	d := godigest.FromBytes(data)
-	return d, writeTarEntry(tw, ocispecv1.ImageBlobsDir+"/sha256/"+d.Hex(), data)
+	return d, writeTarEntry(tw, fmt.Sprintf("%s/sha256/%s", ocispecv1.ImageBlobsDir, d.Hex()), data)
 }
 
 // Writes an in-memory byte slice as a regular tar entry.
@@ -164,7 +167,7 @@ func WriteCopyTar(w io.Writer, srcPath, destDir string) error {
 		tarPath := filepath.Join(destDir, rel)
 		if d.IsDir() {
 			return tw.WriteHeader(&tar.Header{
-				Name:     tarPath + "/",
+				Name:     fmt.Sprintf("%s/", tarPath),
 				Typeflag: tar.TypeDir,
 				Mode:     0755,
 			})
@@ -227,13 +230,77 @@ func RewriteTarPaths(w io.Writer, r io.Reader, srcPath, destPath string) error {
 		switch {
 		case name == srcClean:
 			newName = destClean
-		case strings.HasPrefix(name, srcClean+"/"):
-			newName = destClean + "/" + strings.TrimPrefix(name, srcClean+"/")
+		case strings.HasPrefix(name, fmt.Sprintf("%s/", srcClean)):
+			newName = fmt.Sprintf("%s/%s", destClean, strings.TrimPrefix(name, fmt.Sprintf("%s/", srcClean)))
 		default:
 			newName = name
 		}
 
 		hdr.Name = newName
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if _, err := io.Copy(tw, tr); err != nil {
+			return err
+		}
+	}
+	return tw.Close()
+}
+
+// Streams a host tar archive's contents into an uncompressed tar retargeted
+// under destDir.
+//
+// archivePath points to a tar archive on the host, optionally gzip-compressed;
+// the format is detected from the leading magic bytes. Every entry is rewritten
+// so its path is placed under destDir, preserving all header fields (mode,
+// ownership, symlink and hardlink targets, device numbers, xattrs). When
+// destDir is the image root ("/" or ""), entries are emitted unchanged so that
+// symlink and hardlink targets remain valid. The resulting stream is suitable
+// for [compute.Container.Copy], which applies it to the image snapshot without
+// executing anything in the container.
+func WriteUnpackTar(w io.Writer, archivePath, destDir string) error {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return crex.Wrap(ErrFileSystemOperation, err)
+	}
+	defer f.Close()
+
+	br := bufio.NewReader(f)
+
+	var src io.Reader = br
+	if magic, err := br.Peek(2); err == nil && magic[0] == 0x1f && magic[1] == 0x8b {
+		gz, err := gzip.NewReader(br)
+		if err != nil {
+			return crex.Wrap(ErrFileSystemOperation, err)
+		}
+		defer gz.Close()
+		src = gz
+	}
+
+	destClean := strings.Trim(destDir, "/")
+
+	tr := tar.NewReader(src)
+	tw := tar.NewWriter(w)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		name := strings.TrimPrefix(strings.TrimPrefix(hdr.Name, "./"), "/")
+		if name == "" {
+			continue
+		}
+		if destClean != "" {
+			hdr.Name = fmt.Sprintf("%s/%s", destClean, name)
+		} else {
+			hdr.Name = name
+		}
+
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}

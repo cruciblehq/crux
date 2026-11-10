@@ -643,7 +643,7 @@ func TestMultipleNamespacesAndResources(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		a := testArchive(t, map[string]string{"id": e.ns + "/" + e.res + "@" + e.ver})
+		a := testArchive(t, map[string]string{"id": fmt.Sprintf("%s/%s@%s", e.ns, e.res, e.ver)})
 		if _, err := c.Put(e.ns, e.res, e.ver, a); err != nil {
 			t.Fatal(err)
 		}

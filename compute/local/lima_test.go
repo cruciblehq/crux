@@ -6,6 +6,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -94,7 +95,7 @@ func TestLimaURL(t *testing.T) {
 
 func TestLimaEnv_ContainsLimaHome(t *testing.T) {
 	env := limaEnv()
-	want := "LIMA_HOME=" + vmDir()
+	want := fmt.Sprintf("LIMA_HOME=%s", vmDir())
 	if slices.Contains(env, want) {
 		return
 	}
@@ -136,7 +137,7 @@ func TestLimaEnv_ExcludesEmptyVars(t *testing.T) {
 	env := limaEnv()
 	for _, e := range env {
 		for _, key := range []string{"HOME", "USER", "PATH", "TMPDIR"} {
-			if strings.HasPrefix(e, key+"=") {
+			if strings.HasPrefix(e, fmt.Sprintf("%s=", key)) {
 				t.Errorf("limaEnv included %q when var was empty", e)
 			}
 		}

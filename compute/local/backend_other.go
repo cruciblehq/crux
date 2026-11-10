@@ -60,3 +60,7 @@ func copyArchive(_ context.Context, _ string, _ io.Reader) error {
 func containerdSocket(_ context.Context, _ string) (string, error) {
 	return "", errUnsupportedPlatform
 }
+
+func cruxdAddress(_ context.Context, _ string) (string, error) {
+	return "", errUnsupportedPlatform
+}

@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -20,6 +23,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/cruciblehq/crux/hub"
+	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/spec/reference"
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -29,14 +33,18 @@ const (
 	machineType      = "machine"         // Registry resource type for the machine image.
 	machineNamespace = "crucible"        // Registry namespace for the machine image.
 	machineName      = "machine-default" // Registry resource name for the machine image.
-	machineVersion   = "0.1.0"           // Pinned machine image version.
+	machineVersion   = "0.2.0"           // Pinned machine image version.
 	machineExtension = ".qcow2"          // Disk image file extension.
 )
 
-// Containerd readiness timeout and polling interval.
+// Host interface Lima forwards cruxd's port to.
+const cruxdHost = "127.0.0.1"
+
+// Machine readiness timeout and polling interval.
 const (
-	containerdReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd to start.
-	containerdPollInterval = 2 * time.Second  // Interval between containerd readiness polls.
+	machineReadyTimeout = 15 * time.Minute // Maximum time to wait for containerd and cruxd to start.
+	machinePollInterval = 2 * time.Second  // Interval between machine readiness polls.
+	cruxdHealthTimeout  = 5 * time.Second  // Maximum time to wait for one cruxd health check.
 )
 
 // Path to extracted contents of a cached registry resource version.
@@ -156,8 +164,8 @@ func deprovision(ctx context.Context, _ string) error {
 
 // Queries the current state of a compute instance.
 //
-// The state is determined by probing the Lima VM and the containerd socket
-// inside it, the returned state being the least-healthy of the two.
+// The state is determined by probing the Lima VM and the containerd and cruxd
+// services inside it, the returned state being the least healthy of them.
 func status(ctx context.Context, _ string) (State, error) {
 	rtState := hostStatus(ctx)
 
@@ -168,7 +176,7 @@ func status(ctx context.Context, _ string) (State, error) {
 		return StateStopped, nil
 	}
 
-	if !isContainerdReady(ctx) {
+	if !isMachineReady(ctx) {
 		return StateStopped, nil
 	}
 	return StateRunning, nil
@@ -195,19 +203,18 @@ func copyArchive(ctx context.Context, name string, r io.Reader) error {
 	return limaCopyArchive(ctx, name, r)
 }
 
-// Blocks until containerd is accepting connections.
+// Blocks until containerd and cruxd are accepting connections.
 //
-// Polls via gRPC Health.Check every [containerdPollInterval] seconds. Returns
-// an error if the context is cancelled or the [containerdReadyTimeout] deadline
-// is exceeded.
-func waitForContainerd(ctx context.Context) error {
-	deadline := time.Now().Add(containerdReadyTimeout)
+// Polls every [machinePollInterval]. Returns an error if the context is
+// cancelled or the [machineReadyTimeout] deadline is exceeded.
+func waitForMachine(ctx context.Context) error {
+	deadline := time.Now().Add(machineReadyTimeout)
 	for {
-		if isContainerdReady(ctx) {
+		if isMachineReady(ctx) {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return crex.SystemErrorf("local runtime not ready", "containerd did not become ready within %s", containerdReadyTimeout).
+			return crex.SystemErrorf("local runtime not ready", "containerd and cruxd did not become ready within %s", machineReadyTimeout).
 				Recovery("Recreate the local runtime and retry.").
 				Cause(ErrHostStart).
 				Err()
@@ -215,9 +222,40 @@ func waitForContainerd(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(containerdPollInterval):
+		case <-time.After(machinePollInterval):
 		}
 	}
+}
+
+// Whether containerd and cruxd are both ready to accept connections.
+func isMachineReady(ctx context.Context) bool {
+	return isContainerdReady(ctx) && isCruxdReady(ctx)
+}
+
+// Whether cruxd answers its health endpoint through the forwarded port.
+func isCruxdReady(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, cruxdHealthTimeout)
+	defer cancel()
+
+	addr, err := cruxdAddress(ctx, limaInstanceName)
+	if err != nil {
+		return false
+	}
+	u := url.URL{
+		Scheme: "http",
+		Host:   addr,
+		Path:   speccompute.EndpointHealth,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 // Whether containerd is ready to accept gRPC connections.
@@ -277,7 +315,7 @@ func createAndStartHost(ctx context.Context, imagePath string) error {
 			Err()
 	}
 
-	if err := waitForContainerd(ctx); err != nil {
+	if err := waitForMachine(ctx); err != nil {
 		return crex.Wrap(ErrHostCreate, err)
 	}
 
@@ -407,6 +445,11 @@ func hostExec(ctx context.Context, stdout, stderr io.Writer, command string, arg
 // Returns the containerd socket path for the named instance.
 func containerdSocket(_ context.Context, name string) (string, error) {
 	return containerdSocketPath(name), nil
+}
+
+// Returns the host address where cruxd is reachable for the named instance.
+func cruxdAddress(_ context.Context, _ string) (string, error) {
+	return net.JoinHostPort(cruxdHost, strconv.Itoa(speccompute.DefaultPort)), nil
 }
 
 // Queries the current state of the host VM.

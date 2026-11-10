@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/oci"
+	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -21,21 +21,21 @@ const commitAuthorExport = "export"
 // Drives the stage pipeline: imports base images and executes each step in
 // order. The final image is exported as an OCI tar archive.
 type Builder struct {
-	src     hub.Source      // Registry access for pulling base images.
-	workdir string          // Manifest directory.
-	client  *compute.Client // Live client connection to the container runtime on the build host.
+	src     hub.Source          // Registry access for pulling base images.
+	workdir string              // Manifest directory.
+	runtime speccompute.Runtime // Container runtime on the build host.
 }
 
 // Returns a new Builder.
 //
 // source provides registry access for pulling base images. workdir is the
 // directory containing the manifest and is the root for resolving copy step
-// sources. client is the open connection to the container runtime on the host.
-func NewBuilder(src hub.Source, workdir string, client *compute.Client) *Builder {
+// sources. runtime is the open container runtime on the build host.
+func NewBuilder(src hub.Source, workdir string, runtime speccompute.Runtime) *Builder {
 	return &Builder{
 		src:     src,
 		workdir: workdir,
-		client:  client,
+		runtime: runtime,
 	}
 }
 
@@ -45,8 +45,8 @@ func NewBuilder(src hub.Source, workdir string, client *compute.Client) *Builder
 // image produced by the last stage is exported to [file.ImageFile]. When set,
 // entrypoint becomes the image entrypoint. Returns the build directory.
 func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, output string) (string, error) {
-	stageImages := make(map[string]string)
-	var currentCtr *compute.Container
+	stageImages := make(map[string]speccompute.ImageRef)
+	var currentCtr speccompute.Container
 
 	for i := range recipe.Stages {
 		if currentCtr != nil {
@@ -73,7 +73,7 @@ func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint
 // but the recipe allows it to be set at the step level. This function applies
 // the final entrypoint as an image config update after all stages and steps
 // have been executed.
-func (b *Builder) setEntrypoint(ctx context.Context, ctr *compute.Container, entrypoint []string) error {
+func (b *Builder) setEntrypoint(ctx context.Context, ctr speccompute.Container, entrypoint []string) error {
 	if len(entrypoint) == 0 {
 		return nil
 	}
@@ -82,7 +82,9 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr *compute.Container, ent
 		return crex.Wrap(ErrBuild, err)
 	}
 	cfg.Entrypoint = entrypoint
-	ctr.Configure(cfg)
+	if err := ctr.Configure(ctx, cfg); err != nil {
+		return crex.Wrap(ErrBuild, err)
+	}
 	return nil
 }
 
@@ -90,7 +92,7 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr *compute.Container, ent
 //
 // The image is exported to [file.ImageFile] within the output directory.
 // Returns the output directory path on success.
-func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, output string) (string, error) {
+func (b *Builder) exportImage(ctx context.Context, ctr speccompute.Container, output string) (string, error) {
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
 	}
@@ -106,7 +108,7 @@ func (b *Builder) exportImage(ctx context.Context, ctr *compute.Container, outpu
 	if err != nil {
 		return "", crex.Wrap(ErrBuild, err)
 	}
-	if err := b.client.Export(ctx, ref, f); err != nil {
+	if err := b.runtime.Export(ctx, ref, f); err != nil {
 		return "", crex.Wrap(ErrBuild, err)
 	}
 

@@ -22,7 +22,7 @@ func TestNewBuilder(t *testing.T) {
 	if b.workdir != "/work" {
 		t.Errorf("workdir = %q, want /work", b.workdir)
 	}
-	if b.client != nil {
-		t.Errorf("client = %v, want nil", b.client)
+	if b.runtime != nil {
+		t.Errorf("runtime = %v, want nil", b.runtime)
 	}
 }

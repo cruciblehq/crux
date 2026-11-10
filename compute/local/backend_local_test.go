@@ -16,10 +16,10 @@ func TestMachineArch(t *testing.T) {
 	}
 }
 
-func TestWaitForContainerd_ContextCancelled(t *testing.T) {
+func TestWaitForMachine_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := waitForContainerd(ctx); !errors.Is(err, context.Canceled) {
+	if err := waitForMachine(ctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
 }

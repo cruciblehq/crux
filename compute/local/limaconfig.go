@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path"
 	"path/filepath"
 	"text/template"
 
 	"github.com/adrg/xdg"
+	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -28,6 +30,12 @@ const (
 
 	// containerd socket path inside the Lima VM (guest).
 	guestContainerdSocket = "/run/containerd/containerd.sock"
+
+	// Mount point of the machine resource directory inside the Lima VM.
+	guestMachineDir = "/mnt/crucible/machine"
+
+	// Prefix of the cruxd binary file names shipped with the machine resource.
+	cruxdBinaryPrefix = "cruxd-"
 )
 
 // Path to the containerd Unix socket for an instance.
@@ -55,17 +63,25 @@ var limaConfigTemplate *template.Template
 // defaultLimaDiskGiB). ImagePath is the local path to the machine disk
 // image, which is downloaded from the Crucible registry and cached locally if
 // not already cached. The guest and host socket paths are used to set up Lima
-// port forwarding so crux can dial containerd inside the VM.
+// port forwarding so crux can dial containerd inside the VM. The machine
+// directory holding the image also holds the cruxd binary; it is mounted
+// read-only into the VM so the provision script can install and start cruxd,
+// whose port is forwarded to the host.
 type limaConfig struct {
-	Arch        string // Lima architecture identifier ("aarch64" or "x86_64").
-	CPUs        int    // Number of virtual CPUs (defaultLimaCPUs).
-	Memory      string // Memory allocation (defaultLimaMemoryGiB with "GiB" suffix).
-	Disk        string // Disk size (defaultLimaDiskGiB with "GiB" suffix).
-	User        string // Host username (Lima creates a matching guest user).
-	UserUID     int    // Host user's numeric UID.
-	ImagePath   string // Local path to the cached machine disk image.
-	GuestSocket string // containerd socket path inside the VM (guest-local, under /run).
-	HostSocket  string // containerd socket path on the host (Lima forwards guest to host).
+	Arch            string // Lima architecture identifier ("aarch64" or "x86_64").
+	CPUs            int    // Number of virtual CPUs (defaultLimaCPUs).
+	Memory          string // Memory allocation (defaultLimaMemoryGiB with "GiB" suffix).
+	Disk            string // Disk size (defaultLimaDiskGiB with "GiB" suffix).
+	User            string // Host username (Lima creates a matching guest user).
+	UserUID         int    // Host user's numeric UID.
+	ImagePath       string // Local path to the cached machine disk image.
+	GuestSocket     string // containerd socket path inside the VM (guest-local, under /run).
+	HostSocket      string // containerd socket path on the host (Lima forwards guest to host).
+	MachineDir      string // Host directory of the extracted machine resource.
+	GuestMachineDir string // Mount point of MachineDir inside the VM.
+	CruxdBinary     string // Path inside the VM to the cruxd binary for the VM's architecture.
+	CruxdPort       int    // Port cruxd listens on, forwarded to the same port on the host.
+	CruxdHealthPath string // Path of cruxd's health endpoint, used by the readiness probe.
 }
 
 // Builds the Lima YAML configuration template data.
@@ -75,7 +91,8 @@ type limaConfig struct {
 // which Lima uses to create a matching guest user. The VM boots from the
 // machine disk image at imagePath. containerd runs as a system service inside
 // the VM; Lima's portForwards section tunnels the guest socket to the host so
-// crux can dial it. Does not touch the filesystem.
+// crux can dial it. cruxd is installed from the directory holding imagePath
+// and its port is forwarded to the host. Does not touch the filesystem.
 func buildLimaConfig(imagePath string) (limaConfig, error) {
 	u, err := user.Current()
 	if err != nil {
@@ -86,15 +103,20 @@ func buildLimaConfig(imagePath string) (limaConfig, error) {
 	}
 
 	data := limaConfig{
-		Arch:        limaArch(),
-		CPUs:        defaultLimaCPUs,
-		Memory:      fmt.Sprintf("%dGiB", defaultLimaMemoryGiB),
-		Disk:        fmt.Sprintf("%dGiB", defaultLimaDiskGiB),
-		User:        u.Username,
-		UserUID:     os.Getuid(),
-		ImagePath:   imagePath,
-		GuestSocket: guestContainerdSocket,
-		HostSocket:  containerdSocketPath(limaInstanceName),
+		Arch:            limaArch(),
+		CPUs:            defaultLimaCPUs,
+		Memory:          fmt.Sprintf("%dGiB", defaultLimaMemoryGiB),
+		Disk:            fmt.Sprintf("%dGiB", defaultLimaDiskGiB),
+		User:            u.Username,
+		UserUID:         os.Getuid(),
+		ImagePath:       imagePath,
+		GuestSocket:     guestContainerdSocket,
+		HostSocket:      containerdSocketPath(limaInstanceName),
+		MachineDir:      filepath.Dir(imagePath),
+		GuestMachineDir: guestMachineDir,
+		CruxdBinary:     path.Join(guestMachineDir, fmt.Sprintf("%s%s", cruxdBinaryPrefix, limaArch())),
+		CruxdPort:       speccompute.DefaultPort,
+		CruxdHealthPath: speccompute.EndpointHealth,
 	}
 
 	return data, nil

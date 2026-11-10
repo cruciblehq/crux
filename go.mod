@@ -3,7 +3,7 @@ module github.com/cruciblehq/crux
 go 1.25.1
 
 require (
-	github.com/cruciblehq/spec v0.0.0-20261022174714-928ec66688d9
+	github.com/cruciblehq/spec v0.0.0-20261110150459-f070dc17c32e
 	github.com/cruciblehq/utils-go v0.0.0-20260622164141-8aa115724f02
 )
 
@@ -38,6 +38,7 @@ require (
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
 	github.com/containerd/ttrpc v1.2.7 // indirect
 	github.com/containerd/typeurl/v2 v2.2.3 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/cli v27.5.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
@@ -60,6 +61,7 @@ require (
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626 // indirect
 	github.com/opencontainers/selinux v1.11.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/vbatts/tar-split v0.11.6 // indirect
@@ -77,6 +79,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 	tags.cncf.io/container-device-interface v0.8.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v0.8.0 // indirect

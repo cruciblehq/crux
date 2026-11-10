@@ -75,3 +75,8 @@ func (b *Backend) Run(ctx context.Context, name string, stdout, stderr io.Writer
 func (b *Backend) ContainerdSocket(ctx context.Context, name string) (string, error) {
 	return containerdSocket(ctx, name)
 }
+
+// Returns the host address where cruxd is reachable for the given instance.
+func (b *Backend) CruxdAddress(ctx context.Context, name string) (string, error) {
+	return cruxdAddress(ctx, name)
+}

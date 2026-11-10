@@ -165,15 +165,11 @@ func (s *computeLocalShim) Copy(ctx context.Context, id string, r io.Reader) err
 
 // Opens the container runtime on the instance.
 func (s *computeLocalShim) Connect(ctx context.Context, id string) (speccompute.Runtime, error) {
-	socketPath, err := s.local.ContainerdSocket(ctx, id)
+	addr, err := s.local.CruxdAddress(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	c, err := newClient(socketPath, localInstanceName)
-	if err != nil {
-		return nil, err
-	}
-	return runtimeAdapter{c}, nil
+	return Dial(ctx, addr)
 }
 
 // Converts a [local.State] value to a [State].

@@ -81,7 +81,7 @@ func resolveEntryPoint(args es.OnResolveArgs) (es.OnResolveResult, error) {
 // react, react-reconciler, @cruciblehq/ui, and @cruciblehq/ui-web.
 func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolveResult, error) {
 	for _, e := range options.External {
-		if args.Path == e || strings.HasPrefix(args.Path, e+"/") {
+		if args.Path == e || strings.HasPrefix(args.Path, fmt.Sprintf("%s/", e)) {
 			return es.OnResolveResult{
 				Path:        args.Path,
 				External:    true,
@@ -102,7 +102,7 @@ func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolve
 	}
 
 	if info, err := os.Lstat(path); err != nil {
-		jsPath := path + ".js"
+		jsPath := fmt.Sprintf("%s.js", path)
 		if _, err := os.Lstat(jsPath); err == nil {
 			path = jsPath
 		}

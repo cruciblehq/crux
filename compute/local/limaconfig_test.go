@@ -9,6 +9,8 @@ import (
 	"os/user"
 	"strings"
 	"testing"
+
+	speccompute "github.com/cruciblehq/spec/compute"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -91,5 +93,20 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	}
 	if want := containerdSocketPath(limaInstanceName); cfg.HostSocket != want {
 		t.Errorf("HostSocket: got %q, want %q", cfg.HostSocket, want)
+	}
+	if cfg.MachineDir != "/tmp" {
+		t.Errorf("MachineDir: got %q, want %q", cfg.MachineDir, "/tmp")
+	}
+	if cfg.GuestMachineDir != guestMachineDir {
+		t.Errorf("GuestMachineDir: got %q, want %q", cfg.GuestMachineDir, guestMachineDir)
+	}
+	if want := fmt.Sprintf("%s/%s%s", guestMachineDir, cruxdBinaryPrefix, limaArch()); cfg.CruxdBinary != want {
+		t.Errorf("CruxdBinary: got %q, want %q", cfg.CruxdBinary, want)
+	}
+	if cfg.CruxdPort != speccompute.DefaultPort {
+		t.Errorf("CruxdPort: got %d, want %d", cfg.CruxdPort, speccompute.DefaultPort)
+	}
+	if cfg.CruxdHealthPath != speccompute.EndpointHealth {
+		t.Errorf("CruxdHealthPath: got %q, want %q", cfg.CruxdHealthPath, speccompute.EndpointHealth)
 	}
 }

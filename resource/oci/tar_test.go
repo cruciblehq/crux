@@ -3,8 +3,10 @@ package oci
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -65,7 +67,7 @@ func TestWriteScratchTar(t *testing.T) {
 	}
 
 	mfstDigest := index.Manifests[0].Digest
-	mfstBytes, ok := entries["blobs/sha256/"+mfstDigest.Hex()]
+	mfstBytes, ok := entries[fmt.Sprintf("blobs/sha256/%s", mfstDigest.Hex())]
 	if !ok {
 		t.Fatalf("manifest blob %s not found", mfstDigest)
 	}
@@ -80,7 +82,7 @@ func TestWriteScratchTar(t *testing.T) {
 	if len(mfst.Layers) != 0 {
 		t.Fatalf("scratch image must have no layers, got %d", len(mfst.Layers))
 	}
-	if _, ok := entries["blobs/sha256/"+mfst.Config.Digest.Hex()]; !ok {
+	if _, ok := entries[fmt.Sprintf("blobs/sha256/%s", mfst.Config.Digest.Hex())]; !ok {
 		t.Fatalf("config blob %s not found", mfst.Config.Digest)
 	}
 }
@@ -189,4 +191,136 @@ func TestRewriteTarPathsSingleFile(t *testing.T) {
 	if _, ok := got["disk/root.img"]; !ok {
 		t.Fatalf("renamed entry missing, got %v", got)
 	}
+}
+
+// Reads a tar stream and returns its headers keyed by name.
+func readTarHeaders(t *testing.T, data []byte) map[string]*tar.Header {
+	t.Helper()
+	headers := make(map[string]*tar.Header)
+	tr := tar.NewReader(bytes.NewReader(data))
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("read tar: %v", err)
+		}
+		headers[hdr.Name] = hdr
+	}
+	return headers
+}
+
+// Writes a gzip-compressed tar of the given headers to a temp file and returns its path.
+func writeGzTarFile(t *testing.T, headers []*tar.Header, bodies map[string]string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "rootfs.tar.gz")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	for _, h := range headers {
+		if err := tw.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+		if b, ok := bodies[h.Name]; ok {
+			if _, err := tw.Write([]byte(b)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestWriteUnpackTarRootGzip(t *testing.T) {
+	path := writeGzTarFile(t, []*tar.Header{
+		{Name: "bin/sh", Typeflag: tar.TypeReg, Mode: 0o755, Size: 2},
+		{Name: "bin/bash", Typeflag: tar.TypeSymlink, Linkname: "sh", Mode: 0o777},
+		{Name: "./etc/hostname", Typeflag: tar.TypeReg, Mode: 0o644, Size: 2},
+	}, map[string]string{"bin/sh": "#!", "./etc/hostname": "hi"})
+
+	var buf bytes.Buffer
+	if err := WriteUnpackTar(&buf, path, "/"); err != nil {
+		t.Fatalf("WriteUnpackTar: %v", err)
+	}
+
+	headers := readTarHeaders(t, buf.Bytes())
+
+	// At the root, entries are emitted unprefixed and "./" is stripped.
+	if _, ok := headers["bin/sh"]; !ok {
+		t.Fatalf("bin/sh missing, got %v keys", keysOf(headers))
+	}
+	if _, ok := headers["etc/hostname"]; !ok {
+		t.Fatalf("etc/hostname missing, got %v keys", keysOf(headers))
+	}
+	// Symlink header and its target are preserved.
+	sym, ok := headers["bin/bash"]
+	if !ok {
+		t.Fatalf("bin/bash symlink missing")
+	}
+	if sym.Typeflag != tar.TypeSymlink || sym.Linkname != "sh" {
+		t.Fatalf("symlink not preserved: type=%d link=%q", sym.Typeflag, sym.Linkname)
+	}
+}
+
+func TestWriteUnpackTarDestPrefix(t *testing.T) {
+	path := writeGzTarFile(t, []*tar.Header{
+		{Name: "lib/data.txt", Typeflag: tar.TypeReg, Mode: 0o644, Size: 2},
+	}, map[string]string{"lib/data.txt": "ok"})
+
+	var buf bytes.Buffer
+	if err := WriteUnpackTar(&buf, path, "/opt/app"); err != nil {
+		t.Fatalf("WriteUnpackTar: %v", err)
+	}
+
+	entries := readTarEntries(t, buf.Bytes())
+	if got := entries["opt/app/lib/data.txt"]; string(got) != "ok" {
+		t.Fatalf("opt/app/lib/data.txt = %q, want %q", got, "ok")
+	}
+}
+
+func TestWriteUnpackTarUncompressed(t *testing.T) {
+	// A plain (non-gzip) tar must also be accepted.
+	path := filepath.Join(t.TempDir(), "rootfs.tar")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tw := tar.NewWriter(f)
+	if err := tw.WriteHeader(&tar.Header{Name: "usr/bin/tool", Typeflag: tar.TypeReg, Mode: 0o755, Size: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	tw.Close()
+	f.Close()
+
+	var buf bytes.Buffer
+	if err := WriteUnpackTar(&buf, path, "/"); err != nil {
+		t.Fatalf("WriteUnpackTar: %v", err)
+	}
+	entries := readTarEntries(t, buf.Bytes())
+	if got := entries["usr/bin/tool"]; string(got) != "x" {
+		t.Fatalf("usr/bin/tool = %q, want %q", got, "x")
+	}
+}
+
+// Returns the sorted keys of a header map for diagnostics.
+func keysOf(m map[string]*tar.Header) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

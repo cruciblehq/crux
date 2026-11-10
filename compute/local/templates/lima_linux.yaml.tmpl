@@ -40,6 +40,13 @@ containerd:
 # introducing an external host-side dependency.
 mountType: 9p
 
+# The machine resource directory ships the cruxd binary next to the disk image.
+# It is mounted read-only so the provision script can install cruxd from it.
+mounts:
+  - location: "{{ .MachineDir }}"
+    mountPoint: "{{ .GuestMachineDir }}"
+    writable: false
+
 # On Darwin, we write Lima's UID into containerd's config.toml so the socket is
 # owned by the Lima user directly and group membership is not required. On Linux
 # we instead add the Lima user to the containerd group, transfer ownership of
@@ -63,6 +70,47 @@ provision:
       chmod 775 /run/containerd
       rc-service containerd start
 
+  # Installs cruxd from the mounted machine resource and runs it as a service.
+  # The binary is reinstalled and the service restarted on every boot, so the
+  # VM always runs the cruxd shipped with its machine resource.
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -eu
+      install -m 0755 "{{ .CruxdBinary }}" /usr/local/bin/cruxd
+      if command -v systemctl >/dev/null 2>&1; then
+        cat > /etc/systemd/system/cruxd.service <<'EOF'
+      [Unit]
+      Description=Crucible machine agent
+      After=containerd.service
+      Requires=containerd.service
+
+      [Service]
+      ExecStart=/usr/local/bin/cruxd
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+        systemctl daemon-reload
+        systemctl enable cruxd
+        systemctl restart cruxd
+      elif command -v rc-service >/dev/null 2>&1; then
+        cat > /etc/init.d/cruxd <<'EOF'
+      #!/sbin/openrc-run
+      description="Crucible machine agent"
+      command="/usr/local/bin/cruxd"
+      command_background=true
+      pidfile="/run/cruxd.pid"
+      depend() {
+        need containerd
+      }
+      EOF
+        chmod 0755 /etc/init.d/cruxd
+        rc-update add cruxd default
+        rc-service cruxd restart
+      fi
+
 # Lima polls these after provisioning and marks the instance ready only once
 # all probes pass. This probe checks that containerd is running and the socket
 # is available for Lima to forward to the host.
@@ -73,10 +121,20 @@ probes:
       #!/bin/sh
       test -S /run/containerd/containerd.sock
     hint: containerd is not running
+  - mode: readiness
+    description: cruxd to be running
+    script: |
+      #!/bin/sh
+      wget -q -O /dev/null "http://127.0.0.1:{{ .CruxdPort }}{{ .CruxdHealthPath }}"
+    hint: cruxd is not running
 
 # Forward the containerd Unix socket from guest to host. 9p makes the guest
 # filesystem visible on the host but does not bridge socket connections; Lima
-# tunnels the connection over SSH so the host can dial its local path.
+# tunnels the connection over SSH so the host can dial its local path. cruxd's
+# port is forwarded to the same port on the host loopback interface.
 portForwards:
   - guestSocket: "{{ .GuestSocket }}"
     hostSocket: "{{ .HostSocket }}"
+  - guestPort: {{ .CruxdPort }}
+    hostIP: "127.0.0.1"
+    hostPort: {{ .CruxdPort }}

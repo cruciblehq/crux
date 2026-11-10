@@ -32,7 +32,7 @@ func (s *networkLocalShim) Create(ctx context.Context, opts NetworkOptions) (str
 
 	cidr := opts.Subnet
 	if cidr == "" {
-		return "", crex.New("subnet is required")
+		return "", crex.Newf(ErrNetwork, "subnet is required")
 	}
 
 	_, subnet, err := net.ParseCIDR(cidr)

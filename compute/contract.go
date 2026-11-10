@@ -6,8 +6,7 @@ import (
 	speccompute "github.com/cruciblehq/spec/compute"
 )
 
-// Compile-time proof that the direct containerd implementation satisfies the
-// shared spec contract.
+// Make sure that the direct containerd implementation satisfies the spec.
 //
 // [Container] satisfies [speccompute.Container] directly. [Client] satisfies
 // [speccompute.Runtime] except that its Load returns the concrete [Container];
