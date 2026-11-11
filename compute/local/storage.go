@@ -52,11 +52,6 @@ func ListVolumes(root string) ([]string, error) {
 	return ids, nil
 }
 
-// Returns the host-local path to a volume directory.
-func VolumePath(root, id string) string {
-	return filepath.Join(root, VolumesDir, id)
-}
-
 // Resolves a machine image path, removing the staged copy if it resides in
 // the given temp directory.
 func RemoveImageIfStaged(ctx context.Context, id, tempDir string) error {

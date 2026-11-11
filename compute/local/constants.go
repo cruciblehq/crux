@@ -38,7 +38,6 @@ const (
 	execSubcommand  = "exec"
 	linkSubcommand  = "link"
 	addrSubcommand  = "addr"
-	routeSubcommand = "route"
 )
 
 // nftables table, chain, and family names.

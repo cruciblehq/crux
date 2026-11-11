@@ -14,7 +14,6 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		CPUs:            2,
 		Memory:          "2GiB",
 		Disk:            "10GiB",
-		User:            "testuser",
 		ImagePath:       "/tmp/vm/machine.qcow2",
 		MachineDir:      "/tmp/vm",
 		GuestMachineDir: "/mnt/crucible/machine",

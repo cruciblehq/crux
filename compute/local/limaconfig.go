@@ -5,7 +5,6 @@ package local
 import (
 	"fmt"
 	"os"
-	"os/user"
 	"path"
 	"path/filepath"
 	"text/template"
@@ -61,8 +60,6 @@ type limaConfig struct {
 	CPUs            int    // Number of virtual CPUs (defaultLimaCPUs).
 	Memory          string // Memory allocation (defaultLimaMemoryGiB with "GiB" suffix).
 	Disk            string // Disk size (defaultLimaDiskGiB with "GiB" suffix).
-	User            string // Host username (Lima creates a matching guest user).
-	UserUID         int    // Host user's numeric UID.
 	ImagePath       string // Local path to the cached machine disk image.
 	MachineDir      string // Host directory of the extracted machine resource.
 	GuestMachineDir string // Mount point of MachineDir inside the VM.
@@ -74,27 +71,16 @@ type limaConfig struct {
 // Builds the Lima YAML configuration template data.
 //
 // Targets the host's native architecture and uses defaults for CPU, memory,
-// and disk allocation. The user is set to the current host username and UID,
-// which Lima uses to create a matching guest user. The VM boots from the
-// machine disk image at imagePath. containerd runs as a system service inside
-// the VM. cruxd is installed from the directory holding imagePath and its port
-// is forwarded to the host. Does not touch the filesystem.
-func buildLimaConfig(imagePath string) (limaConfig, error) {
-	u, err := user.Current()
-	if err != nil {
-		return limaConfig{}, crex.SystemError("cannot configure local environment", "failed to determine the current host user").
-			Recovery("If the problem persists, report it to the Crucible team.").
-			Cause(crex.Wrap(ErrHostConfig, err)).
-			Err()
-	}
-
-	data := limaConfig{
+// and disk allocation. The VM boots from the machine disk image at imagePath.
+// containerd runs as a system service inside the VM. cruxd is installed from
+// the directory holding imagePath and its port is forwarded to the host. Does
+// not touch the filesystem.
+func buildLimaConfig(imagePath string) limaConfig {
+	return limaConfig{
 		Arch:            limaArch(),
 		CPUs:            defaultLimaCPUs,
 		Memory:          fmt.Sprintf("%dGiB", defaultLimaMemoryGiB),
 		Disk:            fmt.Sprintf("%dGiB", defaultLimaDiskGiB),
-		User:            u.Username,
-		UserUID:         os.Getuid(),
 		ImagePath:       imagePath,
 		MachineDir:      filepath.Dir(imagePath),
 		GuestMachineDir: guestMachineDir,
@@ -102,8 +88,6 @@ func buildLimaConfig(imagePath string) (limaConfig, error) {
 		CruxdPort:       speccompute.DefaultPort,
 		CruxdHealthPath: speccompute.EndpointHealth,
 	}
-
-	return data, nil
 }
 
 // Writes the Lima YAML configuration file and returns its path.
@@ -115,10 +99,7 @@ func buildLimaConfig(imagePath string) (limaConfig, error) {
 func generateLimaConfig(imagePath string) (string, error) {
 	const description = "cannot configure local environment"
 
-	data, err := buildLimaConfig(imagePath)
-	if err != nil {
-		return "", err
-	}
+	data := buildLimaConfig(imagePath)
 
 	configPath := limaConfigPath()
 	if err := os.MkdirAll(filepath.Dir(configPath), file.DefaultDirMode); err != nil {

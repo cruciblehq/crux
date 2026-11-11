@@ -5,8 +5,6 @@ package local
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"os/user"
 	"strings"
 	"testing"
 
@@ -19,7 +17,6 @@ func TestConfigTemplate_ImagePath(t *testing.T) {
 		CPUs:      2,
 		Memory:    "2GiB",
 		Disk:      "10GiB",
-		User:      "testuser",
 		ImagePath: "/tmp/vm/machine.qcow2",
 	}
 
@@ -40,7 +37,6 @@ func TestConfigTemplate_x86(t *testing.T) {
 		CPUs:      4,
 		Memory:    "4GiB",
 		Disk:      "20GiB",
-		User:      "testuser",
 		ImagePath: "/tmp/vm/machine.qcow2",
 	}
 
@@ -56,12 +52,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 }
 
 func TestBuildLimaConfig_Defaults(t *testing.T) {
-	cfg, err := buildLimaConfig("/tmp/test.qcow2")
-	if err != nil {
-		t.Fatalf("buildLimaConfig: %v", err)
-	}
-
-	u, _ := user.Current()
+	cfg := buildLimaConfig("/tmp/test.qcow2")
 
 	if cfg.Arch != limaArch() {
 		t.Errorf("Arch: got %q, want %q", cfg.Arch, limaArch())
@@ -74,12 +65,6 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	}
 	if want := fmt.Sprintf("%dGiB", defaultLimaDiskGiB); cfg.Disk != want {
 		t.Errorf("Disk: got %q, want %q", cfg.Disk, want)
-	}
-	if cfg.User != u.Username {
-		t.Errorf("User: got %q, want %q", cfg.User, u.Username)
-	}
-	if cfg.UserUID != os.Getuid() {
-		t.Errorf("UserUID: got %d, want %d", cfg.UserUID, os.Getuid())
 	}
 	if cfg.ImagePath != "/tmp/test.qcow2" {
 		t.Errorf("ImagePath: got %q, want %q", cfg.ImagePath, "/tmp/test.qcow2")

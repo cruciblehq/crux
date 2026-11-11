@@ -40,123 +40,28 @@ mounts:
     mountPoint: "{{ .GuestMachineDir }}"
     writable: false
 
-# This script runs inside the VM on every boot, before Lima marks the instance
-# as ready. This is where the containerd socket is configured so the Lima user
-# can reach it through SSH port-forwarding. The script creates the containerd
-# group to obtain its GID. However, Lima's SSH connection is established very
-# early (before this script runs), and the user groups for an SSH session are
-# fixed at login time. Even if the Lima user was added to the containerd group
-# later on, the SSH session wouldn't see it because changing group membership
-# has no effect on an session that has already been established. To work around
-# this, we write containerd's config.toml with a [grpc] section that sets uid =
-# <lima-uid>, making the socket owned by that UID. Since the SSH connection is
-# always established as that user, it is able to connect regardless of group
-# membership. However, on the first boot, containerd may have already started
-# and created the socket before config.toml existed, which means the socket may
-# be owned by root already. As a safety net, we check if the socket exists and
-# is owned by root; if so, we restart containerd so it picks up the new config
-# and recreates the socket with the correct owner. Subquent boots are ordered
-# with rc_after="tiny-cloud-main" to make sure the config is in place before
-# containerd starts, so the race condition doesn't occur again after the first
-# boot. Furthermore, we set the socket directory (/run/containerd) to mode 0711
-# so the Lima user can traverse to the socket even if the directory is owned by
-# root. With this setup, Lima can connect to the containerd socket through SSH
-# port-forwarding without needing to rely on group membership or restarting the
-# SSH session after group changes. We also take UserUID as a template parameter
-# to address another race condition: on the first boot, the provision script may
-# run before cloud-init has created the Lima user. By baking the Lima user UID
-# into the template at render time on the host, we avoid a lookup for the Lima
-# user in the guest at provision time, making the script safe to run even if the
-# user doesn't exist yet. We also pin the CRI plugin's sandbox_image to a known
-# value to avoid depending on the image's default and prevent breakage if the
-# default changes. This is defensive, since we talk to containerd through the
-# socket and don't actually use the plugin. However, this plugin is loaded by
-# default and logs error messages if the sandbox image is not pinned.
+# Installs containerd when the base image does not include it, then enables and
+# starts it under whichever init system the image uses. This runs inside the VM
+# on every boot, before Lima marks the instance as ready.
 provision:
   - mode: system
     script: |
       #!/bin/sh
-
-      # Create containerd group (idempotent) and derive its GID.
-      if ! getent group containerd >/dev/null 2>&1; then
-        if command -v addgroup >/dev/null 2>&1; then
-          addgroup containerd >/dev/null 2>&1 || true
-        elif command -v groupadd >/dev/null 2>&1; then
-          groupadd containerd >/dev/null 2>&1 || true
-        fi
-      fi
-      CONTAINERD_GID=$(getent group containerd | cut -d: -f3)
-      CONTAINERD_GID="${CONTAINERD_GID:-1000}"
-
-      # Install containerd when the base image does not include it.
+      set -eu
       if ! command -v containerd >/dev/null 2>&1; then
-        if command -v apk >/dev/null 2>&1; then
-          apk add --no-cache containerd >/dev/null 2>&1 || true
-        elif command -v apt-get >/dev/null 2>&1; then
+        if command -v apt-get >/dev/null 2>&1; then
           export DEBIAN_FRONTEND=noninteractive
-          apt-get update >/dev/null 2>&1 || true
-          apt-get install -y containerd >/dev/null 2>&1 || true
+          apt-get update
+          apt-get install -y containerd
+        elif command -v apk >/dev/null 2>&1; then
+          apk add --no-cache containerd
         fi
       fi
-
-      # The Lima user UID is baked in at template-render time on the host so we
-      # don't need to look it up in the guest. This makes the script safe to run
-      # even if the Lima user doesn't exist yet in the guest /etc/passwd when 
-      # first runs (e.g. before cloud-init has created the user).
-      LIMA_UID={{ .UserUID }}
-
-      # Write containerd config atomically. Using a temporary file in the same
-      # directory as the destination keeps the rename on one filesystem so mv
-      # is an atomic rename. printf per-line avoids heredoc indentation issues
-      # inside YAML.
-      mkdir -p /etc/containerd
-      TMPFILE=$(mktemp /etc/containerd/config.toml.XXXXXX)
-      {
-        printf 'version = 2\n\n'
-        printf '[grpc]\n'
-        printf '  address = "/run/containerd/containerd.sock"\n'
-        printf '  uid = %s\n' "${LIMA_UID}"
-        printf '  gid = %s\n\n' "${CONTAINERD_GID}"
-        printf '[plugins."io.containerd.grpc.v1.cri"]\n'
-        printf '  sandbox_image = "registry.k8s.io/pause:3.10"\n'
-      } > "${TMPFILE}"
-      mv "${TMPFILE}" /etc/containerd/config.toml
-
-      # With mode 0711 the Lima user can traverse to the socket path even if the
-      # directory is owned by root. connect() only requires the socket itself to
-      # be writable by the caller, which it will be since containerd creates it
-      # owned by LIMA_UID with mode 0660.
-      mkdir -p /run/containerd
-      chmod 711 /run/containerd
-
-      # OpenRC images need containerd ordered after tiny-cloud-main so this
-      # provisioning script can render config before first service start.
-      if [ -f /etc/conf.d/containerd ] && ! grep -q 'tiny-cloud-main' /etc/conf.d/containerd 2>/dev/null; then
-        printf 'rc_after="tiny-cloud-main"\n' >> /etc/conf.d/containerd
-      fi
-
-      # Ensure containerd is enabled and started for whichever init system the
-      # image uses.
       if command -v systemctl >/dev/null 2>&1; then
-        systemctl daemon-reload >/dev/null 2>&1 || true
-        systemctl enable containerd >/dev/null 2>&1 || true
-        systemctl start containerd >/dev/null 2>&1 || true
-      elif command -v rc-update >/dev/null 2>&1; then
-        rc-update add containerd default >/dev/null 2>&1 || true
-        rc-service containerd start >/dev/null 2>&1 || true
-      fi
-
-      # If containerd created the socket with the wrong owner, restart it so it
-      # re-reads config.toml and recreates the socket with the expected owner.
-      if test -S /run/containerd/containerd.sock; then
-        SOCK_UID=$(stat -c '%u' /run/containerd/containerd.sock 2>/dev/null || echo 0)
-        if [ "${SOCK_UID}" != "${LIMA_UID}" ]; then
-          if command -v systemctl >/dev/null 2>&1; then
-            systemctl restart containerd >/dev/null 2>&1 || true
-          elif command -v rc-service >/dev/null 2>&1; then
-            rc-service containerd restart >/dev/null 2>&1 || true
-          fi
-        fi
+        systemctl enable --now containerd
+      elif command -v rc-service >/dev/null 2>&1; then
+        rc-update add containerd default
+        rc-service containerd start
       fi
 
   # Installs cruxd from the mounted machine resource and runs it as a service.
@@ -201,15 +106,8 @@ provision:
       fi
 
 # Lima polls these after provisioning and marks the instance ready only once
-# all probes pass. This probe checks that containerd is running and the socket
-# is available for Lima to forward to the host.
+# all probes pass. cruxd's health check also covers containerd.
 probes:
-  - mode: readiness
-    description: containerd to be running
-    script: |
-      #!/bin/sh
-      test -S /run/containerd/containerd.sock
-    hint: containerd is not running
   - mode: readiness
     description: cruxd to be running
     script: |

@@ -72,14 +72,6 @@ func AttachUnit(ctx context.Context, exec ExecFunc, unitID, bridge, veth, peer s
 	return nil
 }
 
-// Assigns an IP address and default route inside a unit's network namespace.
-func ConfigureUnitAddress(ctx context.Context, exec ExecFunc, unitID, peer string, ip net.IP, bits int, gateway net.IP) error {
-	if err := nsRun(ctx, exec, unitID, ipCommand, addrSubcommand, "add", fmt.Sprintf("%s/%d", ip, bits), "dev", peer); err != nil {
-		return err
-	}
-	return nsRun(ctx, exec, unitID, ipCommand, routeSubcommand, "add", "default", "via", gateway.String())
-}
-
 // Installs a deny-all nftables baseline inside a unit's network namespace.
 //
 // Creates an inet filter table with input and output chains set to policy drop.
@@ -97,11 +89,6 @@ func InstallBaseline(ctx context.Context, exec ExecFunc, unitID string) {
 // Removing the host-side veth also removes its peer inside the namespace.
 func DetachUnit(ctx context.Context, exec ExecFunc, veth string) error {
 	return run(ctx, exec, ipCommand, linkSubcommand, "delete", veth)
-}
-
-// Removes a unit's network namespace from the host.
-func RemoveNamespace(ctx context.Context, exec ExecFunc, unitID string) error {
-	return run(ctx, exec, ipCommand, netnsSubcommand, "delete", unitID)
 }
 
 // Replaces all nftables rules inside a unit's network namespace.
