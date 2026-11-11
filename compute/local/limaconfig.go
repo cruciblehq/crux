@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/cruciblehq/crux/internal/dirs"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -31,11 +32,14 @@ const (
 
 	// Prefix of the cruxd binary file names shipped with the machine resource.
 	cruxdBinaryPrefix = "cruxd-"
+
+	// Lima configuration file in the VM directory.
+	limaConfigFile = "lima.yaml"
 )
 
 // Path to the Lima YAML configuration file for the shared crux VM.
 func limaConfigPath() string {
-	return filepath.Join(vmDir(), "lima.yaml")
+	return filepath.Join(dirs.VM(), limaConfigFile)
 }
 
 // Lima YAML configuration template.

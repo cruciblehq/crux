@@ -3,22 +3,22 @@ package compute
 import (
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/adrg/xdg"
 	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/utils-go/file"
+	"github.com/cruciblehq/crux/internal/dirs"
 )
 
 func useTempDir(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("TMPDIR", dir)
-	return filepath.Join(dir, fmt.Sprintf("crux-%d", os.Getuid()))
+	t.Cleanup(xdg.Reload)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	xdg.Reload()
+	return dirs.Temp()
 }
 
 func TestDefaultLocalInstanceID(t *testing.T) {
@@ -52,20 +52,6 @@ func TestNewBackendLocal(t *testing.T) {
 	}
 }
 
-func TestTempDir(t *testing.T) {
-	want := useTempDir(t)
-	if got := tempDir(); got != want {
-		t.Fatalf("tempDir() = %q, want %q", got, want)
-	}
-}
-
-func TestLocalDataDir(t *testing.T) {
-	want := filepath.Join(useTempDir(t), "data")
-	if got := localDataDir(); got != want {
-		t.Fatalf("localDataDir() = %q, want %q", got, want)
-	}
-}
-
 func TestCreateTemp(t *testing.T) {
 	dir := useTempDir(t)
 	f, err := createTemp("x-*")
@@ -82,50 +68,6 @@ func TestCreateTemp(t *testing.T) {
 	}
 	if info.Mode().Perm() != tempDirMode {
 		t.Errorf("temp dir mode = %v, want %v", info.Mode().Perm(), tempDirMode)
-	}
-}
-
-func TestVerifyTempDirPermissionsTightens(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "loose")
-	if err := os.Mkdir(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyTempDirPermissions(dir); err != nil {
-		t.Fatalf("verifyTempDirPermissions() error = %v", err)
-	}
-	info, err := os.Stat(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != tempDirMode {
-		t.Errorf("mode = %v, want %v", info.Mode().Perm(), tempDirMode)
-	}
-}
-
-func TestVerifyTempDirPermissionsSymlink(t *testing.T) {
-	target := t.TempDir()
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyTempDirPermissions(link); !errors.Is(err, file.ErrUnsafeTempDir) {
-		t.Fatalf("verifyTempDirPermissions() error = %v, want ErrUnsafeTempDir", err)
-	}
-}
-
-func TestVerifyTempDirPermissionsNotDirectory(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyTempDirPermissions(path); !errors.Is(err, file.ErrUnsafeTempDir) {
-		t.Fatalf("verifyTempDirPermissions() error = %v, want ErrUnsafeTempDir", err)
-	}
-}
-
-func TestVerifyTempDirPermissionsMissing(t *testing.T) {
-	if err := verifyTempDirPermissions(filepath.Join(t.TempDir(), "missing")); err == nil {
-		t.Fatal("verifyTempDirPermissions() error = nil, want an error")
 	}
 }
 

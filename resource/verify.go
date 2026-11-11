@@ -2,11 +2,9 @@ package resource
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/file"
 )
 
 // Verifies that a build directory contains the expected artifacts.
@@ -17,13 +15,13 @@ import (
 func Verify(buildDir string, t manifest.ResourceType) error {
 	switch t {
 	case manifest.TypeRuntime:
-		return verify(buildDir, t, file.ImageFile)
+		return verify(buildDir, t, manifest.ImagePath(buildDir))
 	case manifest.TypeService:
-		return verify(buildDir, t, file.ImageFile)
+		return verify(buildDir, t, manifest.ImagePath(buildDir))
 	case manifest.TypeWidget:
-		return verify(buildDir, t, file.WidgetMainFile)
+		return verify(buildDir, t, manifest.WidgetMainPath(buildDir))
 	case manifest.TypeBlueprint:
-		return verify(buildDir, t, file.PlanFile)
+		return verify(buildDir, t, manifest.PlanPath(buildDir))
 	default:
 		return crex.Newf(ErrUnsupportedType, "resource type %q is not supported", t)
 	}
@@ -32,19 +30,17 @@ func Verify(buildDir string, t manifest.ResourceType) error {
 // Verifies that a build directory contains the expected artifacts.
 //
 // Every resource type must have a valid manifest matching the expected type.
-// When artifactFile is non-empty, verifies that the file also exists in the
-// build directory.
-func verify(buildDir string, resourceType manifest.ResourceType, artifactFile string) error {
+// When artifact is non-empty, verifies that the file at that path also exists.
+func verify(buildDir string, resourceType manifest.ResourceType, artifact string) error {
 	if _, err := verifyBuildDir(buildDir, resourceType); err != nil {
 		return err
 	}
 
-	if artifactFile == "" {
+	if artifact == "" {
 		return nil
 	}
 
-	path := filepath.Join(buildDir, artifactFile)
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(artifact); err != nil {
 		return crex.Wrap(ErrBuildOutputNotFound, err)
 	}
 
@@ -57,7 +53,7 @@ func verify(buildDir string, resourceType manifest.ResourceType, artifactFile st
 // right resource type before checking type-specific artifacts. Returns the
 // manifest if its type matches the expected type.
 func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.Manifest, error) {
-	manifestPath := file.Manifest(buildDir)
+	manifestPath := manifest.Path(buildDir)
 	if _, err := os.Stat(manifestPath); err != nil {
 		return nil, crex.Wrap(ErrManifestNotFound, err)
 	}

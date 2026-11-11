@@ -12,7 +12,6 @@ import (
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/file"
 )
 
 // Represents the 'crux push' command.
@@ -48,7 +47,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := resource.Push(ctx, src, *man, file.Package(RootCmd.Context)); err != nil {
+	if err := resource.Push(ctx, src, *man, manifest.PackagePath(RootCmd.Context)); err != nil {
 		const description = "cannot push package"
 		switch {
 		case errors.Is(err, registry.ErrVersionExists):
@@ -65,7 +64,7 @@ func (c *PushCmd) Run(ctx context.Context) error {
 				Reclassify(err)
 		case errors.Is(err, registry.ErrFileSystemOperation):
 			return crex.SystemError(description, "the package archive could not be read from disk").
-				Recoveryf("Run 'crux pack' to create %s, then try again.", file.Package(RootCmd.Context)).
+				Recoveryf("Run 'crux pack' to create %s, then try again.", manifest.PackagePath(RootCmd.Context)).
 				Reclassify(err)
 		case errors.Is(err, registry.ErrRegistryOperation):
 			return crex.SystemError(description, "the registry could not accept the package upload").

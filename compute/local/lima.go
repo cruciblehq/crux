@@ -17,33 +17,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adrg/xdg"
+	"github.com/cruciblehq/crux/internal/dirs"
 	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Default client name used for local runtime paths.
-const defaultClientName = "crux"
-
 // Lima configuration.
 const (
-	limaVersion      = "2.0.3" // Lima version to use for the crux VM.
-	limaInstanceName = "crux"  // Lima instance name used for the crux VM.
+	limaVersion      = "2.0.3"   // Lima version to use for the crux VM.
+	limaInstanceName = "crux"    // Lima instance name used for the crux VM.
+	limaBinDir       = "bin"     // Subdirectory of the Lima installation holding executables.
+	limactlName      = "limactl" // Lima command line binary.
 )
-
-// Path to the vendored Lima installation directory.
-func limaDir() string {
-	return filepath.Join(xdg.DataHome, defaultClientName, "lima")
-}
 
 // Path to the vendored limactl binary.
 func limactlBin() string {
-	return filepath.Join(limaDir(), "bin", "limactl")
-}
-
-// Path to the VM data directory.
-func vmDir() string {
-	return filepath.Join(xdg.DataHome, defaultClientName, "vm")
+	return filepath.Join(dirs.Lima(), limaBinDir, limactlName)
 }
 
 // Download URL template for Lima releases. Uses placeholders for version,
@@ -183,7 +172,7 @@ func ensureLima(ctx context.Context) error {
 		"version", limaVersion,
 	)
 
-	return extractLima(resp.Body, limaDir())
+	return extractLima(resp.Body, dirs.Lima())
 }
 
 // Extracts the Lima distribution from a gzipped tar archive.
@@ -332,7 +321,7 @@ func limaInstanceStatus(ctx context.Context) string {
 // are preserved from the current process so that limactl can find system
 // tools and resolve user directories. USER and TMPDIR are also preserved.
 func limaEnv() []string {
-	env := []string{fmt.Sprintf("LIMA_HOME=%s", vmDir())}
+	env := []string{fmt.Sprintf("LIMA_HOME=%s", dirs.VM())}
 
 	appendIfSet := func(key string) {
 		if val := os.Getenv(key); val != "" {

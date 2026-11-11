@@ -7,6 +7,7 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/crux/internal/dirs"
 	"github.com/cruciblehq/crux/resource/blueprint"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/registry"
@@ -42,7 +43,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	output := file.BuildDir(localStateDir())
+	output := manifest.BuildDir(dirs.Local())
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
@@ -54,6 +55,6 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("local plan written", "path", file.Plan(output))
+	slog.Info("local plan written", "path", manifest.PlanPath(output))
 	return nil
 }

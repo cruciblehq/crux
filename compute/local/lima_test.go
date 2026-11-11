@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cruciblehq/crux/internal/dirs"
 )
 
 func TestExtractLima(t *testing.T) {
@@ -95,7 +97,7 @@ func TestLimaURL(t *testing.T) {
 
 func TestLimaEnv_ContainsLimaHome(t *testing.T) {
 	env := limaEnv()
-	want := fmt.Sprintf("LIMA_HOME=%s", vmDir())
+	want := fmt.Sprintf("LIMA_HOME=%s", dirs.VM())
 	if slices.Contains(env, want) {
 		return
 	}

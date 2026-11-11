@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adrg/xdg"
 	"github.com/cruciblehq/crux/compute"
+	"github.com/cruciblehq/crux/internal/dirs"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -15,11 +15,6 @@ import (
 
 // Name of the lock file used to serialise concurrent blueprint mutations.
 const localLockFile = "blueprint.lock"
-
-// Path to the local blueprint state directory.
-func localStateDir() string {
-	return filepath.Join(xdg.DataHome, "crux", "local")
-}
 
 // Manages the local Crucible environment.
 //
@@ -52,7 +47,7 @@ func localBlueprint() (*manifest.Blueprint, error) {
 // decoded. The caller should treat zero values as "no additional requirements"
 // and let the backend apply its own defaults.
 func localPlanOptions() compute.ComputeOptions {
-	plan, err := manifest.ReadPlanAt(file.BuildDir(localStateDir()))
+	plan, err := manifest.ReadPlanAt(manifest.BuildDir(dirs.Local()))
 	if err != nil {
 		return compute.ComputeOptions{}
 	}
@@ -73,7 +68,7 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 	const description = "cannot access local state"
 	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
 
-	dir := localStateDir()
+	dir := dirs.Local()
 	if err := os.MkdirAll(dir, file.DefaultDirMode); err != nil {
 		return crex.SystemError(description, "failed to create the local state directory").
 			Recoveryf(recoveryWriteAccess, dir).
@@ -119,7 +114,7 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 // Opens the local blueprint from disk, falling back to an empty in-memory
 // blueprint if no blueprint has been written yet.
 func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
-	dir := localStateDir()
+	dir := dirs.Local()
 	m, err := manifest.ReadAt(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

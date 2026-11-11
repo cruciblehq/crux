@@ -3,7 +3,6 @@ package recipe
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/oci"
@@ -42,8 +41,8 @@ func NewBuilder(src hub.Source, workdir string, runtime speccompute.Runtime) *Bu
 // Executes a recipe and writes the output image as an OCI tar archive.
 //
 // Each stage resolves its base image and executes its steps in order. The
-// image produced by the last stage is exported to [file.ImageFile]. When set,
-// entrypoint becomes the image entrypoint. Returns the build directory.
+// image produced by the last stage is exported to [manifest.ImagePath]. When
+// set, entrypoint becomes the image entrypoint. Returns the build directory.
 func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, output string) (string, error) {
 	stageImages := make(map[string]speccompute.ImageRef)
 	var currentCtr speccompute.Container
@@ -90,14 +89,14 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr speccompute.Container, 
 
 // Exports the final image as an OCI tar archive.
 //
-// The image is exported to [file.ImageFile] within the output directory.
+// The image is exported to [manifest.ImagePath] in the output directory.
 // Returns the output directory path on success.
 func (b *Builder) exportImage(ctx context.Context, ctr speccompute.Container, output string) (string, error) {
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
 	}
 
-	image := filepath.Join(output, file.ImageFile)
+	image := manifest.ImagePath(output)
 	f, err := os.OpenFile(image, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, file.DefaultFileMode)
 	if err != nil {
 		return "", crex.Wrap(oci.ErrFileSystemOperation, err)

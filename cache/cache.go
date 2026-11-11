@@ -9,13 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/adrg/xdg"
+	"github.com/cruciblehq/crux/internal/dirs"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
-
-// Default client name used by cache paths.
-const defaultClientName = "crux"
 
 const (
 
@@ -51,12 +48,7 @@ type Cache struct {
 // A file lock is acquired to ensure exclusive write access across processes.
 // The caller must call Close when done with the cache.
 func Open() (*Cache, error) {
-	return OpenAt(defaultRootDir())
-}
-
-// Path to the default registry cache root directory.
-func defaultRootDir() string {
-	return filepath.Join(xdg.CacheHome, defaultClientName, "registry")
+	return OpenAt(dirs.Registry())
 }
 
 // Opens a cache at the specified directory.

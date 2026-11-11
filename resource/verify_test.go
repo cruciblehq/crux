@@ -37,11 +37,11 @@ func TestVerify(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "out.img"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := verify(dir, manifest.TypeWidget, "out.img"); err != nil {
+	if err := verify(dir, manifest.TypeWidget, filepath.Join(dir, "out.img")); err != nil {
 		t.Fatalf("verify with artifact: %v", err)
 	}
 
-	if err := verify(dir, manifest.TypeWidget, "missing.img"); !errors.Is(err, ErrBuildOutputNotFound) {
+	if err := verify(dir, manifest.TypeWidget, filepath.Join(dir, "missing.img")); !errors.Is(err, ErrBuildOutputNotFound) {
 		t.Fatalf("verify missing artifact = %v, want ErrBuildOutputNotFound", err)
 	}
 }

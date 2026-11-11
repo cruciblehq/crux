@@ -17,8 +17,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/adrg/xdg"
-
+	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/hub"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/spec/reference"
@@ -43,11 +42,6 @@ const (
 	machinePollInterval = 2 * time.Second  // Interval between machine readiness polls.
 	cruxdHealthTimeout  = 5 * time.Second  // Maximum time to wait for one cruxd health check.
 )
-
-// Path to extracted contents of a cached registry resource version.
-func registryExtractedVersionDir(namespace, resource, version string) string {
-	return filepath.Join(xdg.CacheHome, defaultClientName, "registry", "extracted", namespace, resource, version)
-}
 
 // Ensures the default machine disk image is available in the local cache.
 //
@@ -334,11 +328,25 @@ func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 // found, returns [ErrMachineImageMissing]. It's up to the caller to decide
 // whether to attempt a fetch from the registry.
 func cachedMachineImagePath() (string, error) {
-	arch := machineArch()
-	path := filepath.Join(
-		registryExtractedVersionDir(machineNamespace, machineName, machineVersion),
-		arch+machineExtension,
-	)
+	c, err := cache.Open()
+	if err != nil {
+		return "", err
+	}
+	defer c.Close()
+
+	ok, err := c.HasExtracted(machineNamespace, machineName, machineVersion)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", crex.Newf(ErrMachineImageMissing, "%s/%s %s is not in the cache", machineNamespace, machineName, machineVersion)
+	}
+	dir, err := c.Extract(machineNamespace, machineName, machineVersion)
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(dir, fmt.Sprintf("%s%s", machineArch(), machineExtension))
 	if _, err := os.Stat(path); err != nil {
 		return "", crex.Newf(ErrMachineImageMissing, "expected at %s", path)
 	}

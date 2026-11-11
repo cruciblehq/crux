@@ -108,7 +108,7 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 			Err()
 	}
 
-	output := file.BuildDir(RootCmd.Context)
+	output := manifest.BuildDir(RootCmd.Context)
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).

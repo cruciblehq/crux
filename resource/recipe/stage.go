@@ -4,13 +4,11 @@ import (
 	"context"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/cruciblehq/crux/resource/oci"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/file"
 )
 
 // Persistent mutable build state within a single stage.
@@ -79,7 +77,7 @@ func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts sp
 		return nil, err
 	}
 
-	imgPath := filepath.Join(result.Extracted, file.ImageFile)
+	imgPath := manifest.ImagePath(result.Extracted)
 	f, err := os.Open(imgPath)
 	if err != nil {
 		return nil, crex.Wrap(oci.ErrFileSystemOperation, err)

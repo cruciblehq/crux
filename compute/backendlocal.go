@@ -2,16 +2,13 @@ package compute
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strconv"
 
 	"github.com/cruciblehq/crux/compute/local"
+	"github.com/cruciblehq/crux/internal/dirs"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/file"
 )
 
 // Name of the local VM instance managed by crux.
@@ -42,7 +39,7 @@ func newBackendLocal() Backend {
 	compute := &computeLocalShim{local: local.NewBackend()}
 	bl := &BackendLocal{
 		compute: compute,
-		storage: newStorageLocal(filepath.Join(localDataDir(), "storage")),
+		storage: newStorageLocal(dirs.Storage()),
 	}
 	bl.network = newNetworkLocal(compute.vmExec)
 	return bl
@@ -112,7 +109,7 @@ func (s *computeLocalShim) UploadImage(ctx context.Context, r io.Reader) (string
 // staging directory. Images outside the staging directory are not removed
 // because they are owned by the caller.
 func (s *computeLocalShim) RemoveImage(ctx context.Context, id string) error {
-	return local.RemoveImageIfStaged(ctx, id, tempDir())
+	return local.RemoveImageIfStaged(ctx, id, dirs.Temp())
 }
 
 // Provisions a new instance from a previously uploaded image.
@@ -184,51 +181,11 @@ func localStateToState(s local.State) State {
 	}
 }
 
-// Path to the directory for temporary local compute files.
-func tempDir() string {
-	name := localInstanceName
-	if uid := os.Getuid(); uid >= 0 {
-		name = fmt.Sprintf("%s-%s", name, strconv.Itoa(uid))
-	}
-	return filepath.Join(os.TempDir(), name)
-}
-
-// Path to the persistent data directory for the local provider.
-func localDataDir() string {
-	name := localInstanceName
-	if uid := os.Getuid(); uid >= 0 {
-		name = fmt.Sprintf("%s-%s", name, strconv.Itoa(uid))
-	}
-	return filepath.Join(os.TempDir(), name, "data")
-}
-
 // Creates a temporary file for local compute staging.
 func createTemp(pattern string) (*os.File, error) {
-	dir := tempDir()
+	dir := dirs.Temp()
 	if err := os.MkdirAll(dir, tempDirMode); err != nil {
 		return nil, err
 	}
-	if err := verifyTempDirPermissions(dir); err != nil {
-		return nil, err
-	}
 	return os.CreateTemp(dir, pattern)
-}
-
-// Validates a temp directory and repairs permissions when they are too open.
-//
-// dir must be a real directory rather than a symlink. If the directory exists
-// but is writable by group or other users, the permissions are tightened to
-// the private temporary-directory mode before the caller proceeds.
-func verifyTempDirPermissions(dir string) error {
-	info, err := os.Lstat(dir)
-	if err != nil {
-		return err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return crex.Newf(file.ErrUnsafeTempDir, "%q is a symlink or not a directory", dir)
-	}
-	if info.Mode().Perm()&0o077 != 0 {
-		return os.Chmod(dir, tempDirMode)
-	}
-	return nil
 }

@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cruciblehq/spec/manifest"
 	es "github.com/evanw/esbuild/pkg/api"
-
-	"github.com/cruciblehq/utils-go/file"
 )
 
 const (
@@ -107,7 +106,7 @@ func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolve
 			path = jsPath
 		}
 	} else if info.IsDir() {
-		path = file.WidgetMain(path)
+		path = manifest.WidgetMainPath(path)
 	}
 
 	return es.OnResolveResult{
