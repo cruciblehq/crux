@@ -177,21 +177,22 @@ func ensureLima(ctx context.Context) error {
 // at dest is replaced, and the new install appears only once extraction has
 // fully succeeded, so an interrupted download never leaves a partial install.
 func extractLima(r io.Reader, dest string) error {
+	const description = "cannot install Lima" // Shut the linter up
 	if err := os.RemoveAll(dest); err != nil {
-		return crex.SystemError("cannot install Lima", "failed to remove the previous Lima install").
+		return crex.SystemError(description, "failed to remove the previous Lima install").
 			Recovery("Check the permissions of the crux data directory, then try again.").
 			Cause(crex.Wrap(ErrLimaDownload, err)).
 			Err()
 	}
 	if err := archive.Extract(r, dest, archive.Gzip); err != nil {
-		return crex.SystemError("cannot install Lima", "failed to extract the Lima archive").
+		return crex.SystemError(description, "failed to extract the Lima archive").
 			Recovery("Free up disk space, then try again.").
 			Cause(crex.Wrap(ErrLimaDownload, err)).
 			Err()
 	}
 
 	if _, err := os.Stat(limactlBin()); err != nil {
-		return crex.SystemError("cannot install Lima", "the Lima archive did not contain limactl").
+		return crex.SystemError(description, "the Lima archive did not contain limactl").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(crex.Newf(ErrLimaDownload, "limactl not found in archive")).
 			Err()
