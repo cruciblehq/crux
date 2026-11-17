@@ -27,7 +27,7 @@ const (
 	machineType      = "machine"         // Registry resource type for the machine image.
 	machineNamespace = "crucible"        // Registry namespace for the machine image.
 	machineName      = "machine-default" // Registry resource name for the machine image.
-	machineVersion   = "0.2.0"           // Pinned machine image version.
+	machineVersion   = "0.3.0"           // Pinned machine image version.
 	machineExtension = ".qcow2"          // Disk image file extension.
 )
 

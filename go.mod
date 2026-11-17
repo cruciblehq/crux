@@ -3,8 +3,8 @@ module github.com/cruciblehq/crux
 go 1.25.1
 
 require (
-	github.com/cruciblehq/spec v0.0.0-20261110172401-990539ea390b
-	github.com/cruciblehq/utils-go v0.0.0-20261110174431-c1f0c1b90143
+	github.com/cruciblehq/spec v0.0.0-20261116210155-8035bcb3bf40
+	github.com/cruciblehq/utils-go v0.0.0-20261116201206-2752ecb58101
 )
 
 require (
@@ -28,13 +28,11 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/vbatts/tar-split v0.11.6 // indirect
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/sync v0.20.0 // indirect
