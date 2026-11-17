@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cruciblehq/spec/reference"
-	. "github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 

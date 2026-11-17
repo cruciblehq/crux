@@ -8,7 +8,7 @@ import (
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/spec/reference"
-	. "github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -54,8 +54,8 @@ func verifyNamespace(ctx context.Context, client *Client, namespace string) erro
 		return nil
 	}
 
-	var regErr *Error
-	if errors.As(err, &regErr) && regErr.Code == ErrorCodeNotFound {
+	var regErr *registry.Error
+	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeNotFound {
 		return crex.Wrap(ErrNamespaceNotFound, err)
 	}
 
@@ -72,12 +72,12 @@ func ensureResource(ctx context.Context, client *Client, namespace, resource, re
 		return nil
 	}
 
-	var regErr *Error
-	if !errors.As(err, &regErr) || regErr.Code != ErrorCodeNotFound {
+	var regErr *registry.Error
+	if !errors.As(err, &regErr) || regErr.Code != registry.ErrorCodeNotFound {
 		return crex.Wrap(ErrRegistryOperation, err)
 	}
 
-	resInfo := ResourceInfo{
+	resInfo := registry.ResourceInfo{
 		Name: resource,
 		Type: resourceType,
 	}
@@ -94,14 +94,14 @@ func ensureResource(ctx context.Context, client *Client, namespace, resource, re
 // Attempts to create the specified version for the resource. Returns
 // [ErrVersionExists] if the version already exists.
 func createVersion(ctx context.Context, client *Client, namespace, resource, version string) error {
-	versionInfo := VersionInfo{
+	versionInfo := registry.VersionInfo{
 		String: version,
 	}
 
 	_, err := client.CreateVersion(ctx, namespace, resource, versionInfo)
 	if err != nil {
-		var regErr *Error
-		if errors.As(err, &regErr) && regErr.Code == ErrorCodeVersionExists {
+		var regErr *registry.Error
+		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists {
 			return crex.Wrap(ErrVersionExists, err)
 		}
 		return crex.Wrap(ErrRegistryOperation, err)

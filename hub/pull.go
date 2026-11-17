@@ -7,7 +7,7 @@ import (
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/spec/reference"
-	. "github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -74,7 +74,7 @@ func pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
 //
 // When the entry is present but has a stale or absent digest, the entry is
 // removed from the cache on a best-effort basis and (nil, false) is returned.
-func checkCache(c *cache.Cache, ref *reference.Reference, ver *Version, expectedDigest string) (*PullResult, bool) {
+func checkCache(c *cache.Cache, ref *reference.Reference, ver *registry.Version, expectedDigest string) (*PullResult, bool) {
 	entry, err := c.Get(ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		if errors.Is(err, cache.ErrNotFound) {
@@ -107,7 +107,7 @@ func checkCache(c *cache.Cache, ref *reference.Reference, ver *Version, expected
 // Verifies the stored archive against expectedDigest before returning.
 // Returns [ErrCacheOperation] if the digest does not match, indicating
 // possible data corruption in transit.
-func downloadAndCache(ctx context.Context, client *Client, c *cache.Cache, ref *reference.Reference, ver *Version, expectedDigest string) (*PullResult, error) {
+func downloadAndCache(ctx context.Context, client *Client, c *cache.Cache, ref *reference.Reference, ver *registry.Version, expectedDigest string) (*PullResult, error) {
 	archiveReader, err := client.DownloadArchive(ctx, ref.Namespace(), ref.Name(), ver.String)
 	if err != nil {
 		return nil, crex.Wrap(ErrDownload, err)

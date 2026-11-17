@@ -3,18 +3,13 @@ package hub
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 
-	. "github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
-)
-
-const (
-	headerContentType = "Content-Type" // Content-Type HTTP header.
-	headerAccept      = "Accept"       // Accept HTTP header.
+	"github.com/cruciblehq/utils-go/httpx"
 )
 
 // HTTP client for interacting with the registry.
@@ -39,20 +34,20 @@ func NewClient(baseURL string, httpClient *http.Client) *Client {
 }
 
 // Creates a new namespace.
-func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Namespace, error) {
-	body, err := json.Marshal(info)
+func (c *Client) CreateNamespace(ctx context.Context, info registry.NamespaceInfo) (*registry.Namespace, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, namespacesPath(), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, registry.NamespaceListPath(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeNamespaceInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeNamespaceInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeNamespace.With(registry.BodyFormat))
 
-	var ns Namespace
+	var ns registry.Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -60,14 +55,14 @@ func (c *Client) CreateNamespace(ctx context.Context, info NamespaceInfo) (*Name
 }
 
 // Retrieves namespace metadata and resource summaries.
-func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*Namespace, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, namespacePath(namespace), nil)
+func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*registry.Namespace, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.NamespacePath(namespace), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeNamespace.With(registry.BodyFormat))
 
-	var ns Namespace
+	var ns registry.Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -75,20 +70,20 @@ func (c *Client) ReadNamespace(ctx context.Context, namespace string) (*Namespac
 }
 
 // Updates mutable namespace metadata.
-func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info NamespaceInfo) (*Namespace, error) {
-	body, err := json.Marshal(info)
+func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info registry.NamespaceInfo) (*registry.Namespace, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, namespacePath(namespace), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, registry.NamespacePath(namespace), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeNamespaceInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeNamespace.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeNamespaceInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeNamespace.With(registry.BodyFormat))
 
-	var ns Namespace
+	var ns registry.Namespace
 	if err := c.do(req, &ns); err != nil {
 		return nil, err
 	}
@@ -97,7 +92,7 @@ func (c *Client) UpdateNamespace(ctx context.Context, namespace string, info Nam
 
 // Permanently deletes a namespace.
 func (c *Client) DeleteNamespace(ctx context.Context, namespace string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, namespacePath(namespace), nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, registry.NamespacePath(namespace), nil)
 	if err != nil {
 		return err
 	}
@@ -105,14 +100,14 @@ func (c *Client) DeleteNamespace(ctx context.Context, namespace string) error {
 }
 
 // Lists all namespaces.
-func (c *Client) ListNamespaces(ctx context.Context) (*NamespaceList, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, namespacesPath(), nil)
+func (c *Client) ListNamespaces(ctx context.Context) (*registry.NamespaceList, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.NamespaceListPath(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeNamespaceList.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeNamespaceList.With(registry.BodyFormat))
 
-	var list NamespaceList
+	var list registry.NamespaceList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -120,20 +115,20 @@ func (c *Client) ListNamespaces(ctx context.Context) (*NamespaceList, error) {
 }
 
 // Creates a new resource in the specified namespace.
-func (c *Client) CreateResource(ctx context.Context, namespace string, info ResourceInfo) (*Resource, error) {
-	body, err := json.Marshal(info)
+func (c *Client) CreateResource(ctx context.Context, namespace string, info registry.ResourceInfo) (*registry.Resource, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, resourcesPath(namespace), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, registry.ResourceListPath(namespace), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeResourceInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeResource.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeResourceInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeResource.With(registry.BodyFormat))
 
-	var resource Resource
+	var resource registry.Resource
 	if err := c.do(req, &resource); err != nil {
 		return nil, err
 	}
@@ -141,14 +136,14 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info Reso
 }
 
 // Retrieves resource metadata with version and channel summaries.
-func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*Resource, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, resourcePath(namespace, resource), nil)
+func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*registry.Resource, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.ResourcePath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeResource.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeResource.With(registry.BodyFormat))
 
-	var res Resource
+	var res registry.Resource
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
@@ -156,20 +151,20 @@ func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (
 }
 
 // Updates mutable resource metadata.
-func (c *Client) UpdateResource(ctx context.Context, namespace, resource string, info ResourceInfo) (*Resource, error) {
-	body, err := json.Marshal(info)
+func (c *Client) UpdateResource(ctx context.Context, namespace, resource string, info registry.ResourceInfo) (*registry.Resource, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, resourcePath(namespace, resource), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, registry.ResourcePath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeResourceInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeResource.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeResourceInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeResource.With(registry.BodyFormat))
 
-	var res Resource
+	var res registry.Resource
 	if err := c.do(req, &res); err != nil {
 		return nil, err
 	}
@@ -178,7 +173,7 @@ func (c *Client) UpdateResource(ctx context.Context, namespace, resource string,
 
 // Permanently deletes a resource.
 func (c *Client) DeleteResource(ctx context.Context, namespace, resource string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, resourcePath(namespace, resource), nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, registry.ResourcePath(namespace, resource), nil)
 	if err != nil {
 		return err
 	}
@@ -186,14 +181,14 @@ func (c *Client) DeleteResource(ctx context.Context, namespace, resource string)
 }
 
 // Lists all resources in a namespace.
-func (c *Client) ListResources(ctx context.Context, namespace string) (*ResourceList, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, resourcesPath(namespace), nil)
+func (c *Client) ListResources(ctx context.Context, namespace string) (*registry.ResourceList, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.ResourceListPath(namespace), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeResourceList.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeResourceList.With(registry.BodyFormat))
 
-	var list ResourceList
+	var list registry.ResourceList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -201,20 +196,20 @@ func (c *Client) ListResources(ctx context.Context, namespace string) (*Resource
 }
 
 // Creates a new version for a resource.
-func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, info VersionInfo) (*Version, error) {
-	body, err := json.Marshal(info)
+func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, info registry.VersionInfo) (*registry.Version, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, versionsPath(namespace, resource), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, registry.VersionListPath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeVersionInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeVersionInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeVersion.With(registry.BodyFormat))
 
-	var version Version
+	var version registry.Version
 	if err := c.do(req, &version); err != nil {
 		return nil, err
 	}
@@ -222,14 +217,14 @@ func (c *Client) CreateVersion(ctx context.Context, namespace, resource string, 
 }
 
 // Retrieves version metadata with archive details.
-func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version string) (*Version, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, versionPath(namespace, resource, version), nil)
+func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version string) (*registry.Version, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.VersionPath(namespace, resource, version), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeVersion.With(registry.BodyFormat))
 
-	var ver Version
+	var ver registry.Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -237,20 +232,20 @@ func (c *Client) ReadVersion(ctx context.Context, namespace, resource, version s
 }
 
 // Updates mutable version metadata.
-func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version string, info VersionInfo) (*Version, error) {
-	body, err := json.Marshal(info)
+func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version string, info registry.VersionInfo) (*registry.Version, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, versionPath(namespace, resource, version), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, registry.VersionPath(namespace, resource, version), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeVersionInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeVersionInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeVersion.With(registry.BodyFormat))
 
-	var ver Version
+	var ver registry.Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -259,7 +254,7 @@ func (c *Client) UpdateVersion(ctx context.Context, namespace, resource, version
 
 // Permanently deletes a version.
 func (c *Client) DeleteVersion(ctx context.Context, namespace, resource, version string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, versionPath(namespace, resource, version), nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, registry.VersionPath(namespace, resource, version), nil)
 	if err != nil {
 		return err
 	}
@@ -267,14 +262,14 @@ func (c *Client) DeleteVersion(ctx context.Context, namespace, resource, version
 }
 
 // Lists all versions for a resource.
-func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (*VersionList, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, versionsPath(namespace, resource), nil)
+func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (*registry.VersionList, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.VersionListPath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeVersionList.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeVersionList.With(registry.BodyFormat))
 
-	var list VersionList
+	var list registry.VersionList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -282,15 +277,15 @@ func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (
 }
 
 // Uploads a version archive.
-func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*Version, error) {
-	req, err := c.newRequest(ctx, http.MethodPut, archivePath(namespace, resource, version), archive)
+func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
+	req, err := c.newRequest(ctx, http.MethodPut, registry.ArchivePath(namespace, resource, version), archive)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, string(MediaTypeArchive))
-	req.Header.Set(headerAccept, MediaTypeVersion.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeArchive.String())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeVersion.With(registry.BodyFormat))
 
-	var ver Version
+	var ver registry.Version
 	if err := c.do(req, &ver); err != nil {
 		return nil, err
 	}
@@ -299,11 +294,11 @@ func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version
 
 // Downloads a version archive.
 func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, version string) (io.ReadCloser, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, archivePath(namespace, resource, version), nil)
+	req, err := c.newRequest(ctx, http.MethodGet, registry.ArchivePath(namespace, resource, version), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, string(MediaTypeArchive))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeArchive.String())
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -314,33 +309,33 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		var regErr Error
-		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
+		regErr, err := decodeRegistryError(resp)
+		if err != nil {
 			return nil, crex.SystemErrorf("registry request failed", "the server returned status %d (%s)", resp.StatusCode, resp.Status).
 				Cause(ErrHTTPStatus).
 				Err()
 		}
-		return nil, &regErr
+		return nil, regErr
 	}
 
 	return resp.Body, nil
 }
 
 // Creates a new channel.
-func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info ChannelInfo) (*Channel, error) {
-	body, err := json.Marshal(info)
+func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info registry.ChannelInfo) (*registry.Channel, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, channelsPath(namespace, resource), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, registry.ChannelListPath(namespace, resource), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeChannelInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeChannelInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
 
-	var channel Channel
+	var channel registry.Channel
 	if err := c.do(req, &channel); err != nil {
 		return nil, err
 	}
@@ -348,14 +343,14 @@ func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, 
 }
 
 // Retrieves channel metadata with full version details.
-func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*Channel, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, channelPath(namespace, resource, channel), nil)
+func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*registry.Channel, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.ChannelPath(namespace, resource, channel), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
 
-	var ch Channel
+	var ch registry.Channel
 	if err := c.do(req, &ch); err != nil {
 		return nil, err
 	}
@@ -363,20 +358,20 @@ func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel s
 }
 
 // Updates a channel's mutable metadata.
-func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info ChannelInfo) (*Channel, error) {
-	body, err := json.Marshal(info)
+func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info registry.ChannelInfo) (*registry.Channel, error) {
+	body, err := codec.Encode(info, registry.BodyFormat)
 	if err != nil {
-		return nil, crex.Wrap(ErrMarshal, err)
+		return nil, crex.Wrap(ErrRequestEncode, err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, channelPath(namespace, resource, channel), bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPut, registry.ChannelPath(namespace, resource, channel), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerContentType, MediaTypeChannelInfo.JSON())
-	req.Header.Set(headerAccept, MediaTypeChannel.JSON())
+	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeChannelInfo.With(registry.BodyFormat))
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
 
-	var ch Channel
+	var ch registry.Channel
 	if err := c.do(req, &ch); err != nil {
 		return nil, err
 	}
@@ -385,7 +380,7 @@ func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel
 
 // Permanently deletes a channel.
 func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, channelPath(namespace, resource, channel), nil)
+	req, err := c.newRequest(ctx, http.MethodDelete, registry.ChannelPath(namespace, resource, channel), nil)
 	if err != nil {
 		return err
 	}
@@ -393,14 +388,14 @@ func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel
 }
 
 // Lists all channels for a resource.
-func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*ChannelList, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, channelsPath(namespace, resource), nil)
+func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*registry.ChannelList, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, registry.ChannelListPath(namespace, resource), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(headerAccept, MediaTypeChannelList.JSON())
+	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannelList.With(registry.BodyFormat))
 
-	var list ChannelList
+	var list registry.ChannelList
 	if err := c.do(req, &list); err != nil {
 		return nil, err
 	}
@@ -409,21 +404,18 @@ func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (
 
 // Creates an HTTP request with the given method, path, and body.
 func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
-	u, err := url.Parse(c.baseURL)
-	if err != nil {
-		return nil, crex.Wrap(ErrBaseURL, err)
-	}
-	u.Path = path
-
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	req, err := httpx.NewRequest(ctx, method, c.baseURL, path, nil, body)
 	if err != nil {
 		return nil, crex.Wrap(ErrHTTPRequest, err)
 	}
 	return req, nil
 }
 
-// Executes an HTTP request and decodes the JSON response.
-func (c *Client) do(req *http.Request, result interface{}) error {
+// Executes an HTTP request and decodes the JSON response into result.
+//
+// A response outside the 2xx range carries a [registry.Error], which is
+// returned as is. result may be nil when no body is expected.
+func (c *Client) do(req *http.Request, result any) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return crex.SystemError("cannot reach registry", "the request to the registry failed").
@@ -433,17 +425,21 @@ func (c *Client) do(req *http.Request, result interface{}) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var regErr Error
-		if err := json.NewDecoder(resp.Body).Decode(&regErr); err != nil {
+		regErr, err := decodeRegistryError(resp)
+		if err != nil {
 			return crex.SystemErrorf("registry request failed", "the server returned status %d (%s)", resp.StatusCode, resp.Status).
 				Cause(ErrHTTPStatus).
 				Err()
 		}
-		return &regErr
+		return regErr
 	}
 
 	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		data, err := io.ReadAll(resp.Body)
+		if err == nil {
+			err = codec.Decode(data, result, registry.BodyFormat)
+		}
+		if err != nil {
 			return crex.SystemError("cannot read registry response", "the registry returned an unreadable response").
 				Cause(crex.Wrap(ErrResponseDecode, err)).
 				Err()
@@ -451,4 +447,19 @@ func (c *Client) do(req *http.Request, result interface{}) error {
 	}
 
 	return nil
+}
+
+// Decodes the registry error carried by a failed response.
+//
+// Reads at most [httpx.MaxErrorPayload] bytes of the body.
+func decodeRegistryError(resp *http.Response) (*registry.Error, error) {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxErrorPayload))
+	if err != nil {
+		return nil, err
+	}
+	var regErr registry.Error
+	if err := codec.Decode(data, &regErr, registry.BodyFormat); err != nil {
+		return nil, err
+	}
+	return &regErr, nil
 }
