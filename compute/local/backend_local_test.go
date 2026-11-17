@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"testing"
+
+	"github.com/adrg/xdg"
 )
 
 func TestMachineArch(t *testing.T) {
@@ -40,6 +42,10 @@ func TestUploadImage_MissingFile(t *testing.T) {
 }
 
 func TestCachedMachineImagePath_MissingImage(t *testing.T) {
+	t.Cleanup(xdg.Reload)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	xdg.Reload()
+
 	if _, err := cachedMachineImagePath(); !errors.Is(err, ErrMachineImageMissing) {
 		t.Fatalf("cachedMachineImagePath() error = %v, want ErrMachineImageMissing", err)
 	}

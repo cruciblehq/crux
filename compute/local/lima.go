@@ -26,6 +26,10 @@ const (
 	limaInstanceName = "crux"    // Lima instance name used for the crux VM.
 	limaBinDir       = "bin"     // Subdirectory of the Lima installation holding executables.
 	limactlName      = "limactl" // Lima command line binary.
+
+	// Directory commands start in inside the VM. Without it, limactl shell
+	// tries the host's current directory, which does not exist in the guest.
+	guestWorkdir = "/"
 )
 
 // Path to the vendored limactl binary.
@@ -207,7 +211,7 @@ func extractLima(r io.Reader, dest string) error {
 // VM is running before calling this function. A non-zero exit code is
 // returned, not reported as an error.
 func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
-	code, err := process.Run(ctx, limactl(append([]string{"shell", limaInstanceName, command}, args...), nil, stdout, stderr))
+	code, err := process.Run(ctx, limactl(append([]string{"shell", "--workdir", guestWorkdir, limaInstanceName, command}, args...), nil, stdout, stderr))
 	if err != nil {
 		return code, crex.SystemError("cannot run command in local environment", "the command could not be started in the virtual machine").
 			Recovery(recoveryRestartLocalEnvironment).
@@ -241,7 +245,7 @@ func limaList(ctx context.Context) ([]string, error) {
 // which uses the existing SSH connection. Entries in the archive are applied
 // as absolute paths, preserving permissions, ownership, and timestamps.
 func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
-	if err := process.Check(ctx, limactl([]string{"shell", name, "tar", "-x", "-C", "/"}, r, nil, nil)); err != nil {
+	if err := process.Check(ctx, limactl([]string{"shell", "--workdir", guestWorkdir, name, "tar", "-x", "-C", "/"}, r, nil, nil)); err != nil {
 		return crex.SystemError("cannot copy files to local environment", "extracting the archive in the virtual machine failed").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrHostExec, err)).

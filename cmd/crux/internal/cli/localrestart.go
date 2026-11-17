@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 )
 
@@ -25,7 +24,7 @@ func (c *LocalRestartCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	name := internal.DefaultInstanceName
+	name := compute.DefaultLocalInstanceID()
 
 	if err := b.Compute().Stop(ctx, name); err != nil {
 		return localRestartError(err)

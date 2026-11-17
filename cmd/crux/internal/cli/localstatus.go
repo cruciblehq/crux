@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 )
 
@@ -17,7 +16,7 @@ func (c *LocalStatusCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	name := internal.DefaultInstanceName
+	name := compute.DefaultLocalInstanceID()
 
 	state, err := b.Compute().Status(ctx, name)
 	if err != nil {

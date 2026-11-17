@@ -30,7 +30,7 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	name := internal.DefaultInstanceName
+	name := compute.DefaultLocalInstanceID()
 	registryURL, err := url.Parse(internal.DefaultRegistryURL)
 	if err != nil {
 		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").

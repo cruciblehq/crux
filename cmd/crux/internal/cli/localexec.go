@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 )
 
@@ -21,7 +20,7 @@ func (c *LocalExecCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	name := internal.DefaultInstanceName
+	name := compute.DefaultLocalInstanceID()
 
 	cmd := stripArgSeparator(c.Command)
 

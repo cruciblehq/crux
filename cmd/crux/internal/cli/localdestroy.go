@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 )
 
@@ -19,7 +18,7 @@ func (c *LocalDestroyCmd) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	name := internal.DefaultInstanceName
+	name := compute.DefaultLocalInstanceID()
 
 	if err := b.Compute().Deprovision(ctx, name); err != nil {
 		return localError(err, "cannot destroy local environment", "Run 'crux local start' to start the local environment first.")
