@@ -10,7 +10,8 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 func useTempDir(t *testing.T) string {
@@ -66,8 +67,8 @@ func TestCreateTemp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if info.Mode().Perm() != tempDirMode {
-		t.Errorf("temp dir mode = %v, want %v", info.Mode().Perm(), tempDirMode)
+	if info.Mode().Perm() != file.OwnerDirMode {
+		t.Errorf("temp dir mode = %v, want %v", info.Mode().Perm(), file.OwnerDirMode)
 	}
 }
 

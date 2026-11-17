@@ -9,13 +9,11 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"time"
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/hub"
@@ -35,13 +33,6 @@ const (
 
 // Host interface Lima forwards cruxd's port to.
 const cruxdHost = "127.0.0.1"
-
-// Machine readiness timeout and polling interval.
-const (
-	machineReadyTimeout = 15 * time.Minute // Maximum time to wait for cruxd to become healthy.
-	machinePollInterval = 2 * time.Second  // Interval between machine readiness polls.
-	cruxdHealthTimeout  = 5 * time.Second  // Maximum time to wait for one cruxd health check.
-)
 
 // Ensures the default machine disk image is available in the local cache.
 //
@@ -85,16 +76,17 @@ func uploadImage(_ context.Context, path string) (string, error) {
 // Provisions a compute instance from the given disk image.
 //
 // imageID is the local filesystem path to a QCOW2 disk image, as returned by
-// [uploadImage]. Returns [ErrHostAlreadyProvisioned] if an instance already
-// exists. The VM is created and started.
-func provision(ctx context.Context, _, imageID string) error {
+// [uploadImage]. enrollment is written into the VM so cruxd can enroll.
+// Returns [ErrHostAlreadyProvisioned] if an instance already exists. The VM is
+// created and started.
+func provision(ctx context.Context, _, imageID string, enrollment []byte) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
 	if hostStatus(ctx) != StateNotProvisioned {
 		return ErrHostAlreadyProvisioned
 	}
-	return createAndStartHost(ctx, imageID)
+	return createAndStartHost(ctx, imageID, enrollment)
 }
 
 // Starts the VM.
@@ -153,25 +145,12 @@ func deprovision(ctx context.Context, _ string) error {
 	return err
 }
 
-// Queries the current state of a compute instance.
+// Queries the current state of the VM.
 //
-// The state is determined by probing the Lima VM and cruxd's health check,
-// which also covers containerd. The returned state is the least healthy of
-// the two.
+// Reports only whether the VM runs. Whether cruxd is reachable is checked by
+// the caller over mutual TLS.
 func status(ctx context.Context, _ string) (State, error) {
-	rtState := hostStatus(ctx)
-
-	if rtState == StateNotProvisioned {
-		return StateNotProvisioned, nil
-	}
-	if rtState != StateRunning {
-		return StateStopped, nil
-	}
-
-	if !isCruxdReady(ctx) {
-		return StateStopped, nil
-	}
-	return StateRunning, nil
+	return hostStatus(ctx), nil
 }
 
 // Runs a command inside the host VM.
@@ -195,65 +174,16 @@ func copyArchive(ctx context.Context, name string, r io.Reader) error {
 	return limaCopyArchive(ctx, name, r)
 }
 
-// Blocks until cruxd reports itself healthy.
-//
-// cruxd's health check also covers containerd. Polls every [machinePollInterval].
-// Returns an error if the context is cancelled or the [machineReadyTimeout]
-// deadline is exceeded.
-func waitForMachine(ctx context.Context) error {
-	deadline := time.Now().Add(machineReadyTimeout)
-	for {
-		if isCruxdReady(ctx) {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return crex.SystemErrorf("local runtime not ready", "cruxd did not become healthy within %s", machineReadyTimeout).
-				Recovery("Recreate the local runtime and retry.").
-				Cause(ErrHostStart).
-				Err()
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(machinePollInterval):
-		}
-	}
-}
-
-// Whether cruxd answers its health endpoint through the forwarded port.
-func isCruxdReady(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, cruxdHealthTimeout)
-	defer cancel()
-
-	addr, err := cruxdAddress(ctx, limaInstanceName)
-	if err != nil {
-		return false
-	}
-	u := url.URL{
-		Scheme: "http",
-		Host:   addr,
-		Path:   speccompute.EndpointHealth,
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return false
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false
-	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
-}
-
 // Creates the Lima instance from the given disk image and starts it.
 //
 // Lima 2.x create does not auto-start; an explicit start call is required.
-// imagePath is the local filesystem path to a QCOW2 disk image.
-func createAndStartHost(ctx context.Context, imagePath string) error {
+// imagePath is the local filesystem path to a QCOW2 disk image. enrollment is
+// written into the VM config. Returns once the VM runs, before cruxd is
+// enrolled.
+func createAndStartHost(ctx context.Context, imagePath string, enrollment []byte) error {
 	const description = "cannot create local environment"
 
-	configPath, err := generateLimaConfig(imagePath)
+	configPath, err := generateLimaConfig(imagePath, enrollment)
 	if err != nil {
 		return crex.SystemError(description, "failed to generate the virtual machine configuration").
 			Recovery("Regenerate the local virtual machine configuration and retry.").
@@ -273,10 +203,6 @@ func createAndStartHost(ctx context.Context, imagePath string) error {
 			Recovery("Retry after recreating the local environment.").
 			Cause(crex.Wrap(ErrHostStart, err)).
 			Err()
-	}
-
-	if err := waitForMachine(ctx); err != nil {
-		return crex.Wrap(ErrHostCreate, err)
 	}
 
 	return nil

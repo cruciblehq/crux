@@ -1,13 +1,12 @@
 package compute
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net/url"
 
 	speccompute "github.com/cruciblehq/spec/compute"
-	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -49,10 +48,13 @@ func (c *cruxdContainer) Exec(ctx context.Context, stdout, stderr io.Writer, com
 		return 0, err
 	}
 
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		var msg speccompute.ExecResponse
-		if err := codec.Unmarshal(scanner.Bytes(), &msg, codec.JSON); err != nil {
+	stream := speccompute.NewExecReader(resp.Body)
+	for {
+		msg, err := stream.Next()
+		if errors.Is(err, io.EOF) {
+			return 0, crex.Newf(ErrCruxd, "exec stream ended without a result")
+		}
+		if err != nil {
 			return 0, crex.Wrap(ErrCruxd, err)
 		}
 		switch msg.Type {
@@ -71,10 +73,6 @@ func (c *cruxdContainer) Exec(ctx context.Context, stdout, stderr io.Writer, com
 			return 0, crex.Newf(ErrCruxd, "unknown exec message type %q", msg.Type)
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return 0, crex.Wrap(ErrCruxd, err)
-	}
-	return 0, crex.Newf(ErrCruxd, "exec stream ended without a result")
 }
 
 // Applies an uncompressed tar archive to the container's writable snapshot.

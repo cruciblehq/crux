@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
+
+	"github.com/cruciblehq/spec/manifest"
 )
 
 // Creates a Linux bridge on the host with a deny-all forward chain.
@@ -109,6 +112,51 @@ func ApplyRules(ctx context.Context, exec ExecFunc, unitID string, rules [][]str
 	}
 }
 
+// Returns the nft arguments of a rule that accepts traffic entering a unit.
+//
+// proto is a protocol keyword or number from the manifest. The "ip" wildcard
+// or an empty value matches any protocol. port is matched only when it is not
+// zero and proto has ports. peer is the source address, matched only when it
+// is not empty.
+func InputRule(proto string, port int, peer string) []string {
+	return nftAcceptRule(nftChainInput, "saddr", proto, port, peer)
+}
+
+// Returns the nft arguments of a rule that accepts traffic leaving a unit.
+//
+// Takes the same arguments as [InputRule], except that peer is the
+// destination address.
+func OutputRule(proto string, port int, peer string) []string {
+	return nftAcceptRule(nftChainOutput, "daddr", proto, port, peer)
+}
+
+// Returns the nft arguments of an accept rule in chain.
+//
+// peerField is the address field that holds peer.
+func nftAcceptRule(chain, peerField, proto string, port int, peer string) []string {
+	args := []string{nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, chain}
+	proto = strings.ToLower(proto)
+	if proto != "" && proto != manifest.ProtocolAny {
+		args = append(args, "meta", "l4proto", proto)
+		if port > 0 && hasPorts(proto) {
+			args = append(args, "th", "dport", strconv.Itoa(port))
+		}
+	}
+	if peer != "" {
+		args = append(args, "ip", peerField, peer)
+	}
+	return append(args, "accept")
+}
+
+// Whether proto carries port numbers.
+func hasPorts(proto string) bool {
+	switch proto {
+	case manifest.ProtocolTCP, manifest.ProtocolUDP, manifest.ProtocolSCTP:
+		return true
+	}
+	return false
+}
+
 // Lists bridge interface names on the host that match the given prefix.
 func ListBridges(ctx context.Context, exec ExecFunc, prefix string) ([]string, error) {
 	out, err := execOutput(ctx, exec, ipCommand, "-o", linkSubcommand, "show", "type", nftFamilyBridge)
@@ -116,12 +164,7 @@ func ListBridges(ctx context.Context, exec ExecFunc, prefix string) ([]string, e
 		return nil, err
 	}
 	var bridges []string
-	for _, line := range strings.Split(out, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		name := strings.TrimSuffix(fields[1], ":")
+	for _, name := range parseLinkNames(out) {
 		if strings.HasPrefix(name, prefix) {
 			bridges = append(bridges, name)
 		}
@@ -152,14 +195,22 @@ func ListBridgeInterfaces(ctx context.Context, exec ExecFunc, bridge string) ([]
 	if err != nil {
 		return nil, err
 	}
-	var ifaces []string
+	return parseLinkNames(out), nil
+}
+
+// Returns the interface names in the output of "ip -o link show".
+//
+// Each line looks like "3: name: <FLAGS> ...", so the name is the second field
+// without its trailing colon.
+func parseLinkNames(out string) []string {
+	const nameField = 1
+	var names []string
 	for line := range strings.SplitSeq(out, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		if len(fields) <= nameField {
 			continue
 		}
-		name := strings.TrimSuffix(fields[1], ":")
-		ifaces = append(ifaces, name)
+		names = append(names, strings.TrimSuffix(fields[nameField], ":"))
 	}
-	return ifaces, nil
+	return names
 }

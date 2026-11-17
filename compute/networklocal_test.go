@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -63,29 +64,6 @@ func TestTruncate(t *testing.T) {
 	}
 	if got, want := truncate("short", 32), "short"; got != want {
 		t.Fatalf("truncate() = %q, want %q", got, want)
-	}
-}
-
-func TestBuildNftRule(t *testing.T) {
-	rule := Rule{
-		Direction: Ingress,
-		Protocol:  "tcp",
-		Port:      8080,
-		Peer:      "10.0.0.2",
-	}
-	got := buildNftRule(rule)
-	want := []string{"nft", "add", "rule", "inet", "filter", "input", "meta", "l4proto", "tcp", "th", "dport", "8080", "ip", "saddr", "10.0.0.2", "accept"}
-	if len(got) != len(want) {
-		t.Fatalf("buildNftRule() len = %d, want %d; got %v", len(got), len(want), got)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("buildNftRule()[%d] = %q, want %q; full = %v", i, got[i], want[i], got)
-		}
-	}
-
-	if args := buildNftRule(Rule{Direction: Direction(99)}); args != nil {
-		t.Fatalf("buildNftRule() for unknown direction = %v, want nil", args)
 	}
 }
 
@@ -228,5 +206,18 @@ func TestNetworkListFails(t *testing.T) {
 	fx := &fakeExec{fail: "ip -o link show"}
 	if _, err := newNetworkLocal(fx.run).List(context.Background()); !errors.Is(err, ErrNetwork) {
 		t.Fatalf("List() error = %v, want ErrNetwork", err)
+	}
+}
+
+func TestRandHex(t *testing.T) {
+	s := randHex(8)
+	if len(s) != 16 {
+		t.Fatalf("len(randHex(8)) = %d, want 16", len(s))
+	}
+	if _, err := hex.DecodeString(s); err != nil {
+		t.Fatalf("randHex(8) = %q, want hex", s)
+	}
+	if s == randHex(8) {
+		t.Fatalf("randHex(8) returned %q twice", s)
 	}
 }

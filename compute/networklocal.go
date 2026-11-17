@@ -2,13 +2,14 @@ package compute
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
 
 	"github.com/cruciblehq/crux/compute/local"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/crypto"
 )
 
 // Shim that adapts the local network implementation to the [Network] interface.
@@ -27,7 +28,7 @@ func newNetworkLocal(exec local.ExecFunc) Network {
 
 // Creates a new Linux bridge on the VM.
 func (s *networkLocalShim) Create(ctx context.Context, opts NetworkOptions) (string, error) {
-	id := fmt.Sprintf("%s%s", local.NetworkIDPrefix, crypto.RandHex(idLen))
+	id := fmt.Sprintf("%s%s", local.NetworkIDPrefix, randHex(idLen))
 	bridge := bridgeName(id)
 
 	cidr := opts.Subnet
@@ -61,8 +62,8 @@ func (s *networkLocalShim) Remove(ctx context.Context, id string) error {
 // Attaches a unit to a network.
 func (s *networkLocalShim) Attach(ctx context.Context, unitID, networkID string) error {
 	bridge := bridgeName(networkID)
-	veth := truncate(fmt.Sprintf("%s%s", local.VethPrefix, crypto.RandHex(local.VethRandLen)), local.InterfaceNameMax)
-	peer := truncate(fmt.Sprintf("%s%s", local.PeerPrefix, crypto.RandHex(local.VethRandLen)), local.InterfaceNameMax)
+	veth := truncate(fmt.Sprintf("%s%s", local.VethPrefix, randHex(local.VethRandLen)), local.InterfaceNameMax)
+	peer := truncate(fmt.Sprintf("%s%s", local.PeerPrefix, randHex(local.VethRandLen)), local.InterfaceNameMax)
 
 	if err := local.AttachUnit(ctx, s.exec, unitID, bridge, veth, peer); err != nil {
 		return crex.Wrap(ErrNetwork, err)
@@ -90,8 +91,11 @@ func (s *networkLocalShim) Detach(ctx context.Context, unitID, networkID string)
 func (s *networkLocalShim) Apply(ctx context.Context, unitID string, rules []Rule) error {
 	var nftRules [][]string
 	for _, r := range rules {
-		if args := buildNftRule(r); args != nil {
-			nftRules = append(nftRules, args)
+		switch r.Direction {
+		case Ingress:
+			nftRules = append(nftRules, local.InputRule(r.Protocol, r.Port, r.Peer))
+		case Egress:
+			nftRules = append(nftRules, local.OutputRule(r.Protocol, r.Port, r.Peer))
 		}
 	}
 	local.ApplyRules(ctx, s.exec, unitID, nftRules)
@@ -107,7 +111,7 @@ func (s *networkLocalShim) List(ctx context.Context) ([]NetworkInfo, error) {
 
 	var result []NetworkInfo
 	for _, name := range bridges {
-		id := local.NetworkIDPrefix + strings.TrimPrefix(name, local.BridgePrefix)
+		id := fmt.Sprintf("%s%s", local.NetworkIDPrefix, strings.TrimPrefix(name, local.BridgePrefix))
 		info := NetworkInfo{ID: id}
 		if addr, err := local.InterfaceAddress(ctx, s.exec, name); err == nil {
 			info.Subnet = addr
@@ -119,47 +123,7 @@ func (s *networkLocalShim) List(ctx context.Context) ([]NetworkInfo, error) {
 
 // Derives the bridge interface name from a network ID.
 func bridgeName(networkID string) string {
-	return truncate(local.BridgePrefix+strings.TrimPrefix(networkID, local.NetworkIDPrefix), local.InterfaceNameMax)
-}
-
-// Translates a [Rule] into an nft command argument list.
-func buildNftRule(r Rule) []string {
-	var chain string
-	switch r.Direction {
-	case Ingress:
-		chain = "input"
-	case Egress:
-		chain = "output"
-	default:
-		return nil
-	}
-
-	args := []string{"nft", "add", "rule", "inet", "filter", chain}
-
-	proto := strings.ToLower(r.Protocol)
-	switch proto {
-	case "tcp", "udp", "sctp", "dccp":
-		args = append(args, "meta", "l4proto", proto)
-		if r.Port > 0 {
-			args = append(args, "th", "dport", fmt.Sprintf("%d", r.Port))
-		}
-	case "icmp", "icmpv6":
-		args = append(args, "meta", "l4proto", proto)
-	default:
-		args = append(args, "meta", "l4proto", proto)
-	}
-
-	if r.Peer != "" {
-		switch r.Direction {
-		case Ingress:
-			args = append(args, "ip", "saddr", r.Peer)
-		case Egress:
-			args = append(args, "ip", "daddr", r.Peer)
-		}
-	}
-
-	args = append(args, "accept")
-	return args
+	return truncate(fmt.Sprintf("%s%s", local.BridgePrefix, strings.TrimPrefix(networkID, local.NetworkIDPrefix)), local.InterfaceNameMax)
 }
 
 // Returns the first host address in a subnet.
@@ -176,4 +140,13 @@ func truncate(s string, maxCh int) string {
 		return s[:maxCh]
 	}
 	return s
+}
+
+// Returns n random bytes as a lowercase hex string.
+//
+// crypto/rand.Read never fails, so there is no error to return.
+func randHex(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }

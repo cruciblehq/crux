@@ -3,23 +3,21 @@
 package local
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/process"
 )
 
 // Lima configuration.
@@ -51,15 +49,17 @@ const (
 	goarchAMD64 = "amd64" // 64-bit x86.
 )
 
+// Go GOOS values.
+const (
+	goosDarwin = "darwin" // macOS.
+	goosLinux  = "linux"  // Linux.
+)
+
 // Architecture identifiers used in Lima YAML configuration.
 const (
 	limaArchARM64 = "aarch64" // ARM64 (Lima uses aarch64).
 	limaArchAMD64 = "x86_64"  // AMD64 (Lima uses x86_64).
 )
-
-// Maximum time to wait for child process I/O pipes to drain after context
-// cancellation kills the process.
-const commandWaitDelay = 5 * time.Second
 
 // Status strings returned by limactl list.
 const (
@@ -70,18 +70,12 @@ const (
 // Shared recovery guidance for local Lima command failures.
 const recoveryRestartLocalEnvironment = "Restart the local environment and try again."
 
-// Process exit codes returned by limaExec.
-const (
-	exitCodeSuccess = 0  // Command exited cleanly.
-	exitCodeError   = -1 // Command could not be started or its exit code is unavailable.
-)
-
 // OS name used in Lima release asset URLs (e.g. "Darwin", "Linux").
 func limaOS() string {
 	switch runtime.GOOS {
-	case "darwin":
+	case goosDarwin:
 		return limaOSDarwin
-	case "linux":
+	case goosLinux:
 		return limaOSLinux
 	default:
 		return runtime.GOOS
@@ -108,7 +102,7 @@ func limaArch() string {
 func limaDownloadArch() string {
 	switch runtime.GOARCH {
 	case goarchARM64:
-		if runtime.GOOS == "linux" {
+		if runtime.GOOS == goosLinux {
 			return limaArchARM64 // "aarch64" on Linux
 		}
 		return goarchARM64 // "arm64" on Darwin
@@ -179,9 +173,17 @@ func ensureLima(ctx context.Context) error {
 //
 // All entries are extracted into the destination directory, preserving the
 // archive's internal structure and executable permissions. This includes the
-// limactl binary and supporting files like guest agents.
+// limactl binary and supporting files like guest agents. Any earlier install
+// at dest is replaced, and the new install appears only once extraction has
+// fully succeeded, so an interrupted download never leaves a partial install.
 func extractLima(r io.Reader, dest string) error {
-	if err := archive.ExtractFromReader(r, dest, archive.Gzip); err != nil {
+	if err := os.RemoveAll(dest); err != nil {
+		return crex.SystemError("cannot install Lima", "failed to remove the previous Lima install").
+			Recovery("Check the permissions of the crux data directory, then try again.").
+			Cause(crex.Wrap(ErrLimaDownload, err)).
+			Err()
+	}
+	if err := archive.Extract(r, dest, archive.Gzip); err != nil {
 		return crex.SystemError("cannot install Lima", "failed to extract the Lima archive").
 			Recovery("Free up disk space, then try again.").
 			Cause(crex.Wrap(ErrLimaDownload, err)).
@@ -201,27 +203,17 @@ func extractLima(r io.Reader, dest string) error {
 //
 // Blocks until the command completes or the context is cancelled. The command
 // runs as the default Lima user inside the guest. The caller must ensure the
-// VM is running before calling this function.
+// VM is running before calling this function. A non-zero exit code is
+// returned, not reported as an error.
 func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
-	shellArgs := append([]string{"shell", limaInstanceName, command}, args...)
-
-	cmd := exec.CommandContext(ctx, limactlBin(), shellArgs...)
-	cmd.WaitDelay = commandWaitDelay
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	cmd.Env = limaEnv()
-
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.ExitCode(), nil
-		}
-		return exitCodeError, crex.SystemError("cannot run command in local environment", "the command could not be started in the virtual machine").
+	code, err := process.Run(ctx, limactl(append([]string{"shell", limaInstanceName, command}, args...), nil, stdout, stderr))
+	if err != nil {
+		return code, crex.SystemError("cannot run command in local environment", "the command could not be started in the virtual machine").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrHostExec, err)).
 			Err()
 	}
-
-	return exitCodeSuccess, nil
+	return code, nil
 }
 
 // Lists all Lima instances managed by crux.
@@ -230,18 +222,14 @@ func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string
 // Names are returned sorted lexicographically. Returns an empty slice when no
 // instances have been provisioned.
 func limaList(ctx context.Context) ([]string, error) {
-	var stdout bytes.Buffer
-	cmd := exec.CommandContext(ctx, limactlBin(), "list", "--format={{.Name}}")
-	cmd.WaitDelay = commandWaitDelay
-	cmd.Stdout = &stdout
-	cmd.Env = limaEnv()
-	if err := cmd.Run(); err != nil {
+	out, err := process.Output(ctx, limactl([]string{"list", "--format={{.Name}}"}, nil, nil, nil))
+	if err != nil {
 		return nil, crex.SystemError("cannot list local instances", "limactl failed to list instances").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrLimaCtl, err)).
 			Err()
 	}
-	names := strings.Fields(stdout.String())
+	names := strings.Fields(out)
 	sort.Strings(names)
 	return names, nil
 }
@@ -252,11 +240,7 @@ func limaList(ctx context.Context) ([]string, error) {
 // which uses the existing SSH connection. Entries in the archive are applied
 // as absolute paths, preserving permissions, ownership, and timestamps.
 func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
-	cmd := exec.CommandContext(ctx, limactlBin(), "shell", name, "tar", "-x", "-C", "/")
-	cmd.WaitDelay = commandWaitDelay
-	cmd.Stdin = r
-	cmd.Env = limaEnv()
-	if err := cmd.Run(); err != nil {
+	if err := process.Check(ctx, limactl([]string{"shell", name, "tar", "-x", "-C", "/"}, r, nil, nil)); err != nil {
 		return crex.SystemError("cannot copy files to local environment", "extracting the archive in the virtual machine failed").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrHostExec, err)).
@@ -267,21 +251,11 @@ func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
 
 // Runs a limactl subcommand synchronously.
 //
-// Blocks until the command exits or the context is cancelled. Lima stderr is
-// captured and appended to any non-zero exit error so callers can see what
-// Lima reported without the output reaching the user's terminal.
+// Blocks until the command exits or the context is cancelled. Lima's stderr is
+// kept out of the user's terminal and included in the error when the command
+// fails.
 func limactlRun(ctx context.Context, args ...string) error {
-	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, limactlBin(), args...)
-	cmd.WaitDelay = commandWaitDelay
-	cmd.Stderr = &stderr
-	cmd.Env = limaEnv()
-
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg != "" {
-			return crex.Wrapf(ErrLimaCtl, err, "%s", msg)
-		}
+	if err := process.Check(ctx, limactl(args, nil, nil, nil)); err != nil {
 		return crex.Wrap(ErrLimaCtl, err)
 	}
 	return nil
@@ -302,37 +276,31 @@ func limactlRunNoTTY(ctx context.Context, args ...string) error {
 // Returns the raw status string from limactl (e.g. "Running", "Stopped"), or
 // an empty string if the instance does not exist.
 func limaInstanceStatus(ctx context.Context) string {
-	var stdout bytes.Buffer
-	cmd := exec.CommandContext(ctx, limactlBin(), "list", "--format={{.Status}}", limaInstanceName)
-	cmd.WaitDelay = commandWaitDelay
-	cmd.Stdout = &stdout
-	cmd.Env = limaEnv()
-
-	if err := cmd.Run(); err != nil {
+	out, err := process.Output(ctx, limactl([]string{"list", "--format={{.Status}}", limaInstanceName}, nil, nil, nil))
+	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(stdout.String())
+	return out
+}
+
+// Returns the limactl command for args with the Lima environment.
+func limactl(args []string, stdin io.Reader, stdout, stderr io.Writer) process.Command {
+	return process.Command{
+		Path:   limactlBin(),
+		Args:   args,
+		Env:    limaEnv(),
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	}
 }
 
 // Environment for limactl commands.
 //
 // LIMA_HOME is set to the crux VM directory so Lima stores its instance
-// data alongside other crux state rather than in ~/.lima. PATH and HOME
-// are preserved from the current process so that limactl can find system
-// tools and resolve user directories. USER and TMPDIR are also preserved.
+// data alongside other crux state rather than in ~/.lima. PATH, HOME, USER,
+// and TMPDIR are preserved from the current process so that limactl can find
+// system tools and resolve user directories.
 func limaEnv() []string {
-	env := []string{fmt.Sprintf("LIMA_HOME=%s", dirs.VM())}
-
-	appendIfSet := func(key string) {
-		if val := os.Getenv(key); val != "" {
-			env = append(env, fmt.Sprintf("%s=%s", key, val))
-		}
-	}
-
-	appendIfSet("PATH")
-	appendIfSet("HOME")
-	appendIfSet("USER")
-	appendIfSet("TMPDIR")
-
-	return env
+	return append([]string{fmt.Sprintf("LIMA_HOME=%s", dirs.VM())}, process.Environ("PATH", "HOME", "USER", "TMPDIR")...)
 }

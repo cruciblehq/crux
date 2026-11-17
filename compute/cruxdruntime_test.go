@@ -3,6 +3,7 @@ package compute
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net/http"
@@ -11,16 +12,22 @@ import (
 
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/codec"
+	"github.com/cruciblehq/utils-go/httpx"
+	"github.com/cruciblehq/utils-go/mediatype"
 )
 
-func writeJSON(t *testing.T, w http.ResponseWriter, mt speccompute.MediaType, v any) {
+func writeJSON(t *testing.T, w http.ResponseWriter, mt mediatype.MediaType, v any) {
 	t.Helper()
-	data, err := codec.Encode(v, codec.JSON)
-	if err != nil {
-		t.Fatalf("encode: %v", err)
+	if err := httpx.Write(w, mt, speccompute.BodyFormat, http.StatusOK, v); err != nil {
+		t.Fatalf("write response: %v", err)
 	}
-	w.Header().Set(speccompute.HeaderContentType, mt.JSON())
-	_, _ = w.Write(data)
+}
+
+func writeError(t *testing.T, w http.ResponseWriter, status int, code speccompute.ErrorCode, message string) {
+	t.Helper()
+	if err := httpx.Write(w, speccompute.MediaTypeError, speccompute.BodyFormat, status, speccompute.Error{Code: code, Message: message}); err != nil {
+		t.Fatalf("write error: %v", err)
+	}
 }
 
 func readJSON(t *testing.T, r *http.Request, v any) {
@@ -29,9 +36,13 @@ func readJSON(t *testing.T, r *http.Request, v any) {
 	if err != nil {
 		t.Fatalf("read request: %v", err)
 	}
-	if err := codec.Unmarshal(data, v, codec.JSON); err != nil {
+	if err := codec.Decode(data, v, speccompute.BodyFormat); err != nil {
 		t.Fatalf("decode request: %v", err)
 	}
+}
+
+func tlsConfig(srv *httptest.Server) *tls.Config {
+	return srv.Client().Transport.(*http.Transport).TLSClientConfig
 }
 
 func serveCruxd(t *testing.T, mux *http.ServeMux) *cruxdRuntime {
@@ -39,9 +50,9 @@ func serveCruxd(t *testing.T, mux *http.ServeMux) *cruxdRuntime {
 	mux.HandleFunc(speccompute.EndpointHandshake, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: speccompute.Version})
 	})
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewTLSServer(mux)
 	t.Cleanup(srv.Close)
-	rt, err := Dial(context.Background(), srv.Listener.Addr().String())
+	rt, err := Dial(context.Background(), srv.Listener.Addr().String(), tlsConfig(srv), nil)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
@@ -55,24 +66,40 @@ func TestDial(t *testing.T) {
 	}
 }
 
+func TestDialSendsRevocations(t *testing.T) {
+	var got speccompute.HandshakeRequest
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		readJSON(t, r, &got)
+		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: speccompute.Version})
+	}))
+	defer srv.Close()
+
+	if _, err := Dial(context.Background(), srv.Listener.Addr().String(), tlsConfig(srv), []byte("crl")); err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if string(got.Revocations) != "crl" {
+		t.Errorf("Revocations = %q, want %q", got.Revocations, "crl")
+	}
+}
+
 func TestDialIncompatibleVersion(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: "999"})
 	}))
 	defer srv.Close()
 
-	_, err := Dial(context.Background(), srv.Listener.Addr().String())
+	_, err := Dial(context.Background(), srv.Listener.Addr().String(), tlsConfig(srv), nil)
 	if !errors.Is(err, ErrIncompatibleCruxd) {
 		t.Errorf("dial = %v, want ErrIncompatibleCruxd", err)
 	}
 }
 
 func TestDialUnreachable(t *testing.T) {
-	srv := httptest.NewServer(http.NotFoundHandler())
+	srv := httptest.NewTLSServer(http.NotFoundHandler())
 	addr := srv.Listener.Addr().String()
 	srv.Close()
 
-	_, err := Dial(context.Background(), addr)
+	_, err := Dial(context.Background(), addr, tlsConfig(srv), nil)
 	if !errors.Is(err, ErrCruxd) {
 		t.Errorf("dial = %v, want ErrCruxd", err)
 	}
@@ -81,7 +108,7 @@ func TestDialUnreachable(t *testing.T) {
 func TestRuntimeImport(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(speccompute.EndpointImport, func(w http.ResponseWriter, r *http.Request) {
-		if ct := r.Header.Get(speccompute.HeaderContentType); ct != speccompute.MediaTypeImageArchive.String() {
+		if ct := r.Header.Get(httpx.HeaderContentType); ct != speccompute.MediaTypeImageArchive.String() {
 			t.Errorf("content type = %q, want %q", ct, speccompute.MediaTypeImageArchive.String())
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -109,7 +136,7 @@ func TestRuntimeExport(t *testing.T) {
 		if req.Ref != "img:1" {
 			t.Errorf("ref = %q, want %q", req.Ref, "img:1")
 		}
-		w.Header().Set(speccompute.HeaderContentType, speccompute.MediaTypeImageArchive.String())
+		w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeImageArchive.String())
 		_, _ = w.Write([]byte("archive"))
 	})
 	rt := serveCruxd(t, mux)
@@ -131,7 +158,7 @@ func TestRuntimeExtract(t *testing.T) {
 		if req.Path != "/app" {
 			t.Errorf("path = %q, want %q", req.Path, "/app")
 		}
-		w.Header().Set(speccompute.HeaderContentType, speccompute.MediaTypeFileTree.String())
+		w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeFileTree.String())
 		_, _ = w.Write([]byte("tar"))
 	})
 	rt := serveCruxd(t, mux)
@@ -199,7 +226,7 @@ func TestRuntimeLoad(t *testing.T) {
 func TestRuntimeOperationError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(speccompute.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeError, speccompute.Error{Code: speccompute.ErrorCodeNotFound, Message: "image not found"})
+		writeError(t, w, http.StatusNotFound, speccompute.ErrorCodeNotFound, "image not found")
 	})
 	rt := serveCruxd(t, mux)
 
@@ -216,6 +243,20 @@ func TestRuntimeOperationError(t *testing.T) {
 	}
 }
 
+func TestRuntimeOperationErrorAtStatusOK(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc(speccompute.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
+		writeError(t, w, http.StatusOK, speccompute.ErrorCodeNotFound, "image not found")
+	})
+	rt := serveCruxd(t, mux)
+
+	_, err := rt.Inspect(context.Background(), "img:missing")
+	var opErr *speccompute.Error
+	if !errors.As(err, &opErr) || opErr.Code != speccompute.ErrorCodeNotFound {
+		t.Fatalf("inspect = %v, want a not_found spec error", err)
+	}
+}
+
 func TestRuntimeTransportError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(speccompute.EndpointRemove, func(w http.ResponseWriter, r *http.Request) {
@@ -224,8 +265,9 @@ func TestRuntimeTransportError(t *testing.T) {
 	rt := serveCruxd(t, mux)
 
 	err := rt.Remove(context.Background(), "img:1")
-	if !errors.Is(err, ErrCruxd) {
-		t.Errorf("remove = %v, want ErrCruxd", err)
+	var opErr *speccompute.Error
+	if !errors.Is(err, ErrCruxd) || errors.As(err, &opErr) {
+		t.Errorf("remove = %v, want a transport ErrCruxd", err)
 	}
 }
 

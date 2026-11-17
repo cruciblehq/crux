@@ -7,7 +7,6 @@ import (
 
 	"github.com/cruciblehq/crux/compute/local"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/crypto"
 )
 
 // Shim that adapts the local storage implementation to the [Storage] interface.
@@ -26,7 +25,7 @@ func newStorageLocal(root string) Storage {
 
 // Creates a new volume directory on the host filesystem.
 func (s *storageLocalShim) Create(ctx context.Context, opts VolumeOptions) (string, error) {
-	id := fmt.Sprintf("%s%s", local.VolumeIDPrefix, crypto.RandHex(idLen))
+	id := fmt.Sprintf("%s%s", local.VolumeIDPrefix, randHex(idLen))
 	if _, err := local.CreateVolume(s.root, id, os.FileMode(opts.Mode)); err != nil {
 		return "", crex.Wrap(ErrStorage, err)
 	}

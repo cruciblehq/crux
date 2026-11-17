@@ -19,7 +19,8 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		GuestMachineDir: "/mnt/crucible/machine",
 		CruxdBinary:     "/mnt/crucible/machine/cruxd-aarch64",
 		CruxdPort:       2789,
-		CruxdHealthPath: "/health",
+		EnrollmentPath:  "/etc/cruxd/enrollment.json",
+		Enrollment:      `{"machine":"abc"}`,
 	}
 
 	var buf bytes.Buffer
@@ -43,7 +44,8 @@ func TestConfigTemplate_IsValid(t *testing.T) {
 		`mountPoint: "/mnt/crucible/machine"`,
 		"writable: false",
 		`install -m 0755 "/mnt/crucible/machine/cruxd-aarch64" /usr/local/bin/cruxd`,
-		`wget -q -O /dev/null "http://127.0.0.1:2789/health"`,
+		`cat > "/etc/cruxd/enrollment.json" <<'EOF'`,
+		`{"machine":"abc"}`,
 		"guestPort: 2789",
 		"hostPort: 2789",
 	}

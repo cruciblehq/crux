@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
 	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -58,7 +59,10 @@ var limaConfigTemplate *template.Template
 // image, which is downloaded from the Crucible registry and cached locally if
 // not already cached. The machine directory holding the image also holds the
 // cruxd binary; it is mounted read-only into the VM so the provision script
-// can install and start cruxd, whose port is forwarded to the host.
+// can install and start cruxd, whose port is forwarded to the host. Enrollment
+// is written into the VM at EnrollmentPath on every boot; cruxd deletes it
+// once enrolled. The config file is readable only by the user, because it
+// holds the enrollment token.
 type limaConfig struct {
 	Arch            string // Lima architecture identifier ("aarch64" or "x86_64").
 	CPUs            int    // Number of virtual CPUs (defaultLimaCPUs).
@@ -69,7 +73,8 @@ type limaConfig struct {
 	GuestMachineDir string // Mount point of MachineDir inside the VM.
 	CruxdBinary     string // Path inside the VM to the cruxd binary for the VM's architecture.
 	CruxdPort       int    // Port cruxd listens on, forwarded to the same port on the host.
-	CruxdHealthPath string // Path of cruxd's health endpoint, used by the readiness probe.
+	EnrollmentPath  string // Path inside the VM where cruxd reads its enrollment data.
+	Enrollment      string // Enrollment data as a single line of JSON.
 }
 
 // Builds the Lima YAML configuration template data.
@@ -77,9 +82,9 @@ type limaConfig struct {
 // Targets the host's native architecture and uses defaults for CPU, memory,
 // and disk allocation. The VM boots from the machine disk image at imagePath.
 // containerd runs as a system service inside the VM. cruxd is installed from
-// the directory holding imagePath and its port is forwarded to the host. Does
-// not touch the filesystem.
-func buildLimaConfig(imagePath string) limaConfig {
+// the directory holding imagePath and its port is forwarded to the host.
+// enrollment is the machine's enrollment data. Does not touch the filesystem.
+func buildLimaConfig(imagePath string, enrollment []byte) limaConfig {
 	return limaConfig{
 		Arch:            limaArch(),
 		CPUs:            defaultLimaCPUs,
@@ -90,7 +95,8 @@ func buildLimaConfig(imagePath string) limaConfig {
 		GuestMachineDir: guestMachineDir,
 		CruxdBinary:     path.Join(guestMachineDir, fmt.Sprintf("%s%s", cruxdBinaryPrefix, limaArch())),
 		CruxdPort:       speccompute.DefaultPort,
-		CruxdHealthPath: speccompute.EndpointHealth,
+		EnrollmentPath:  trust.EnrollmentPath,
+		Enrollment:      string(enrollment),
 	}
 }
 
@@ -98,12 +104,13 @@ func buildLimaConfig(imagePath string) limaConfig {
 //
 // The configuration is generated with [buildLimaConfig] and rendered using
 // [limaConfigTemplate]. The file is written to disk so it can be read by
-// limactl when provisioning the VM. If the file already exists it will be
-// overwritten. Returns the path to the file that was generated.
-func generateLimaConfig(imagePath string) (string, error) {
+// limactl when provisioning the VM, and is readable only by the user. If the
+// file already exists it will be overwritten. Returns the path to the file
+// that was generated.
+func generateLimaConfig(imagePath string, enrollment []byte) (string, error) {
 	const description = "cannot configure local environment"
 
-	data := buildLimaConfig(imagePath)
+	data := buildLimaConfig(imagePath, enrollment)
 
 	configPath := limaConfigPath()
 	if err := os.MkdirAll(filepath.Dir(configPath), file.DefaultDirMode); err != nil {
@@ -113,7 +120,7 @@ func generateLimaConfig(imagePath string) (string, error) {
 			Err()
 	}
 
-	f, err := os.Create(configPath)
+	f, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, file.OwnerFileMode)
 	if err != nil {
 		return "", crex.SystemError(description, "failed to write the configuration file").
 			Recoveryf("Make sure you have write access to %s, then try again.", configPath).
@@ -121,6 +128,12 @@ func generateLimaConfig(imagePath string) (string, error) {
 			Err()
 	}
 	defer f.Close()
+	if err := f.Chmod(file.OwnerFileMode); err != nil {
+		return "", crex.SystemError(description, "failed to restrict access to the configuration file").
+			Recoveryf("Make sure you own %s, then try again.", configPath).
+			Cause(crex.Wrap(ErrHostConfig, err)).
+			Err()
+	}
 
 	if err := limaConfigTemplate.Execute(f, data); err != nil {
 		return "", crex.SystemError(description, "failed to render the configuration file").

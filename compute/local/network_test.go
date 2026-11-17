@@ -60,3 +60,27 @@ func TestListBridgeInterfaces_ParsesNames(t *testing.T) {
 		t.Fatalf("ListBridgeInterfaces() = %q, want %q", got, want)
 	}
 }
+
+func TestInputRule(t *testing.T) {
+	got := strings.Join(InputRule("TCP", 8080, "10.0.0.2"), " ")
+	want := "nft add rule inet filter input meta l4proto tcp th dport 8080 ip saddr 10.0.0.2 accept"
+	if got != want {
+		t.Fatalf("InputRule() = %q, want %q", got, want)
+	}
+}
+
+func TestInputRule_AnyProtocol(t *testing.T) {
+	got := strings.Join(InputRule("ip", 8080, ""), " ")
+	want := "nft add rule inet filter input accept"
+	if got != want {
+		t.Fatalf("InputRule() = %q, want %q", got, want)
+	}
+}
+
+func TestOutputRule(t *testing.T) {
+	got := strings.Join(OutputRule("icmp", 53, "10.0.0.3"), " ")
+	want := "nft add rule inet filter output meta l4proto icmp ip daddr 10.0.0.3 accept"
+	if got != want {
+		t.Fatalf("OutputRule() = %q, want %q", got, want)
+	}
+}

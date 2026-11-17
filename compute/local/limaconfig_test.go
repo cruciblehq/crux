@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/trust"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -52,7 +53,7 @@ func TestConfigTemplate_x86(t *testing.T) {
 }
 
 func TestBuildLimaConfig_Defaults(t *testing.T) {
-	cfg := buildLimaConfig("/tmp/test.qcow2")
+	cfg := buildLimaConfig("/tmp/test.qcow2", []byte(`{"machine":"abc"}`))
 
 	if cfg.Arch != limaArch() {
 		t.Errorf("Arch: got %q, want %q", cfg.Arch, limaArch())
@@ -81,7 +82,10 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	if cfg.CruxdPort != speccompute.DefaultPort {
 		t.Errorf("CruxdPort: got %d, want %d", cfg.CruxdPort, speccompute.DefaultPort)
 	}
-	if cfg.CruxdHealthPath != speccompute.EndpointHealth {
-		t.Errorf("CruxdHealthPath: got %q, want %q", cfg.CruxdHealthPath, speccompute.EndpointHealth)
+	if cfg.EnrollmentPath != trust.EnrollmentPath {
+		t.Errorf("EnrollmentPath: got %q, want %q", cfg.EnrollmentPath, trust.EnrollmentPath)
+	}
+	if cfg.Enrollment != `{"machine":"abc"}` {
+		t.Errorf("Enrollment: got %q, want %q", cfg.Enrollment, `{"machine":"abc"}`)
 	}
 }

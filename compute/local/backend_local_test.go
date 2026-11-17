@@ -16,14 +16,6 @@ func TestMachineArch(t *testing.T) {
 	}
 }
 
-func TestWaitForMachine_ContextCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if err := waitForMachine(ctx); !errors.Is(err, context.Canceled) {
-		t.Errorf("expected context.Canceled, got %v", err)
-	}
-}
-
 func TestUploadImage_ExistingFile(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "machine*.qcow2")
 	if err != nil {

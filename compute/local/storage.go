@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Creates a volume directory under root with the given permissions.
@@ -36,18 +37,12 @@ func RemoveVolume(root, id string) error {
 // Each subdirectory of <root>/volumes is reported as a volume ID.
 func ListVolumes(root string) ([]string, error) {
 	dir := filepath.Join(root, VolumesDir)
-	entries, err := os.ReadDir(dir)
+	ids, err := file.ListSubdirs(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, crex.Wrap(ErrStorage, err)
-	}
-	var ids []string
-	for _, e := range entries {
-		if e.IsDir() {
-			ids = append(ids, e.Name())
-		}
 	}
 	return ids, nil
 }
@@ -63,8 +58,7 @@ func RemoveImageIfStaged(ctx context.Context, id, tempDir string) error {
 	if err != nil {
 		return err
 	}
-	rel, err := filepath.Rel(prefix, abs)
-	if err != nil || len(rel) > 0 && rel[0] == '.' {
+	if !file.IsInside(abs, prefix) {
 		return nil
 	}
 	return os.Remove(abs)

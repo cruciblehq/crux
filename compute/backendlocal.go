@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
+	"github.com/cruciblehq/crux/machines"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Name of the local VM instance managed by crux.
@@ -18,9 +20,6 @@ const localInstanceName = "crux"
 func DefaultLocalInstanceID() string {
 	return localInstanceName
 }
-
-// Permission mode for the temp directory, reachable only by the current user.
-const tempDirMode os.FileMode = 0o700
 
 // Local port of the compute backend.
 type BackendLocal struct {
@@ -113,9 +112,19 @@ func (s *computeLocalShim) RemoveImage(ctx context.Context, id string) error {
 }
 
 // Provisions a new instance from a previously uploaded image.
+//
+// The instance boots with enrollment data for a new machine record, and this
+// blocks until crux has enrolled it and cruxd reports healthy.
 func (s *computeLocalShim) Provision(ctx context.Context, img string, opts ComputeOptions) (string, error) {
 	id := localInstanceName
-	if err := s.local.Provision(ctx, id, img); err != nil {
+	enrollment, err := newMachine(id)
+	if err != nil {
+		return "", err
+	}
+	if err := s.local.Provision(ctx, id, img, enrollment); err != nil {
+		return "", err
+	}
+	if err := s.waitReady(ctx, id); err != nil {
 		return "", err
 	}
 	return id, nil
@@ -123,12 +132,18 @@ func (s *computeLocalShim) Provision(ctx context.Context, img string, opts Compu
 
 // Tears down the instance and removes all associated persistent state.
 func (s *computeLocalShim) Deprovision(ctx context.Context, id string) error {
-	return s.local.Deprovision(ctx, id)
+	if err := s.local.Deprovision(ctx, id); err != nil {
+		return err
+	}
+	return machines.Remove(dirs.Machines(), id)
 }
 
 // Starts the instance and blocks until it is reachable.
 func (s *computeLocalShim) Start(ctx context.Context, id string) error {
-	return s.local.Start(ctx, id)
+	if err := s.local.Start(ctx, id); err != nil {
+		return err
+	}
+	return s.waitReady(ctx, id)
 }
 
 // Stops the instance without removing its persistent state.
@@ -137,12 +152,25 @@ func (s *computeLocalShim) Stop(ctx context.Context, id string) error {
 }
 
 // Returns the current lifecycle state of the instance.
+//
+// A running VM counts as running only when cruxd answers its health check
+// over mutual TLS.
 func (s *computeLocalShim) Status(ctx context.Context, id string) (State, error) {
 	state, err := s.local.Status(ctx, id)
 	if err != nil {
 		return 0, err
 	}
-	return localStateToState(state), nil
+	if state != local.StateRunning {
+		return localStateToState(state), nil
+	}
+	addr, err := s.local.CruxdAddress(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if machineHealthy(ctx, id, addr) != nil {
+		return StateStopped, nil
+	}
+	return StateRunning, nil
 }
 
 // Returns the identifiers of all instances known to the local backend.
@@ -160,13 +188,22 @@ func (s *computeLocalShim) Copy(ctx context.Context, id string, r io.Reader) err
 	return s.local.Copy(ctx, id, r)
 }
 
-// Opens the container runtime on the instance.
+// Opens the container runtime on the instance over mutual TLS.
 func (s *computeLocalShim) Connect(ctx context.Context, id string) (speccompute.Runtime, error) {
 	addr, err := s.local.CruxdAddress(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return Dial(ctx, addr)
+	return connectMachine(ctx, id, addr)
+}
+
+// Blocks until the instance is enrolled and cruxd reports healthy.
+func (s *computeLocalShim) waitReady(ctx context.Context, id string) error {
+	addr, err := s.local.CruxdAddress(ctx, id)
+	if err != nil {
+		return err
+	}
+	return waitForMachine(ctx, id, addr)
 }
 
 // Converts a [local.State] value to a [State].
@@ -184,7 +221,7 @@ func localStateToState(s local.State) State {
 // Creates a temporary file for local compute staging.
 func createTemp(pattern string) (*os.File, error) {
 	dir := dirs.Temp()
-	if err := os.MkdirAll(dir, tempDirMode); err != nil {
+	if err := os.MkdirAll(dir, file.OwnerDirMode); err != nil {
 		return nil, err
 	}
 	return os.CreateTemp(dir, pattern)

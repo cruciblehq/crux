@@ -8,4 +8,5 @@ var (
 	ErrNetwork           = crex.New("network operation failed")
 	ErrCruxd             = crex.New("cruxd request failed")
 	ErrIncompatibleCruxd = crex.New("incompatible cruxd protocol version")
+	ErrNotEnrolled       = crex.New("machine not enrolled")
 )

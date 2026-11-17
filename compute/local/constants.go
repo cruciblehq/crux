@@ -1,6 +1,6 @@
 package local
 
-import "os"
+import "github.com/cruciblehq/utils-go/file"
 
 // Linux interface name constraints.
 const (
@@ -23,8 +23,8 @@ const (
 
 // Filesystem defaults.
 const (
-	VolumesDir                    = "volumes" // Subdirectory name for volume storage.
-	DefaultVolumeMode os.FileMode = 0o700     // Default permission mode for volume directories.
+	VolumesDir        = "volumes"         // Subdirectory name for volume storage.
+	DefaultVolumeMode = file.OwnerDirMode // Default permission mode for volume directories.
 )
 
 // Command names and subcommands used by the network implementation.

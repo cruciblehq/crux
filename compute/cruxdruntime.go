@@ -3,24 +3,22 @@ package compute
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
-	"strings"
 
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/httpx"
+	"github.com/cruciblehq/utils-go/mediatype"
 )
-
-// Largest transport error body read into an error message.
-const maxErrorBody = 4096
 
 // Make sure the HTTP client satisfies the spec.
 var _ speccompute.Runtime = (*cruxdRuntime)(nil)
 
-// Container runtime on a machine, reached through cruxd over HTTP.
+// Container runtime on a machine, reached through cruxd over HTTPS.
 //
 // Each method sends one request to cruxd and maps its response back to the
 // [speccompute.Runtime] contract.
@@ -29,17 +27,22 @@ type cruxdRuntime struct {
 	client *http.Client // Client used for every request.
 }
 
-// Connects to cruxd at addr.
+// Connects to cruxd at addr over TLS with cfg.
 //
-// addr is a host and port. Returns an error when cruxd cannot be reached or
-// reports a protocol version other than [speccompute.Version].
-func Dial(ctx context.Context, addr string) (speccompute.Runtime, error) {
+// addr is a host and port. cfg decides which machine certificate is accepted.
+// revocations is the DER revocation list sent in the handshake, so the machine
+// learns about revoked certificates. Returns an error when cruxd cannot be
+// reached or reports a protocol version other than [speccompute.Version].
+func Dial(ctx context.Context, addr string, cfg *tls.Config, revocations []byte) (speccompute.Runtime, error) {
 	r := &cruxdRuntime{
-		base:   (&url.URL{Scheme: "http", Host: addr}).String(),
-		client: &http.Client{},
+		base: (&url.URL{Scheme: "https", Host: addr}).String(),
+		client: &http.Client{Transport: &http.Transport{
+			TLSClientConfig:   cfg,
+			ForceAttemptHTTP2: true,
+		}},
 	}
 	var resp speccompute.HandshakeResponse
-	req := speccompute.HandshakeRequest{Version: speccompute.Version}
+	req := speccompute.HandshakeRequest{Version: speccompute.Version, Revocations: revocations}
 	if err := r.call(ctx, speccompute.EndpointHandshake, speccompute.MediaTypeHandshakeRequest, req, speccompute.MediaTypeHandshakeResponse, &resp); err != nil {
 		return nil, err
 	}
@@ -141,7 +144,7 @@ func (r *cruxdRuntime) Close() error {
 // Sends req to endpoint and decodes the response into out.
 //
 // When out is nil the response is expected to have no body.
-func (r *cruxdRuntime) call(ctx context.Context, endpoint string, reqType speccompute.MediaType, req any, respType speccompute.MediaType, out any) error {
+func (r *cruxdRuntime) call(ctx context.Context, endpoint string, reqType mediatype.MediaType, req any, respType mediatype.MediaType, out any) error {
 	resp, err := r.send(ctx, endpoint, reqType, req)
 	if err != nil {
 		return err
@@ -153,15 +156,15 @@ func (r *cruxdRuntime) call(ctx context.Context, endpoint string, reqType specco
 	return decodeResponse(resp, respType, out)
 }
 
-// Encodes req as JSON and posts it to endpoint.
+// Encodes req in the compute body format and posts it to endpoint.
 //
 // The caller must close the response body.
-func (r *cruxdRuntime) send(ctx context.Context, endpoint string, reqType speccompute.MediaType, req any) (*http.Response, error) {
-	body, err := codec.Encode(req, codec.JSON)
+func (r *cruxdRuntime) send(ctx context.Context, endpoint string, reqType mediatype.MediaType, req any) (*http.Response, error) {
+	body, err := codec.Encode(req, speccompute.BodyFormat)
 	if err != nil {
 		return nil, crex.Wrap(ErrCruxd, err)
 	}
-	return r.post(ctx, endpoint, nil, reqType.JSON(), bytes.NewReader(body))
+	return r.post(ctx, endpoint, nil, reqType.With(speccompute.BodyFormat), bytes.NewReader(body))
 }
 
 // Posts body to endpoint with the given query and content type.
@@ -176,18 +179,12 @@ func (r *cruxdRuntime) post(ctx context.Context, endpoint string, query url.Valu
 // The content type header is set only when contentType is not empty. The
 // caller must close the response body.
 func (r *cruxdRuntime) request(ctx context.Context, method, endpoint string, query url.Values, contentType string, body io.Reader) (*http.Response, error) {
-	u, err := url.Parse(r.base)
-	if err != nil {
-		return nil, crex.Wrap(ErrCruxd, err)
-	}
-	u.Path = endpoint
-	u.RawQuery = query.Encode()
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	req, err := httpx.NewRequest(ctx, method, r.base, endpoint, query, body)
 	if err != nil {
 		return nil, crex.Wrap(ErrCruxd, err)
 	}
 	if contentType != "" {
-		req.Header.Set(speccompute.HeaderContentType, contentType)
+		req.Header.Set(httpx.HeaderContentType, contentType)
 	}
 	resp, err := r.client.Do(req)
 	if err != nil {
@@ -196,9 +193,9 @@ func (r *cruxdRuntime) request(ctx context.Context, method, endpoint string, que
 	return resp, nil
 }
 
-// Checks resp for a failure and decodes its JSON body into out.
-func decodeResponse(resp *http.Response, mt speccompute.MediaType, out any) error {
-	if err := checkResponse(resp, mt.JSON()); err != nil {
+// Checks resp for a failure and decodes its body into out.
+func decodeResponse(resp *http.Response, mt mediatype.MediaType, out any) error {
+	if err := checkResponse(resp, mt.With(speccompute.BodyFormat)); err != nil {
 		return err
 	}
 	return decodeBody(resp.Body, out)
@@ -206,36 +203,35 @@ func decodeResponse(resp *http.Response, mt speccompute.MediaType, out any) erro
 
 // Returns the failure carried by resp, if any.
 //
-// A non-200 status is a transport failure. A [speccompute.Error] payload is an
-// operation failure and is returned wrapped so callers can inspect it. When
-// expected is not empty, the response must carry that content type.
+// A [speccompute.Error] payload is an operation failure, whatever the status,
+// and is returned wrapped so callers can inspect it. Any other response with a
+// status other than 200 is a transport failure. When expected is not empty,
+// the response must carry that content type.
 func checkResponse(resp *http.Response, expected string) error {
-	if resp.StatusCode != http.StatusOK {
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-		return crex.Newf(ErrCruxd, "cruxd returned status %d with %q", resp.StatusCode, strings.TrimSpace(string(msg)))
-	}
-	ct := resp.Header.Get(speccompute.HeaderContentType)
-	mt, _, _ := mime.ParseMediaType(ct)
-	if mt == speccompute.MediaTypeError.JSON() {
+	ct := resp.Header.Get(httpx.HeaderContentType)
+	if mediatype.Matches(ct, speccompute.MediaTypeError.With(speccompute.BodyFormat)) {
 		var e speccompute.Error
-		if err := decodeBody(resp.Body, &e); err != nil {
+		if err := decodeBody(io.LimitReader(resp.Body, httpx.MaxErrorPayload), &e); err != nil {
 			return err
 		}
 		return crex.Wrap(ErrCruxd, &e)
 	}
-	if expected != "" && mt != expected {
+	if resp.StatusCode != http.StatusOK {
+		return crex.Newf(ErrCruxd, "cruxd returned status %d with %q", resp.StatusCode, httpx.ErrorBody(resp))
+	}
+	if expected != "" && !mediatype.Matches(ct, expected) {
 		return crex.Newf(ErrCruxd, "%q does not match %q", ct, expected)
 	}
 	return nil
 }
 
-// Reads r to the end and decodes it as JSON into out.
+// Reads r to the end and decodes it into out.
 func decodeBody(r io.Reader, out any) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return crex.Wrap(ErrCruxd, err)
 	}
-	if err := codec.Unmarshal(data, out, codec.JSON); err != nil {
+	if err := codec.Decode(data, out, speccompute.BodyFormat); err != nil {
 		return crex.Wrap(ErrCruxd, err)
 	}
 	return nil

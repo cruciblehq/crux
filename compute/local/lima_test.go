@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
 )
 
 func TestExtractLima(t *testing.T) {

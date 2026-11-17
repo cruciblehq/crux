@@ -9,18 +9,17 @@ import (
 	"testing"
 
 	speccompute "github.com/cruciblehq/spec/compute"
-	"github.com/cruciblehq/utils-go/codec"
+	"github.com/cruciblehq/utils-go/httpx"
 )
 
 func writeExecStream(t *testing.T, w http.ResponseWriter, msgs ...speccompute.ExecResponse) {
 	t.Helper()
-	w.Header().Set(speccompute.HeaderContentType, speccompute.MediaTypeExecResponse.String())
+	w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeExecResponse.String())
+	stream := speccompute.NewExecWriter(w)
 	for _, msg := range msgs {
-		data, err := codec.Encode(msg, codec.JSON)
-		if err != nil {
-			t.Fatalf("encode: %v", err)
+		if err := stream.Send(msg); err != nil {
+			t.Fatalf("send: %v", err)
 		}
-		_, _ = w.Write(append(data, '\n'))
 	}
 }
 
@@ -49,7 +48,7 @@ func TestContainerStart(t *testing.T) {
 func TestContainerStartNotFound(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(speccompute.EndpointStart, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeError, speccompute.Error{Code: speccompute.ErrorCodeNotFound, Message: "container not found"})
+		writeError(t, w, http.StatusNotFound, speccompute.ErrorCodeNotFound, "container not found")
 	})
 	ctr := serveContainer(t, mux)
 
@@ -77,7 +76,7 @@ func TestContainerCopy(t *testing.T) {
 		if id := r.URL.Query().Get(speccompute.QueryParamID); id != "c1" {
 			t.Errorf("id = %q, want %q", id, "c1")
 		}
-		if ct := r.Header.Get(speccompute.HeaderContentType); ct != speccompute.MediaTypeLayer.String() {
+		if ct := r.Header.Get(httpx.HeaderContentType); ct != speccompute.MediaTypeLayer.String() {
 			t.Errorf("content type = %q, want %q", ct, speccompute.MediaTypeLayer.String())
 		}
 		body, _ := io.ReadAll(r.Body)

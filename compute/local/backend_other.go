@@ -25,7 +25,7 @@ func uploadImage(_ context.Context, _ string) (string, error) {
 	return "", errUnsupportedPlatform
 }
 
-func provision(_ context.Context, _, _ string) error {
+func provision(_ context.Context, _, _ string, _ []byte) error {
 	return errUnsupportedPlatform
 }
 

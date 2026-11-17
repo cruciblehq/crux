@@ -32,8 +32,11 @@ func (b *Backend) UploadImage(ctx context.Context, path string) (string, error) 
 }
 
 // Provisions a compute host instance from a previously uploaded image.
-func (b *Backend) Provision(ctx context.Context, name, imageID string) error {
-	return provision(ctx, name, imageID)
+//
+// enrollment is the machine's enrollment data, written into the VM at
+// [trust.EnrollmentPath] until the machine enrolls.
+func (b *Backend) Provision(ctx context.Context, name, imageID string, enrollment []byte) error {
+	return provision(ctx, name, imageID, enrollment)
 }
 
 // Tears down the instance and removes all state.
