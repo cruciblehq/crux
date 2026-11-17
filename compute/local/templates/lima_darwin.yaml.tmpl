@@ -66,11 +66,18 @@ provision:
 
   # Installs cruxd from the mounted machine resource and runs it as a service.
   # The binary is reinstalled and the service restarted on every boot, so the
-  # VM always runs the cruxd shipped with its machine resource.
+  # VM always runs the cruxd shipped with its machine resource. The enrollment
+  # data is written first, readable only by root; an enrolled cruxd deletes it
+  # on start.
   - mode: system
     script: |
       #!/bin/sh
       set -eu
+      install -d -m 0700 "$(dirname "{{ .EnrollmentPath }}")"
+      (umask 077 && cat > "{{ .EnrollmentPath }}" <<'EOF'
+      {{ .Enrollment }}
+      EOF
+      )
       install -m 0755 "{{ .CruxdBinary }}" /usr/local/bin/cruxd
       if command -v systemctl >/dev/null 2>&1; then
         cat > /etc/systemd/system/cruxd.service <<'EOF'
@@ -104,16 +111,6 @@ provision:
         rc-update add cruxd default
         rc-service cruxd restart
       fi
-
-# Lima polls these after provisioning and marks the instance ready only once
-# all probes pass. cruxd's health check also covers containerd.
-probes:
-  - mode: readiness
-    description: cruxd to be running
-    script: |
-      #!/bin/sh
-      wget -q -O /dev/null "http://127.0.0.1:{{ .CruxdPort }}{{ .CruxdHealthPath }}"
-    hint: cruxd is not running
 
 # Forward cruxd's port to the same port on the host loopback interface. crux
 # talks to the machine only through cruxd.
