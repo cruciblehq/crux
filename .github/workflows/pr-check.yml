@@ -6,6 +6,6 @@ on:
 
 jobs:
   check:
-    uses: cruciblehq/.github/.github/workflows/go-check.yml@main
+    uses: cruciblehq/.github/.github/workflows/go-check.yml
     with:
       coverage-threshold: 15

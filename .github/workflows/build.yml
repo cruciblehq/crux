@@ -79,9 +79,9 @@ jobs:
           mkdir -p dist
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -v -ldflags "\
-            -X github.com/cruciblehq/crux/internal.version=${VERSION} \
-            -X github.com/cruciblehq/crux/internal.stage=${STAGE} \
-            -X github.com/cruciblehq/crux/internal.gitCommit=${COMMIT}" \
+            -X github.com/cruciblehq/crux/cmd/crux/internal.version=${VERSION} \
+            -X github.com/cruciblehq/crux/cmd/crux/internal.stage=${STAGE} \
+            -X github.com/cruciblehq/crux/cmd/crux/internal.gitCommit=${COMMIT}" \
           -o dist/crux-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/crux
 
       - name: Sign macOS binary
