@@ -9,7 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/dirs"
+	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -307,7 +308,7 @@ func (c *Cache) extract(namespace, resource, version string) (string, error) {
 	}
 	defer f.Close()
 
-	if err := extractDirAtomic(f, dir); err != nil {
+	if err := archive.Extract(f, dir, archive.Zstd); err != nil {
 		return "", crex.SystemError("cannot extract cache entry", "failed to extract the cached archive").
 			Recovery("The cache may be corrupt. Run 'crux cache clear' and try again.").
 			Cause(err).
@@ -403,7 +404,7 @@ func (c *Cache) writeEntry(namespace, resource, version string, r io.Reader) (*V
 	}
 
 	archPath := filepath.Join(dir, archiveFilename)
-	digest, size, err := file.WriteAtomic(r, dir, archPath)
+	digest, size, err := writeArchive(r, archPath)
 	if err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to write the cached archive").
 			Recovery("Free up disk space, then try again.").
@@ -439,14 +440,12 @@ func (c *Cache) removeVersion(namespace, resource, version string) error {
 	}
 
 	// Best-effort parent directory cleanup.
-	for _, dir := range []string{
-		filepath.Dir(vDir),
-		filepath.Dir(filepath.Dir(vDir)),
-		filepath.Dir(eDir),
-		filepath.Dir(filepath.Dir(eDir)),
+	for _, pair := range [][2]string{
+		{filepath.Dir(vDir), c.archivesRoot()},
+		{filepath.Dir(eDir), c.extractedRoot()},
 	} {
-		if pErr := file.RemoveDirIfEmpty(dir); pErr != nil {
-			slog.Error("failed to prune empty directory", "dir", dir, "error", pErr)
+		if pErr := file.RemoveEmptyParents(pair[0], pair[1]); pErr != nil {
+			slog.Error("failed to prune empty directory", "dir", pair[0], "error", pErr)
 		}
 	}
 

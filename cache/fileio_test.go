@@ -1,12 +1,16 @@
 package cache
 
 import (
-	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestOpenFile(t *testing.T) {
@@ -124,41 +128,46 @@ func TestWriteMetaBadPath(t *testing.T) {
 	}
 }
 
-func TestExtractDirAtomic(t *testing.T) {
+func TestWriteArchive(t *testing.T) {
 	dir := t.TempDir()
-	dest := filepath.Join(dir, "extracted")
+	dest := filepath.Join(dir, "out.bin")
+	content := "hello world"
 
-	archive := testArchive(t, map[string]string{"hello.txt": "world"})
-	if err := extractDirAtomic(archive, dest); err != nil {
-		t.Fatal(err)
+	digest, size, err := writeArchive(strings.NewReader(content), dest)
+	if err != nil {
+		t.Fatalf("writeArchive() = %v, want nil", err)
 	}
-
-	data, err := os.ReadFile(filepath.Join(dest, "hello.txt"))
+	if size != int64(len(content)) {
+		t.Errorf("size = %d, want %d", size, len(content))
+	}
+	h := sha256.Sum256([]byte(content))
+	if want := fmt.Sprintf("sha256:%s", hex.EncodeToString(h[:])); digest != want {
+		t.Errorf("digest = %s, want %s", digest, want)
+	}
+	data, err := os.ReadFile(dest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(data) != "world" {
-		t.Fatalf("expected %q, got %q", "world", data)
+	if string(data) != content {
+		t.Errorf("content = %q, want %q", data, content)
 	}
 }
 
-func TestExtractDirAtomicCreatesParent(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "deep", "nested")
+func TestWriteArchiveReadError(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "out.bin")
 
-	archive := testArchive(t, map[string]string{"f": "content"})
-	if err := extractDirAtomic(archive, dir); err != nil {
+	if _, _, err := writeArchive(iotest.ErrReader(os.ErrClosed), dest); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("writeArchive() = %v, want %v", err, os.ErrClosed)
+	}
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Errorf("destination exists after a failed write, stat = %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := os.Stat(filepath.Join(dir, "f")); err != nil {
-		t.Fatal("expected extracted file to exist")
-	}
-}
-
-func TestExtractDirAtomicBadReader(t *testing.T) {
-	dest := filepath.Join(t.TempDir(), "out")
-	err := extractDirAtomic(bytes.NewReader([]byte("not a valid archive")), dest)
-	if err == nil {
-		t.Fatal("expected error for invalid archive data")
+	if len(entries) != 0 {
+		t.Errorf("dir has %d entries after a failed write, want 0", len(entries))
 	}
 }

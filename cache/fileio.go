@@ -1,13 +1,15 @@
 package cache
 
 import (
-	"encoding/json"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/cruciblehq/utils-go/archive"
+	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -19,29 +21,6 @@ func openFile(path string) (*os.File, error) {
 		return nil, ErrNotFound
 	}
 	return f, err
-}
-
-// Extracts a zstd-compressed tar archive into dir atomically.
-//
-// The archive is extracted into a temporary sibling directory, then renamed
-// into place.
-func extractDirAtomic(r io.Reader, dir string) error {
-	parent := filepath.Dir(dir)
-	if err := os.MkdirAll(parent, file.DefaultDirMode); err != nil {
-		return err
-	}
-
-	tmpDir, err := os.MkdirTemp(parent, ".extracting-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpDir) // No-op after successful rename.
-
-	if err := archive.ExtractFromReader(r, tmpDir, archive.Zstd); err != nil {
-		return err
-	}
-
-	return os.Rename(tmpDir, dir)
 }
 
 // Reads and parses a version metadata file.
@@ -60,7 +39,7 @@ func readMeta(metaPath string) (*Version, error) {
 	}
 
 	var ver Version
-	if err := json.Unmarshal(data, &ver); err != nil {
+	if err := codec.Decode(data, &ver, codec.JSON); err != nil {
 		return nil, crex.SystemError("cannot read cache", "the cache metadata file is corrupt").
 			Recovery(recoveryCacheClear).
 			Cause(err).
@@ -85,18 +64,40 @@ func writeMeta(metPath, namespace, resource, version, digest string, size int64)
 		UpdatedAt: now,
 	}
 
-	data, err := json.Marshal(ver)
+	data, err := codec.Encode(ver, codec.JSON)
 	if err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to encode the cache metadata").
 			Recovery("Run 'crux cache clear' and try again.").
 			Cause(err).
 			Err()
 	}
-	if err := os.WriteFile(metPath, data, file.DefaultFileMode); err != nil {
+	if err := file.WriteFile(metPath, data, file.DefaultFileMode); err != nil {
 		return nil, crex.SystemError("cannot write to cache", "failed to write the cache metadata file").
 			Recovery("Free up disk space, then try again.").
 			Cause(err).
 			Err()
 	}
 	return ver, nil
+}
+
+// Streams r to path atomically and returns its SHA-256 digest and size.
+//
+// The digest is hex encoded with a "sha256:" prefix, the form recorded in the
+// entry metadata.
+func writeArchive(r io.Reader, path string) (string, int64, error) {
+	a, err := file.CreateAtomic(filepath.Dir(path), file.DefaultFileMode)
+	if err != nil {
+		return "", 0, err
+	}
+	defer a.Abort()
+
+	h := sha256.New()
+	size, err := io.Copy(io.MultiWriter(a, h), r)
+	if err != nil {
+		return "", 0, err
+	}
+	if err := a.Commit(path); err != nil {
+		return "", 0, err
+	}
+	return fmt.Sprintf("sha256:%s", hex.EncodeToString(h.Sum(nil))), size, nil
 }
