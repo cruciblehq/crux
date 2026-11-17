@@ -6,14 +6,15 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/resource/oci"
 	speccompute "github.com/cruciblehq/spec/compute"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -156,7 +157,7 @@ func (b *Builder) copyStep(ctx context.Context, ctr speccompute.Container, step 
 
 	pr, pw := io.Pipe()
 	go func() {
-		pw.CloseWithError(oci.WriteCopyTar(pw, filepath.Join(b.workdir, src), dest))
+		pw.CloseWithError(archive.Write(pw, filepath.Join(b.workdir, src), dest, archive.Tar))
 	}()
 
 	return ctr.Copy(ctx, pr)
@@ -165,9 +166,9 @@ func (b *Builder) copyStep(ctx context.Context, ctr speccompute.Container, step 
 // Executes an Unpack step by extracting a host archive into the container.
 //
 // The host source path is resolved relative to the manifest directory and must
-// point to a tar archive, optionally gzip-compressed. Its contents are extracted
-// into the image at the destination, which defaults to the current workdir when
-// set, otherwise to the image root. Unlike a copy, the archive's entries are
+// point to a tar archive, plain or compressed with Gzip or Zstandard. Its
+// contents are extracted into the image at the destination, which defaults to
+// the current workdir when set, otherwise to the image root. Unlike a copy, the archive's entries are
 // unpacked rather than stored as a single file, which is how a base filesystem
 // is seeded into a scratch image.
 func (b *Builder) unpackStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState) error {
@@ -190,10 +191,35 @@ func (b *Builder) unpackStep(ctx context.Context, ctr speccompute.Container, ste
 
 	pr, pw := io.Pipe()
 	go func() {
-		pw.CloseWithError(oci.WriteUnpackTar(pw, filepath.Join(b.workdir, src), dest))
+		pw.CloseWithError(writeUnpackTar(pw, filepath.Join(b.workdir, src), dest))
 	}()
 
 	return ctr.Copy(ctx, pr)
+}
+
+// Writes the archive at archivePath to w as an uncompressed tar with its
+// entries moved under dest.
+//
+// The archive may be plain tar, Gzip, or Zstandard. The format is found from
+// its leading bytes.
+func writeUnpackTar(w io.Writer, archivePath, dest string) error {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return crex.Wrapf(ErrBuild, err, "open archive %q", archivePath)
+	}
+	defer f.Close()
+
+	format, r, err := archive.DetectFormat(f)
+	if err != nil {
+		return err
+	}
+	dr, err := archive.Decompress(r, format)
+	if err != nil {
+		return crex.Wrapf(ErrBuild, err, "decompress archive %q", archivePath)
+	}
+	defer dr.Close()
+
+	return archive.Rebase(w, dr, "", dest)
 }
 
 // Copies srcPath from the named prior stage into ctr at destPath.
@@ -225,7 +251,7 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr speccompute.Container,
 
 	pr, pw := io.Pipe()
 	go func() {
-		err := oci.RewriteTarPaths(pw, rc, srcPath, destPath)
+		err := archive.Rebase(pw, rc, srcPath, destPath)
 		rc.Close()
 		pw.CloseWithError(err)
 	}()

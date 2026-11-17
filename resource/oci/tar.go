@@ -2,21 +2,15 @@ package oci
 
 import (
 	"archive/tar"
-	"bufio"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 
 	godigest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go"
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/cruciblehq/utils-go/crex"
+	"github.com/cruciblehq/utils-go/file"
 )
 
 // Names for the scratch base image.
@@ -29,6 +23,9 @@ const (
 	scratchImageRef     = "scratch:latest"           // Full name registered for the scratch image.
 	scratchImageTag     = "latest"                   // OCI ref-name tag for the scratch image.
 )
+
+// Schema version of OCI image manifests and indexes.
+const ociSchemaVersion = 2
 
 // Writes scratch (empty) OCI image.
 //
@@ -73,7 +70,7 @@ func writeScratchConfig(tw *tar.Writer) (godigest.Digest, int64, error) {
 // Writes the image manifest blob referencing config and returns its digest and byte length.
 func writeScratchManifest(tw *tar.Writer, configDigest godigest.Digest, configSize int64) (godigest.Digest, int64, error) {
 	mfst, err := json.Marshal(ocispecv1.Manifest{
-		Versioned: ocispec.Versioned{SchemaVersion: 2},
+		Versioned: ocispec.Versioned{SchemaVersion: ociSchemaVersion},
 		MediaType: ocispecv1.MediaTypeImageManifest,
 		Config: ocispecv1.Descriptor{
 			MediaType: ocispecv1.MediaTypeImageConfig,
@@ -96,7 +93,7 @@ func writeScratchManifest(tw *tar.Writer, configDigest godigest.Digest, configSi
 // the unnamed manifest and reports no images.
 func writeScratchIndex(tw *tar.Writer, mfstDigest godigest.Digest, mfstSize int64) error {
 	index, err := json.Marshal(ocispecv1.Index{
-		Versioned: ocispec.Versioned{SchemaVersion: 2},
+		Versioned: ocispec.Versioned{SchemaVersion: ociSchemaVersion},
 		MediaType: ocispecv1.MediaTypeImageIndex,
 		Manifests: []ocispecv1.Descriptor{
 			{
@@ -126,7 +123,7 @@ func writeBlob(tw *tar.Writer, data []byte) (godigest.Digest, error) {
 func writeTarEntry(tw *tar.Writer, name string, data []byte) error {
 	hdr := &tar.Header{
 		Name:     name,
-		Mode:     0644,
+		Mode:     int64(file.DefaultFileMode),
 		Size:     int64(len(data)),
 		Typeflag: tar.TypeReg,
 	}
@@ -135,178 +132,4 @@ func writeTarEntry(tw *tar.Writer, name string, data []byte) error {
 	}
 	_, err := tw.Write(data)
 	return err
-}
-
-// Writes host files at srcPath into a tar archive destined for destDir.
-//
-// Directories are walked recursively; symlinks are followed by Lstat and
-// written as regular paths. The destination paths inside the tar are formed by
-// joining destDir with the relative path from srcPath.
-func WriteCopyTar(w io.Writer, srcPath, destDir string) error {
-	tw := tar.NewWriter(w)
-	defer tw.Close()
-
-	info, err := os.Stat(srcPath)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-
-	if !info.IsDir() {
-		tarPath := filepath.Join(destDir, filepath.Base(srcPath))
-		return copyFileToTar(tw, srcPath, tarPath)
-	}
-
-	return filepath.WalkDir(srcPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return crex.Wrap(ErrFileSystemOperation, err)
-		}
-		rel, err := filepath.Rel(srcPath, path)
-		if err != nil {
-			return crex.Wrap(ErrFileSystemOperation, err)
-		}
-		tarPath := filepath.Join(destDir, rel)
-		if d.IsDir() {
-			return tw.WriteHeader(&tar.Header{
-				Name:     fmt.Sprintf("%s/", tarPath),
-				Typeflag: tar.TypeDir,
-				Mode:     0755,
-			})
-		}
-		return copyFileToTar(tw, path, tarPath)
-	})
-}
-
-// Copies a single file from the host into a tar writer at tarPath.
-func copyFileToTar(tw *tar.Writer, hostPath, tarPath string) error {
-	fi, err := os.Lstat(hostPath)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	hdr, err := tar.FileInfoHeader(fi, "")
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	hdr.Name = tarPath
-
-	if err := tw.WriteHeader(hdr); err != nil {
-		return err
-	}
-
-	f, err := os.Open(hostPath)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	defer f.Close()
-
-	_, err = io.Copy(tw, f)
-	return err
-}
-
-// Rewrites entry paths in an uncompressed tar stream from srcPath to destPath.
-//
-// When srcPath names a single file the entry is renamed to destPath. When
-// srcPath names a directory, the srcPath prefix in every entry name is replaced
-// by destPath. Both paths must use forward slashes. Leading slashes in srcPath
-// and destPath are stripped before comparison and output.
-func RewriteTarPaths(w io.Writer, r io.Reader, srcPath, destPath string) error {
-	srcClean := strings.Trim(srcPath, "/")
-	destClean := strings.Trim(destPath, "/")
-
-	tr := tar.NewReader(r)
-	tw := tar.NewWriter(w)
-
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		name := strings.TrimPrefix(strings.TrimPrefix(hdr.Name, "./"), "/")
-
-		var newName string
-		switch {
-		case name == srcClean:
-			newName = destClean
-		case strings.HasPrefix(name, fmt.Sprintf("%s/", srcClean)):
-			newName = fmt.Sprintf("%s/%s", destClean, strings.TrimPrefix(name, fmt.Sprintf("%s/", srcClean)))
-		default:
-			newName = name
-		}
-
-		hdr.Name = newName
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-		if _, err := io.Copy(tw, tr); err != nil {
-			return err
-		}
-	}
-	return tw.Close()
-}
-
-// Streams a host tar archive's contents into an uncompressed tar retargeted
-// under destDir.
-//
-// archivePath points to a tar archive on the host, optionally gzip-compressed;
-// the format is detected from the leading magic bytes. Every entry is rewritten
-// so its path is placed under destDir, preserving all header fields (mode,
-// ownership, symlink and hardlink targets, device numbers, xattrs). When
-// destDir is the image root ("/" or ""), entries are emitted unchanged so that
-// symlink and hardlink targets remain valid. The resulting stream is suitable
-// for [compute.Container.Copy], which applies it to the image snapshot without
-// executing anything in the container.
-func WriteUnpackTar(w io.Writer, archivePath, destDir string) error {
-	f, err := os.Open(archivePath)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	defer f.Close()
-
-	br := bufio.NewReader(f)
-
-	var src io.Reader = br
-	if magic, err := br.Peek(2); err == nil && magic[0] == 0x1f && magic[1] == 0x8b {
-		gz, err := gzip.NewReader(br)
-		if err != nil {
-			return crex.Wrap(ErrFileSystemOperation, err)
-		}
-		defer gz.Close()
-		src = gz
-	}
-
-	destClean := strings.Trim(destDir, "/")
-
-	tr := tar.NewReader(src)
-	tw := tar.NewWriter(w)
-
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		name := strings.TrimPrefix(strings.TrimPrefix(hdr.Name, "./"), "/")
-		if name == "" {
-			continue
-		}
-		if destClean != "" {
-			hdr.Name = fmt.Sprintf("%s/%s", destClean, name)
-		} else {
-			hdr.Name = name
-		}
-
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-		if _, err := io.Copy(tw, tr); err != nil {
-			return err
-		}
-	}
-	return tw.Close()
 }

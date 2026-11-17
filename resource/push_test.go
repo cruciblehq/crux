@@ -7,7 +7,6 @@ import (
 
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/registry"
 )
 
 func TestPushMissingPackage(t *testing.T) {
@@ -20,7 +19,7 @@ func TestPushMissingPackage(t *testing.T) {
 	}
 
 	err = Push(context.Background(), src, m, "/nonexistent/pkg.tar.zst")
-	if !errors.Is(err, registry.ErrFileSystemOperation) {
-		t.Fatalf("Push missing package = %v, want registry.ErrFileSystemOperation", err)
+	if !errors.Is(err, hub.ErrFileSystemOperation) {
+		t.Fatalf("Push missing package = %v, want hub.ErrFileSystemOperation", err)
 	}
 }

@@ -114,5 +114,5 @@ func lowerFirst(s string) string {
 	if s == "" {
 		return s
 	}
-	return string(unicode.ToLower(rune(s[0]))) + s[1:]
+	return fmt.Sprintf("%c%s", unicode.ToLower(rune(s[0])), s[1:])
 }

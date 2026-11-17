@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -40,7 +39,7 @@ func ensureOutputDir(outputPath string) error {
 		return nil
 	}
 	if err := os.MkdirAll(outputDir, file.DefaultDirMode); err != nil {
-		return crex.Wrap(registry.ErrFileSystemOperation, err)
+		return crex.Wrap(ErrFileSystemOperation, err)
 	}
 	return nil
 }
@@ -48,12 +47,43 @@ func ensureOutputDir(outputPath string) error {
 // Creates the archive from the build directory contents.
 //
 // Archives the build directory as-is. The manifest and build artifacts are
-// assumed to already be in their final form.
+// assumed to already be in their final form. The compression follows the
+// output extension, and the archive appears at outputPath only once it is
+// complete.
 func createArchive(outputPath string, buildDir string) error {
-	if err := archive.Create(buildDir, outputPath); err != nil {
-		return crex.SystemError("failed to create package archive", "could not write the archive to disk").
-			Recovery("Check that you have write permissions for the output path.").
+	const (
+		description = "failed to create package archive"
+		reason      = "could not write the archive to disk"
+		recovery    = "Check that you have write permissions for the output path."
+	)
+
+	format, err := archive.FormatOfName(outputPath)
+	if err != nil {
+		return crex.UserError(description, "the output path does not name a supported archive format").
+			Recovery("Use an output path that ends in .tar.zst.").
 			Cause(err).
+			Err()
+	}
+
+	af, err := file.CreateAtomic(filepath.Dir(outputPath), file.DefaultFileMode)
+	if err != nil {
+		return crex.SystemError(description, reason).
+			Recovery(recovery).
+			Cause(crex.Wrap(ErrFileSystemOperation, err)).
+			Err()
+	}
+	defer af.Abort()
+
+	if err := archive.Write(af, buildDir, "", format); err != nil {
+		return crex.SystemError(description, reason).
+			Recovery(recovery).
+			Cause(err).
+			Err()
+	}
+	if err := af.Commit(outputPath); err != nil {
+		return crex.SystemError(description, reason).
+			Recovery(recovery).
+			Cause(crex.Wrap(ErrFileSystemOperation, err)).
 			Err()
 	}
 

@@ -28,7 +28,12 @@ func TestPack(t *testing.T) {
 
 	// The archive round-trips back to the original paths.
 	extracted := filepath.Join(t.TempDir(), "out")
-	if err := archive.Extract(output, extracted); err != nil {
+	f, err := os.Open(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := archive.Extract(f, extracted, archive.Zstd); err != nil {
 		t.Fatalf("extract: %v", err)
 	}
 	if got, err := os.ReadFile(filepath.Join(extracted, "out.img")); err != nil || string(got) != "payload" {
