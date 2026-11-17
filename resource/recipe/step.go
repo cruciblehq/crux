@@ -322,7 +322,7 @@ func applyStateModifiers(state *stageState, step *manifest.Step) {
 //
 // Only Linux targets are supported. Non-Linux platforms are silently skipped.
 func matchesBuildPlatform(platform string) bool {
-	// TODO: compare against the actual target platform from the build context.
+	// TO DO: compare against the actual target platform from the build context.
 	targetOS, _, _ := strings.Cut(platform, "/")
 	return targetOS == "linux"
 }
