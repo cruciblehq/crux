@@ -10,7 +10,6 @@ import (
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 	"github.com/cruciblehq/utils-go/watch"
@@ -112,7 +111,7 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
-			Cause(crex.Wrap(registry.ErrFileSystemOperation, err)).
+			Cause(crex.Wrap(resource.ErrFileSystemOperation, err)).
 			Err()
 	}
 

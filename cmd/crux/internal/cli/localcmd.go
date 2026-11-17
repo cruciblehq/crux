@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/internal/dirs"
+	"github.com/cruciblehq/crux/compute/local"
+	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -76,7 +77,7 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 			Err()
 	}
 
-	lf, err := os.OpenFile(filepath.Join(dir, localLockFile), os.O_CREATE|os.O_RDWR, 0600)
+	lf, err := os.OpenFile(filepath.Join(dir, localLockFile), os.O_CREATE|os.O_RDWR, file.OwnerFileMode)
 	if err != nil {
 		return crex.SystemError(description, "failed to open the local state lock").
 			Recoveryf(recoveryWriteAccess, dir).
@@ -142,4 +143,28 @@ func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
 			Err()
 	}
 	return m, bp, nil
+}
+
+// Maps the local backend's lifecycle errors to user errors.
+//
+// description says what failed. notRunning is the recovery offered when the
+// environment is not running, because the right next step depends on the
+// command. Other errors are returned unchanged.
+func localError(err error, description, notRunning string) error {
+	switch {
+	case errors.Is(err, local.ErrHostNotCreated):
+		return crex.UserError(description, "the local environment has not been provisioned").
+			Recovery("Run 'crux local start' to provision the local environment first.").
+			Reclassify(err)
+	case errors.Is(err, local.ErrHostNotRunning):
+		return crex.UserError(description, "the local environment is not running").
+			Recovery(notRunning).
+			Reclassify(err)
+	case errors.Is(err, local.ErrHostAlreadyProvisioned):
+		return crex.UserError(description, "the local environment is already provisioned").
+			Recovery("Run 'crux local start' to use the existing environment, or 'crux local reset' to recreate it.").
+			Reclassify(err)
+	default:
+		return err
+	}
 }

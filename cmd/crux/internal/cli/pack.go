@@ -7,7 +7,6 @@ import (
 
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -26,7 +25,7 @@ func (c *PackCmd) Run(ctx context.Context) error {
 
 	result, err := resource.Pack(ctx, manifest.BuildDir(RootCmd.Context), manifest.PackagePath(RootCmd.Context))
 	if err != nil {
-		if errors.Is(err, registry.ErrFileSystemOperation) {
+		if errors.Is(err, resource.ErrFileSystemOperation) {
 			return crex.SystemError("cannot package resource", "the package output directory could not be created").
 				Recoveryf("Make sure you have write access to %s, then try again.", manifest.PackagePath(RootCmd.Context)).
 				Reclassify(err)

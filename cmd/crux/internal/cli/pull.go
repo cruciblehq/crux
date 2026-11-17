@@ -9,7 +9,6 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -58,23 +57,23 @@ func (c *PullCmd) Run(ctx context.Context) error {
 	if err != nil {
 		const description = "cannot pull resource"
 		switch {
-		case errors.Is(err, registry.ErrNoVersions), errors.Is(err, registry.ErrNoMatchingVersion), errors.Is(err, registry.ErrTypeMismatch):
+		case errors.Is(err, hub.ErrNoVersions), errors.Is(err, hub.ErrNoMatchingVersion), errors.Is(err, hub.ErrTypeMismatch):
 			return crex.UserError("resource not found", raw).
 				Recovery("Check the resource reference and version, then try again.").
 				Reclassify(err)
-		case errors.Is(err, registry.ErrNoArchive):
+		case errors.Is(err, hub.ErrNoArchive):
 			return crex.UserError(description, "the requested resource version has no uploaded archive").
 				Recovery("Choose a different version, or republish the resource with an archive.").
 				Reclassify(err)
-		case errors.Is(err, registry.ErrResolveVersion):
+		case errors.Is(err, hub.ErrResolveVersion):
 			return crex.SystemError(description, "the registry could not resolve the requested resource version").
 				Recovery("Check your network connection and try again.").
 				Reclassify(err)
-		case errors.Is(err, registry.ErrDownload):
+		case errors.Is(err, hub.ErrDownload):
 			return crex.SystemError(description, "the resource archive could not be downloaded from the registry").
 				Recovery("Check your network connection and try again.").
 				Reclassify(err)
-		case errors.Is(err, registry.ErrCacheOperation):
+		case errors.Is(err, hub.ErrCacheOperation):
 			return crex.SystemError(description, "the local cache could not store or extract the resource archive").
 				Recovery("Run 'crux cache clear' and try again.").
 				Reclassify(err)

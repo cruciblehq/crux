@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/url"
 	"os"
@@ -13,26 +12,10 @@ import (
 	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Returns a start-specific structured error when this command has enough
-// context to improve user guidance.
+// Returns a user error for a failed 'start' when the cause is a known
+// local environment state.
 func localStartError(err error) error {
-	const description = "cannot start local environment"
-	switch {
-	case errors.Is(err, local.ErrHostNotCreated):
-		return crex.UserError(description, "the local environment has not been provisioned").
-			Recovery("Run 'crux local start' to provision the local environment first.").
-			Reclassify(err)
-	case errors.Is(err, local.ErrHostNotRunning):
-		return crex.UserError(description, "the local environment is not running").
-			Recovery("Run 'crux local start' to start the local environment first.").
-			Reclassify(err)
-	case errors.Is(err, local.ErrHostAlreadyProvisioned):
-		return crex.UserError(description, "the local environment is already provisioned").
-			Recovery("Run 'crux local start' to use the existing environment, or 'crux local reset' to recreate it.").
-			Reclassify(err)
-	default:
-		return err
-	}
+	return localError(err, "cannot start local environment", "Run 'crux local start' to start the local environment first.")
 }
 
 // Represents the 'crux local start' command.

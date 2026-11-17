@@ -2,35 +2,16 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/compute/local"
-	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Returns a restart-specific structured error when this command has enough
-// context to improve user guidance.
+// Returns a user error for a failed 'restart' when the cause is a known
+// local environment state.
 func localRestartError(err error) error {
-	const description = "cannot restart local environment"
-	switch {
-	case errors.Is(err, local.ErrHostNotCreated):
-		return crex.UserError(description, "the local environment has not been provisioned").
-			Recovery("Run 'crux local start' to provision the local environment first.").
-			Reclassify(err)
-	case errors.Is(err, local.ErrHostNotRunning):
-		return crex.UserError(description, "the local environment is not running").
-			Recovery("Run 'crux local start' instead of 'crux local restart'.").
-			Reclassify(err)
-	case errors.Is(err, local.ErrHostAlreadyProvisioned):
-		return crex.UserError(description, "the local environment is already provisioned").
-			Recovery("Run 'crux local start' to use the existing environment, or 'crux local reset' to recreate it.").
-			Reclassify(err)
-	default:
-		return err
-	}
+	return localError(err, "cannot restart local environment", "Run 'crux local start' instead of 'crux local restart'.")
 }
 
 // Represents the 'crux local restart' command.

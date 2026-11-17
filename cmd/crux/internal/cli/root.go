@@ -36,7 +36,7 @@ func Execute(ctx context.Context) error {
 		kong.Description("Crucible resource manager.\n\nBuild, run, and distribute Crucible resources."),
 		kong.UsageOnError(),
 		kong.Vars{
-			"version": internal.VersionString(),
+			"version": internal.Build.String(),
 		},
 		kong.BindTo(ctx, (*context.Context)(nil)),
 	)

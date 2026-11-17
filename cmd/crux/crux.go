@@ -20,7 +20,7 @@ func main() {
 	slog.SetDefault(logger())
 
 	slog.Debug("build",
-		"version", internal.VersionString(),
+		"version", internal.Build.String(),
 	)
 
 	slog.Debug("crux is running",
@@ -74,10 +74,10 @@ func setUpSignalHandler() (context.Context, context.CancelFunc) {
 // Debug builds default to debug level, quiet builds default to warn level, and
 // all others default to info level.
 func logLevel() slog.Level {
-	if internal.IsDebug() {
+	if internal.Debug {
 		return slog.LevelDebug
 	}
-	if internal.IsQuiet() {
+	if internal.Quiet {
 		return slog.LevelWarn
 	}
 	return slog.LevelInfo
