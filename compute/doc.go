@@ -1,34 +1,24 @@
-// Package compute provisions and manages infrastructure for Crucible.
+// Package compute provisions machines and talks to cruxd on them.
 //
-// The package maintains a registry of provider backends, initialised lazily.
-// Callers select a backend via [BackendFor] with a [Provider] constant, then
-// access the resource manager they need through [Backend.Compute],
-// [Backend.Storage], or [Backend.Network].
+// A [Provider] creates and runs machines on one kind of infrastructure.
+// Callers look one up by name with [ProviderFor]:
 //
-//	b, err := compute.BackendFor(compute.Local)
-//	c := b.Compute()
+//	p, err := compute.ProviderFor(compute.Local)
 //
-// Provider implementations live in sub-packages (e.g. compute/local) and are
-// adapted to the compute model by shims that live in this package.
+// Provider methods block until the machine reaches the expected state. If it
+// does not, the provider reverts partial changes and returns an error.
+// Cancelling the context aborts a long call.
 //
-// Compute methods are synchronous: they block until the underlying instance
-// reaches the expected target state. If it does not converge, the provider
-// reverts any partial changes and returns an error. Context cancellation is
-// the mechanism for aborting a long-running call.
+// Provision returns the identifier that every later call uses:
 //
-// Provisioning returns a provider-assigned identifier for the new instance.
-// All subsequent operations use that identifier. If provisioning fails, the
-// provider tears down any partial state automatically.
+//	id, err := p.Provision(ctx, imageID, opts)
+//	err = p.Stop(ctx, id)
+//	err = p.Start(ctx, id)
+//	err = p.Deprovision(ctx, id)
 //
-//	id, err := c.Provision(ctx, imageID, opts)
+// [Provider.Status] returns the [State] of a machine: [StateNotProvisioned],
+// [StateStopped], or [StateRunning]. [Provider.Connect] opens a session with
+// cruxd on a running machine.
 //
-//	err = c.Stop(ctx, id)
-//	err = c.Start(ctx, id)
-//	err = c.Deprovision(ctx, id)
-//
-// On macOS the local backend provisions a lightweight VM on first use that
-// runs containerd. On Linux containerd runs natively as a system service.
-//
-// [Compute.Status] returns the current [State] of an instance:
-// [StateNotProvisioned], [StateStopped], or [StateRunning].
+// The local provider runs one Lima VM through the [lima] package.
 package compute

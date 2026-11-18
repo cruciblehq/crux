@@ -1,31 +1,17 @@
-// Package local implements the local compute backend.
+// Package lima runs the local machine as a Lima virtual machine.
 //
-// On macOS and Linux, the local provider manages a Lima virtual machine that
-// runs containerd. On macOS the VM uses Apple's Virtualization framework
-// (vmType: vz); on Linux it uses QEMU (vmType: qemu). On unsupported platforms
-// every method returns [ErrUnsupportedPlatform].
+// On macOS the VM uses Apple's Virtualization framework (vmType: vz). On
+// Linux it uses QEMU (vmType: qemu). On other platforms every operation
+// returns [ErrUnsupportedPlatform]. There is one VM, named after
+// [limaInstanceName], and every operation blocks until it completes.
 //
-// [NewBackend] returns a [provider.Backend] whose lifecycle methods are
-// synchronous: they block until the operation completes. Lima is invoked
-// inline via limactl; the VM is always named after [limaInstanceName].
-//
-// A typical sequence provisions an instance, interacts with it, and tears
-// it down when done:
-//
-//	b := local.NewBackend()
-//	err := b.Provision(ctx, "my-instance", imageID, nil)
-//
-//	state, _ := b.Status(ctx, "my-instance") // provider.StateRunning
-//
-//	exitCode, err := b.Run(ctx, "my-instance", os.Stdout, os.Stderr, "uname", "-a")
-//
-//	b.Stop(ctx, "my-instance")
-//	b.Deprovision(ctx, "my-instance")
-//
-// [provider.Backend.Start] resumes a previously provisioned instance
-// without re-downloading dependencies:
-//
-//	b.Start(ctx, "my-instance")
+//	path, err := lima.EnsureMachineImage(ctx, registryURL)
+//	err = lima.Provision(ctx, path, enrollment)
+//	state, err := lima.Status(ctx)
+//	code, err := lima.Exec(ctx, os.Stdout, os.Stderr, "uname", "-a")
+//	err = lima.Stop(ctx)
+//	err = lima.Start(ctx)
+//	err = lima.Deprovision(ctx)
 //
 // The machine disk image is pulled as a machine resource from the Crucible
 // registry and cached locally before provisioning. The extracted archive must
@@ -48,4 +34,4 @@
 // declaratively and make the hypervisor layer an implementation detail of each
 // compute provider. It would also enable deriving the exact VM configuration
 // from affordances, which currently isn't possible.
-package local
+package lima

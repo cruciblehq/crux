@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package local
+package lima
 
 import (
 	"context"
@@ -38,7 +38,7 @@ const cruxdHost = "127.0.0.1"
 //
 // Downloads from a given registry if not already cached. Returns the local
 // filesystem path to the image file.
-func ensureMachineImage(ctx context.Context, registryURL *url.URL) (string, error) {
+func EnsureMachineImage(ctx context.Context, registryURL *url.URL) (string, error) {
 	path, err := cachedMachineImagePath()
 	if errors.Is(err, ErrMachineImageMissing) {
 		slog.Info("machine image not in cache, downloading...",
@@ -57,13 +57,13 @@ func ensureMachineImage(ctx context.Context, registryURL *url.URL) (string, erro
 	return path, nil
 }
 
-// Local implementation of [provider.Backend.UploadImage].
+// Checks that a machine disk image is readable and returns its image ID.
 //
 // The local provider uses the image directly from the local filesystem, so this
 // function only verifies the file exists and is accessible. The returned path
 // is used as the image ID passed to Lima during provisioning. Other providers
 // copy the image file to remote storage and return an image ID.
-func uploadImage(_ context.Context, path string) (string, error) {
+func UploadImage(_ context.Context, path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
 			Recovery("Download the machine image again and retry.").
@@ -73,40 +73,40 @@ func uploadImage(_ context.Context, path string) (string, error) {
 	return path, nil
 }
 
-// Provisions a compute instance from the given disk image.
+// Creates and starts the machine from the given disk image.
 //
 // imageID is the local filesystem path to a QCOW2 disk image, as returned by
-// [uploadImage]. enrollment is written into the VM so cruxd can enroll.
-// Returns [ErrHostAlreadyProvisioned] if an instance already exists. The VM is
+// [UploadImage]. enrollment is written into the VM so cruxd can enroll.
+// Returns [ErrMachineAlreadyProvisioned] if the machine already exists. The VM is
 // created and started.
-func provision(ctx context.Context, _, imageID string, enrollment []byte) error {
+func Provision(ctx context.Context, imageID string, enrollment []byte) error {
 	if err := ensureLima(ctx); err != nil {
 		return err
 	}
-	if hostStatus(ctx) != StateNotProvisioned {
-		return ErrHostAlreadyProvisioned
+	if machineStatus(ctx) != StateNotProvisioned {
+		return ErrMachineAlreadyProvisioned
 	}
-	return createAndStartHost(ctx, imageID, enrollment)
+	return createAndStartMachine(ctx, imageID, enrollment)
 }
 
 // Starts the VM.
 //
 // The VM must already be provisioned. If already running this is a no-op, and
-// if it exists but is stopped, it is resumed. Returns [ErrHostNotCreated] if
+// if it exists but is stopped, it is resumed. Returns [ErrMachineNotCreated] if
 // the VM has not been provisioned.
-func start(ctx context.Context, _ string) error {
-	state := hostStatus(ctx)
+func Start(ctx context.Context) error {
+	state := machineStatus(ctx)
 	if state == StateRunning {
 		return nil
 	}
 	if state == StateNotProvisioned {
-		return ErrHostNotCreated
+		return ErrMachineNotCreated
 	}
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
 		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
 			Recovery("Recreate the local virtual machine and retry.").
-			Cause(crex.Wrap(ErrHostStart, err)).
+			Cause(crex.Wrap(ErrMachineStart, err)).
 			Err()
 	}
 	return nil
@@ -114,32 +114,32 @@ func start(ctx context.Context, _ string) error {
 
 // Stops the VM.
 //
-// Returns [ErrHostNotRunning] if the VM is not currently running. limactl stop
+// Returns [ErrMachineNotRunning] if the VM is not currently running. limactl stop
 // sends a graceful shutdown signal to the guest, giving containerd a chance to
 // clean up before the VM halts.
-func stop(ctx context.Context, _ string) error {
-	state := hostStatus(ctx)
+func Stop(ctx context.Context) error {
+	state := machineStatus(ctx)
 	if state != StateRunning {
-		return ErrHostNotRunning
+		return ErrMachineNotRunning
 	}
 
 	if err := limactlRun(ctx, "stop", limaInstanceName); err != nil {
 		return crex.SystemError("cannot stop local environment", "the local virtual machine failed to stop").
 			Recovery("Retry after recreating the local environment.").
-			Cause(crex.Wrap(ErrHostStop, err)).
+			Cause(crex.Wrap(ErrMachineStop, err)).
 			Err()
 	}
 	return nil
 }
 
-// Tears down the instance and destroys the VM.
+// Destroys the VM.
 //
 // After this, the VM no longer appears in limactl list and all resources it
 // consumed are freed. If the VM exists, it is terminated and deleted along
 // with its disk image. Returns nil if the VM does not exist.
-func deprovision(ctx context.Context, _ string) error {
-	err := destroyHost(ctx)
-	if errors.Is(err, ErrHostNotCreated) {
+func Deprovision(ctx context.Context) error {
+	err := destroyMachine(ctx)
+	if errors.Is(err, ErrMachineNotCreated) {
 		return nil
 	}
 	return err
@@ -149,29 +149,24 @@ func deprovision(ctx context.Context, _ string) error {
 //
 // Reports only whether the VM runs. Whether cruxd is reachable is checked by
 // the caller over mutual TLS.
-func status(ctx context.Context, _ string) (State, error) {
-	return hostStatus(ctx), nil
+func Status(ctx context.Context) (State, error) {
+	return machineStatus(ctx), nil
 }
 
-// Runs a command inside the host VM.
+// Runs a command inside the VM.
 //
 // Used for setup and teardown tasks that must run on the host. The output is
 // streamed to stdout and stderr as it is produced. Returns the exit code and
 // a nil error when the process exits normally, regardless of exit code. Also
 // returns a non-nil error only if the command could not be started or the
 // context was cancelled before the process completed.
-func execute(ctx context.Context, _ string, stdout, stderr io.Writer, command string, args ...string) (int, error) {
-	return hostExec(ctx, stdout, stderr, command, args...)
+func Exec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
+	return limaGuestExec(ctx, stdout, stderr, command, args...)
 }
 
-// Lists all instances managed by the local provider.
-func list(ctx context.Context) ([]string, error) {
+// Lists the Lima instances.
+func List(ctx context.Context) ([]string, error) {
 	return limaList(ctx)
-}
-
-// Sends a tar archive to the named instance and applies it to the host filesystem.
-func copyArchive(ctx context.Context, name string, r io.Reader) error {
-	return limaCopyArchive(ctx, name, r)
 }
 
 // Creates the Lima instance from the given disk image and starts it.
@@ -180,28 +175,28 @@ func copyArchive(ctx context.Context, name string, r io.Reader) error {
 // imagePath is the local filesystem path to a QCOW2 disk image. enrollment is
 // written into the VM config. Returns once the VM runs, before cruxd is
 // enrolled.
-func createAndStartHost(ctx context.Context, imagePath string, enrollment []byte) error {
+func createAndStartMachine(ctx context.Context, imagePath string, enrollment []byte) error {
 	const description = "cannot create local environment"
 
 	configPath, err := generateLimaConfig(imagePath, enrollment)
 	if err != nil {
 		return crex.SystemError(description, "failed to generate the virtual machine configuration").
 			Recovery("Regenerate the local virtual machine configuration and retry.").
-			Cause(crex.Wrap(ErrHostCreate, err)).
+			Cause(crex.Wrap(ErrMachineCreate, err)).
 			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "create", fmt.Sprintf("--name=%s", limaInstanceName), configPath); err != nil {
 		return crex.SystemError(description, "the local virtual machine could not be created").
 			Recovery("Retry after recreating the local virtual machine.").
-			Cause(crex.Wrap(ErrHostCreate, err)).
+			Cause(crex.Wrap(ErrMachineCreate, err)).
 			Err()
 	}
 
 	if err := limactlRunNoTTY(ctx, "start", limaInstanceName); err != nil {
 		return crex.SystemError("cannot start local environment", "the local virtual machine failed to start").
 			Recovery("Retry after recreating the local environment.").
-			Cause(crex.Wrap(ErrHostStart, err)).
+			Cause(crex.Wrap(ErrMachineStart, err)).
 			Err()
 	}
 
@@ -290,44 +285,36 @@ func machineArch() string {
 	}
 }
 
-// Deletes the host VM and its disk images.
+// Deletes the VM and its disk images.
 //
-// Blocks until cleanup is complete. Returns [ErrHostNotCreated] if the VM
+// Blocks until cleanup is complete. Returns [ErrMachineNotCreated] if the VM
 // does not exist.
-func destroyHost(ctx context.Context) error {
-	status := hostStatus(ctx)
+func destroyMachine(ctx context.Context) error {
+	status := machineStatus(ctx)
 	if status == StateNotProvisioned {
-		return ErrHostNotCreated
+		return ErrMachineNotCreated
 	}
 
 	if err := limactlRun(ctx, "delete", "--force", limaInstanceName); err != nil {
 		return crex.SystemError("cannot destroy local environment", "the local virtual machine could not be deleted").
 			Recovery("Try again, or stop the local environment first.").
-			Cause(crex.Wrap(ErrHostDestroy, err)).
+			Cause(crex.Wrap(ErrMachineDestroy, err)).
 			Err()
 	}
 
 	return nil
 }
 
-// Runs a command inside the host VM.
-//
-// Executes via limactl shell. Streams stdout and stderr to the provided writers
-// and returns the command's exit code.
-func hostExec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
-	return limaGuestExec(ctx, stdout, stderr, command, args...)
+// Returns the address on this computer where cruxd in the VM is reachable.
+func CruxdAddress() string {
+	return net.JoinHostPort(cruxdHost, strconv.Itoa(speccompute.DefaultPort))
 }
 
-// Returns the host address where cruxd is reachable for the named instance.
-func cruxdAddress(_ context.Context, _ string) (string, error) {
-	return net.JoinHostPort(cruxdHost, strconv.Itoa(speccompute.DefaultPort)), nil
-}
-
-// Queries the current state of the host VM.
+// Queries the current state of the VM.
 //
 // Maps the Lima instance status string to a local state. If the instance
 // does not exist or cannot be reached, returns [StateNotProvisioned].
-func hostStatus(ctx context.Context) State {
+func machineStatus(ctx context.Context) State {
 	switch limaInstanceStatus(ctx) {
 	case limaStatusRunning:
 		return StateRunning

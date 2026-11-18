@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package local
+package lima
 
 import (
 	"context"
@@ -25,9 +25,9 @@ func TestUploadImage_ExistingFile(t *testing.T) {
 	}
 	f.Close()
 
-	got, err := uploadImage(context.Background(), f.Name())
+	got, err := UploadImage(context.Background(), f.Name())
 	if err != nil {
-		t.Fatalf("uploadImage: %v", err)
+		t.Fatalf("UploadImage: %v", err)
 	}
 	if got != f.Name() {
 		t.Errorf("got %q, want %q", got, f.Name())
@@ -35,7 +35,7 @@ func TestUploadImage_ExistingFile(t *testing.T) {
 }
 
 func TestUploadImage_MissingFile(t *testing.T) {
-	_, err := uploadImage(context.Background(), "/nonexistent/path/machine.qcow2")
+	_, err := UploadImage(context.Background(), "/nonexistent/path/machine.qcow2")
 	if !errors.Is(err, ErrImageUpload) {
 		t.Errorf("expected ErrImageUpload, got %v", err)
 	}

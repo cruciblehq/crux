@@ -1,12 +1,12 @@
 package compute
 
-// Lifecycle state of a compute instance managed by a [Backend].
+// Lifecycle state of a machine.
 type State int
 
 const (
-	StateNotProvisioned State = iota // Instance has not been provisioned.
-	StateRunning                     // Instance is running and reachable.
-	StateStopped                     // Instance exists but is not running.
+	StateNotProvisioned State = iota // Machine has not been provisioned.
+	StateRunning                     // Machine is running and cruxd answers.
+	StateStopped                     // Machine exists but is not running.
 )
 
 // Canonical string representation of the state.

@@ -1,6 +1,4 @@
-package local
-
-import "github.com/cruciblehq/utils-go/file"
+package lima
 
 // Linux interface name constraints.
 const (
@@ -19,12 +17,6 @@ const (
 // Random identifier lengths in bytes.
 const (
 	VethRandLen = 4 // Random bytes in veth interface names.
-)
-
-// Filesystem defaults.
-const (
-	VolumesDir        = "volumes"         // Subdirectory name for volume storage.
-	DefaultVolumeMode = file.OwnerDirMode // Default permission mode for volume directories.
 )
 
 // Command names and subcommands used by the network implementation.

@@ -1,6 +1,6 @@
 //go:build linux
 
-package local
+package lima
 
 import (
 	"bytes"

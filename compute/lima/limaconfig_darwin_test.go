@@ -1,6 +1,6 @@
 //go:build darwin
 
-package local
+package lima
 
 import (
 	"bytes"

@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package local
+package lima
 
 import (
 	"context"
@@ -215,7 +215,7 @@ func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string
 	if err != nil {
 		return code, crex.SystemError("cannot run command in local environment", "the command could not be started in the virtual machine").
 			Recovery(recoveryRestartLocalEnvironment).
-			Cause(crex.Wrap(ErrHostExec, err)).
+			Cause(crex.Wrap(ErrMachineExec, err)).
 			Err()
 	}
 	return code, nil
@@ -237,21 +237,6 @@ func limaList(ctx context.Context) ([]string, error) {
 	names := strings.Fields(out)
 	sort.Strings(names)
 	return names, nil
-}
-
-// Extracts a tar archive into the root filesystem of the named Lima instance.
-//
-// Pipes r into "tar -x -C /" running inside the instance via limactl shell,
-// which uses the existing SSH connection. Entries in the archive are applied
-// as absolute paths, preserving permissions, ownership, and timestamps.
-func limaCopyArchive(ctx context.Context, name string, r io.Reader) error {
-	if err := process.Check(ctx, limactl([]string{"shell", "--workdir", guestWorkdir, name, "tar", "-x", "-C", "/"}, r, nil, nil)); err != nil {
-		return crex.SystemError("cannot copy files to local environment", "extracting the archive in the virtual machine failed").
-			Recovery(recoveryRestartLocalEnvironment).
-			Cause(crex.Wrap(ErrHostExec, err)).
-			Err()
-	}
-	return nil
 }
 
 // Runs a limactl subcommand synchronously.

@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package local
+package lima
 
 import (
 	"fmt"
@@ -20,10 +20,10 @@ const (
 
 	// Fixed resource allocation for the local shared VM.
 	//
-	// The local backend runs all services inside a single Lima VM, so VM sizing
+	// The local provider runs all services inside a single Lima VM, so VM sizing
 	// is not derived from grants. Instead, these fixed values act as a baseline.
-	// Cloud providers will derive instance sizing from grants at provisioning
-	// time; the local backend intentionally (and silently) ignores them.
+	// Cloud providers will derive machine sizing from grants at provisioning
+	// time; the local provider intentionally (and silently) ignores them.
 	defaultLimaCPUs      = 2  // Virtual CPUs allocated to the local VM.
 	defaultLimaMemoryGiB = 2  // Memory in GiB allocated to the local VM.
 	defaultLimaDiskGiB   = 10 // Disk size in GiB allocated to the local VM.
@@ -51,7 +51,7 @@ var limaConfigTemplate *template.Template
 
 // Values injected into the Lima YAML template.
 //
-// Provision values (CPUs, Memory, and Disk) are fixed since the local backend
+// Provision values (CPUs, Memory, and Disk) are fixed since the local provider
 // does not derive VM sizing from grants. These values are passed directly to
 // the hypervisor without being validated against host resources, so these they
 // constitute minimum requirements (defaultLimaCPUs, defaultLimaMemoryGiB, and
@@ -116,7 +116,7 @@ func generateLimaConfig(imagePath string, enrollment []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(configPath), file.DefaultDirMode); err != nil {
 		return "", crex.SystemError(description, "failed to create the configuration directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", filepath.Dir(configPath)).
-			Cause(crex.Wrap(ErrHostConfig, err)).
+			Cause(crex.Wrap(ErrMachineConfig, err)).
 			Err()
 	}
 
@@ -124,21 +124,21 @@ func generateLimaConfig(imagePath string, enrollment []byte) (string, error) {
 	if err != nil {
 		return "", crex.SystemError(description, "failed to write the configuration file").
 			Recoveryf("Make sure you have write access to %s, then try again.", configPath).
-			Cause(crex.Wrap(ErrHostConfig, err)).
+			Cause(crex.Wrap(ErrMachineConfig, err)).
 			Err()
 	}
 	defer f.Close()
 	if err := f.Chmod(file.OwnerFileMode); err != nil {
 		return "", crex.SystemError(description, "failed to restrict access to the configuration file").
 			Recoveryf("Make sure you own %s, then try again.", configPath).
-			Cause(crex.Wrap(ErrHostConfig, err)).
+			Cause(crex.Wrap(ErrMachineConfig, err)).
 			Err()
 	}
 
 	if err := limaConfigTemplate.Execute(f, data); err != nil {
 		return "", crex.SystemError(description, "failed to render the configuration file").
 			Recovery("If the problem persists, report it to the Crucible team.").
-			Cause(crex.Wrap(ErrHostConfig, err)).
+			Cause(crex.Wrap(ErrMachineConfig, err)).
 			Err()
 	}
 

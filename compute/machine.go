@@ -60,7 +60,7 @@ func newMachine(name string) ([]byte, error) {
 //
 // crux accepts only the certificate the root signed for this machine, and
 // sends its revocation list in the handshake.
-func connectMachine(ctx context.Context, name, addr string) (speccompute.Runtime, error) {
+func connectMachine(ctx context.Context, name, addr string) (Machine, error) {
 	auth, err := openAuthority()
 	if err != nil {
 		return nil, err

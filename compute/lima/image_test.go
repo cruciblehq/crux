@@ -1,4 +1,4 @@
-package local
+package lima
 
 import (
 	"context"
@@ -7,27 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 )
-
-func TestCreateVolume_DefaultMode(t *testing.T) {
-	root := t.TempDir()
-	path, err := CreateVolume(root, "vol-default", 0)
-	if err != nil {
-		t.Fatalf("CreateVolume: %v", err)
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("os.Stat(%q): %v", path, err)
-	}
-	if !info.IsDir() {
-		t.Fatalf("CreateVolume created %q, want a directory", path)
-	}
-	if mode := info.Mode().Perm(); mode != DefaultVolumeMode {
-		t.Fatalf("CreateVolume permissions = %o, want %o", mode, DefaultVolumeMode)
-	}
-	if want := filepath.Join(root, VolumesDir, "vol-default"); path != want {
-		t.Fatalf("CreateVolume path = %q, want %q", path, want)
-	}
-}
 
 func TestRemoveImageIfStaged(t *testing.T) {
 	root := t.TempDir()

@@ -15,8 +15,16 @@ import (
 	"github.com/cruciblehq/utils-go/mediatype"
 )
 
-// Make sure the HTTP client satisfies the spec.
-var _ speccompute.Runtime = (*cruxdRuntime)(nil)
+// Make sure the HTTP client satisfies the machine contract.
+var _ Machine = (*cruxdRuntime)(nil)
+
+// The container runtime and units of one machine, reached through cruxd.
+type Machine interface {
+	speccompute.Runtime
+
+	// Returns the units kept running on the machine.
+	Units() speccompute.Units
+}
 
 // Container runtime on a machine, reached through cruxd over HTTPS.
 //
@@ -33,7 +41,7 @@ type cruxdRuntime struct {
 // revocations is the DER revocation list sent in the handshake, so the machine
 // learns about revoked certificates. Returns an error when cruxd cannot be
 // reached or reports a protocol version other than [speccompute.Version].
-func Dial(ctx context.Context, addr string, cfg *tls.Config, revocations []byte) (speccompute.Runtime, error) {
+func Dial(ctx context.Context, addr string, cfg *tls.Config, revocations []byte) (Machine, error) {
 	r := &cruxdRuntime{
 		base: (&url.URL{Scheme: "https", Host: addr}).String(),
 		client: &http.Client{Transport: &http.Transport{

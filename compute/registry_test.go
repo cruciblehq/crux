@@ -5,22 +5,18 @@ import (
 	"testing"
 )
 
-func TestBackendForLocal(t *testing.T) {
-	b, err := BackendFor(Local)
+func TestProviderForLocal(t *testing.T) {
+	p, err := ProviderFor(Local)
 	if err != nil {
-		t.Fatalf("BackendFor(Local) error = %v", err)
+		t.Fatalf("ProviderFor(Local) error = %v, want nil", err)
 	}
-	if b == nil {
-		t.Fatal("BackendFor(Local) = nil, want a backend")
-	}
-	again, _ := BackendFor(Local)
-	if again != b {
-		t.Error("BackendFor(Local) returned a different backend on the second call")
+	if _, ok := p.(localProvider); !ok {
+		t.Fatalf("ProviderFor(Local) = %T, want localProvider", p)
 	}
 }
 
-func TestBackendForUnknown(t *testing.T) {
-	if _, err := BackendFor(Provider("bogus")); !errors.Is(err, ErrUnknownProvider) {
-		t.Fatalf("BackendFor(bogus) error = %v, want ErrUnknownProvider", err)
+func TestProviderForUnknown(t *testing.T) {
+	if _, err := ProviderFor(ProviderName("bogus")); !errors.Is(err, ErrUnknownProvider) {
+		t.Fatalf("ProviderFor(bogus) error = %v, want ErrUnknownProvider", err)
 	}
 }

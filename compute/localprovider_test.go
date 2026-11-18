@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/adrg/xdg"
-	"github.com/cruciblehq/crux/compute/local"
+	"github.com/cruciblehq/crux/compute/lima"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -22,34 +22,21 @@ func useTempDir(t *testing.T) string {
 	return dirs.Temp()
 }
 
-func TestDefaultLocalInstanceID(t *testing.T) {
-	if got := DefaultLocalInstanceID(); got != localInstanceName {
-		t.Fatalf("DefaultLocalInstanceID() = %q, want %q", got, localInstanceName)
+func TestDefaultLocalMachineID(t *testing.T) {
+	if got := DefaultLocalMachineID(); got != localMachineName {
+		t.Fatalf("DefaultLocalMachineID() = %q, want %q", got, localMachineName)
 	}
 }
 
-func TestLocalStateToState(t *testing.T) {
-	if got, want := localStateToState(local.StateRunning), StateRunning; got != want {
-		t.Fatalf("localStateToState() = %v, want %v", got, want)
+func TestLimaStateToState(t *testing.T) {
+	if got, want := limaStateToState(lima.StateRunning), StateRunning; got != want {
+		t.Fatalf("limaStateToState() = %v, want %v", got, want)
 	}
-	if got, want := localStateToState(local.StateStopped), StateStopped; got != want {
-		t.Fatalf("localStateToState() = %v, want %v", got, want)
+	if got, want := limaStateToState(lima.StateStopped), StateStopped; got != want {
+		t.Fatalf("limaStateToState() = %v, want %v", got, want)
 	}
-	if got, want := localStateToState(local.StateNotProvisioned), StateNotProvisioned; got != want {
-		t.Fatalf("localStateToState() = %v, want %v", got, want)
-	}
-}
-
-func TestNewBackendLocal(t *testing.T) {
-	b := newBackendLocal()
-	if b.Compute() == nil {
-		t.Error("Compute() = nil, want a compute manager")
-	}
-	if b.Storage() == nil {
-		t.Error("Storage() = nil, want a storage manager")
-	}
-	if b.Network() == nil {
-		t.Error("Network() = nil, want a network manager")
+	if got, want := limaStateToState(lima.StateNotProvisioned), StateNotProvisioned; got != want {
+		t.Fatalf("limaStateToState() = %v, want %v", got, want)
 	}
 }
 
@@ -74,9 +61,9 @@ func TestCreateTemp(t *testing.T) {
 
 func TestUploadImageFromReader(t *testing.T) {
 	dir := useTempDir(t)
-	shim := &computeLocalShim{local: local.NewBackend()}
+	var p localProvider
 
-	id, err := shim.UploadImage(context.Background(), bytes.NewReader([]byte("disk")))
+	id, err := p.UploadImage(context.Background(), bytes.NewReader([]byte("disk")))
 	if err != nil {
 		t.Fatalf("UploadImage() error = %v", err)
 	}
@@ -91,7 +78,7 @@ func TestUploadImageFromReader(t *testing.T) {
 		t.Errorf("staged image = %q, want %q", data, "disk")
 	}
 
-	if err := shim.RemoveImage(context.Background(), id); err != nil {
+	if err := p.RemoveImage(context.Background(), id); err != nil {
 		t.Fatalf("RemoveImage() error = %v", err)
 	}
 	if _, err := os.Stat(id); !os.IsNotExist(err) {
@@ -111,8 +98,8 @@ func TestUploadImageFromFile(t *testing.T) {
 	}
 	defer f.Close()
 
-	shim := &computeLocalShim{local: local.NewBackend()}
-	id, err := shim.UploadImage(context.Background(), f)
+	var p localProvider
+	id, err := p.UploadImage(context.Background(), f)
 	if err != nil {
 		t.Fatalf("UploadImage() error = %v", err)
 	}
@@ -120,7 +107,7 @@ func TestUploadImageFromFile(t *testing.T) {
 		t.Errorf("UploadImage() id = %q, want %q", id, path)
 	}
 
-	if err := shim.RemoveImage(context.Background(), id); err != nil {
+	if err := p.RemoveImage(context.Background(), id); err != nil {
 		t.Fatalf("RemoveImage() error = %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {

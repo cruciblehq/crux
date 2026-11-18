@@ -1,6 +1,6 @@
-package local
+package lima
 
-// Lifecycle state of the local compute instance.
+// Lifecycle state of the Lima VM.
 type State int
 
 const (

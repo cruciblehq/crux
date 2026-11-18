@@ -1,6 +1,6 @@
 //go:build darwin || linux
 
-package local
+package lima
 
 import (
 	"archive/tar"

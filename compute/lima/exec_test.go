@@ -1,4 +1,4 @@
-package local
+package lima
 
 import (
 	"context"
@@ -32,8 +32,8 @@ func TestRun_ExitCodeIsClassified(t *testing.T) {
 	err := run(context.Background(), func(_ context.Context, _, _ io.Writer, _ string, _ ...string) (int, error) {
 		return 7, nil
 	}, "ip", "link", "show")
-	if !errors.Is(err, ErrHostExec) {
-		t.Fatalf("run() error = %v, want ErrHostExec", err)
+	if !errors.Is(err, ErrMachineExec) {
+		t.Fatalf("run() error = %v, want ErrMachineExec", err)
 	}
 }
 
