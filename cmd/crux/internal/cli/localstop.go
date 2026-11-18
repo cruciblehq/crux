@@ -14,13 +14,13 @@ type LocalStopCmd struct{}
 func (c *LocalStopCmd) Run(ctx context.Context) error {
 	slog.Info("stopping local environment...")
 
-	b, err := compute.BackendFor(compute.Local)
+	p, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := compute.DefaultLocalInstanceID()
+	name := compute.DefaultLocalMachineID()
 
-	if err := b.Compute().Stop(ctx, name); err != nil {
+	if err := p.Stop(ctx, name); err != nil {
 		return localError(err, "cannot stop local environment", "Run 'crux local start' to start the local environment first.")
 	}
 

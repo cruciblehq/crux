@@ -14,13 +14,13 @@ type LocalDestroyCmd struct{}
 func (c *LocalDestroyCmd) Run(ctx context.Context) error {
 	slog.Info("destroying local environment...")
 
-	b, err := compute.BackendFor(compute.Local)
+	p, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := compute.DefaultLocalInstanceID()
+	name := compute.DefaultLocalMachineID()
 
-	if err := b.Compute().Deprovision(ctx, name); err != nil {
+	if err := p.Deprovision(ctx, name); err != nil {
 		return localError(err, "cannot destroy local environment", "Run 'crux local start' to start the local environment first.")
 	}
 

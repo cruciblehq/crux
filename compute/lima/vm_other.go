@@ -5,7 +5,6 @@ package lima
 import (
 	"context"
 	"io"
-	"net/url"
 
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -15,11 +14,6 @@ var errUnsupportedPlatform = crex.SystemError("unsupported platform", "the local
 	Recovery("Run crux on macOS or Linux to use the local provider.").
 	Cause(ErrUnsupportedPlatform).
 	Err()
-
-// Fails because the local provider does not support this platform.
-func EnsureMachineImage(_ context.Context, _ *url.URL) (string, error) {
-	return "", errUnsupportedPlatform
-}
 
 // Fails because the local provider does not support this platform.
 func UploadImage(_ context.Context, _ string) (string, error) {

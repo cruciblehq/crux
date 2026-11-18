@@ -11,7 +11,7 @@ import (
 
 // Builds a Crucible runtime resource from its configuration.
 //
-// Drives the shared recipe pipeline against the local compute backend. A
+// Drives the shared recipe pipeline against the local machine. A
 // runtime has no entrypoint, so the produced image keeps the entrypoint of its
 // final stage.
 type Builder struct {
@@ -30,14 +30,14 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 
 // Builds the runtime described by cfg into the output directory.
 //
-// Connects to the local compute backend and runs the recipe. Returns the build
+// Connects to the local machine and runs the recipe. Returns the build
 // directory on success.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Runtime, output string) (string, error) {
-	backend, err := compute.BackendFor(compute.Local)
+	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return "", err
 	}
-	client, err := backend.Compute().Connect(ctx, compute.DefaultLocalInstanceID())
+	client, err := provider.Connect(ctx, compute.DefaultLocalMachineID())
 	if err != nil {
 		return "", err
 	}

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/compute/local"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
@@ -30,6 +29,7 @@ type LocalCmd struct {
 	Destroy LocalDestroyCmd `cmd:"" help:"Destroy the local environment and all its data."`
 	Status  LocalStatusCmd  `cmd:"" help:"Show local environment status."`
 	Exec    LocalExecCmd    `cmd:"" help:"Run a command inside the local environment."`
+	Logs    LocalLogsCmd    `cmd:"" help:"Print the output of a unit in the local environment."`
 	Add     LocalAddCmd     `cmd:"" help:"Add a service to the local blueprint."`
 	Remove  LocalRemoveCmd  `cmd:"" aliases:"rm" help:"Remove a service from the local blueprint."`
 	List    LocalListCmd    `cmd:"" aliases:"ls" help:"List services in the local blueprint."`
@@ -40,22 +40,6 @@ type LocalCmd struct {
 func localBlueprint() (*manifest.Blueprint, error) {
 	_, bp, err := openLocalBlueprint()
 	return bp, err
-}
-
-// Returns compute options from the local deployment plan, if one exists.
-//
-// Returns a zero-value Options if no plan was written yet or if it cannot be
-// decoded. The caller should treat zero values as "no additional requirements"
-// and let the backend apply its own defaults.
-func localPlanOptions() compute.ComputeOptions {
-	plan, err := manifest.ReadPlanAt(manifest.BuildDir(dirs.Local()))
-	if err != nil {
-		return compute.ComputeOptions{}
-	}
-	if _, ok := plan.Infrastructure.Computes["default"]; !ok {
-		return compute.ComputeOptions{}
-	}
-	return compute.ComputeOptions{}
 }
 
 // Acquires an exclusive lock on the blueprint file, reads it, calls fn, and
@@ -145,22 +129,22 @@ func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
 	return m, bp, nil
 }
 
-// Maps the local backend's lifecycle errors to user errors.
+// Maps the Lima lifecycle errors to user errors.
 //
 // description says what failed. notRunning is the recovery offered when the
 // environment is not running, because the right next step depends on the
 // command. Other errors are returned unchanged.
 func localError(err error, description, notRunning string) error {
 	switch {
-	case errors.Is(err, local.ErrHostNotCreated):
+	case errors.Is(err, compute.ErrMachineNotProvisioned):
 		return crex.UserError(description, "the local environment has not been provisioned").
 			Recovery("Run 'crux local start' to provision the local environment first.").
 			Reclassify(err)
-	case errors.Is(err, local.ErrHostNotRunning):
+	case errors.Is(err, compute.ErrMachineNotRunning):
 		return crex.UserError(description, "the local environment is not running").
 			Recovery(notRunning).
 			Reclassify(err)
-	case errors.Is(err, local.ErrHostAlreadyProvisioned):
+	case errors.Is(err, compute.ErrMachineAlreadyProvisioned):
 		return crex.UserError(description, "the local environment is already provisioned").
 			Recovery("Run 'crux local start' to use the existing environment, or 'crux local reset' to recreate it.").
 			Reclassify(err)

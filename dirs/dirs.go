@@ -16,7 +16,6 @@ import (
 const (
 	app          = "crux"     // Subdirectory under each XDG base directory.
 	localName    = "local"    // Local environment blueprint state.
-	storageName  = "storage"  // Local volumes.
 	limaName     = "lima"     // Vendored Lima installation.
 	vmName       = "vm"       // Lima home holding the VM.
 	registryName = "registry" // Registry cache.
@@ -38,11 +37,6 @@ func cache() string {
 // Returns the directory for the local environment blueprint state.
 func Local() string {
 	return filepath.Join(data(), localName)
-}
-
-// Returns the directory for local volumes.
-func Storage() string {
-	return filepath.Join(data(), storageName)
 }
 
 // Returns the directory of the vendored Lima installation.

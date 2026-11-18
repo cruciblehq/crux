@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
@@ -85,7 +86,7 @@ func (p localProvider) Provision(ctx context.Context, img string, opts Provision
 		return "", err
 	}
 	if err := lima.Provision(ctx, img, enrollment); err != nil {
-		return "", err
+		return "", limaError(err)
 	}
 	if err := p.waitReady(ctx, id); err != nil {
 		return "", err
@@ -104,14 +105,14 @@ func (p localProvider) Deprovision(ctx context.Context, id string) error {
 // Starts the machine and blocks until it is reachable.
 func (p localProvider) Start(ctx context.Context, id string) error {
 	if err := lima.Start(ctx); err != nil {
-		return err
+		return limaError(err)
 	}
 	return p.waitReady(ctx, id)
 }
 
 // Stops the machine without removing its persistent state.
 func (p localProvider) Stop(ctx context.Context, id string) error {
-	return lima.Stop(ctx)
+	return limaError(lima.Stop(ctx))
 }
 
 // Returns the current lifecycle state of the machine.
@@ -150,6 +151,20 @@ func (p localProvider) Connect(ctx context.Context, id string) (Machine, error) 
 // Blocks until the machine is enrolled and cruxd reports healthy.
 func (p localProvider) waitReady(ctx context.Context, id string) error {
 	return waitForMachine(ctx, id, lima.CruxdAddress())
+}
+
+// Tags Lima lifecycle errors with the matching compute error.
+func limaError(err error) error {
+	switch {
+	case errors.Is(err, lima.ErrMachineNotCreated):
+		return crex.Tag(err, ErrMachineNotProvisioned)
+	case errors.Is(err, lima.ErrMachineAlreadyProvisioned):
+		return crex.Tag(err, ErrMachineAlreadyProvisioned)
+	case errors.Is(err, lima.ErrMachineNotRunning):
+		return crex.Tag(err, ErrMachineNotRunning)
+	default:
+		return err
+	}
 }
 
 // Converts a [lima.State] value to a [State].

@@ -14,7 +14,6 @@ func TestDirs(t *testing.T) {
 		want string
 	}{
 		{"Local", Local(), filepath.Join(xdg.DataHome, "crux", "local")},
-		{"Storage", Storage(), filepath.Join(xdg.DataHome, "crux", "storage")},
 		{"Lima", Lima(), filepath.Join(xdg.DataHome, "crux", "lima")},
 		{"VM", VM(), filepath.Join(xdg.DataHome, "crux", "vm")},
 		{"Registry", Registry(), filepath.Join(xdg.CacheHome, "crux", "registry")},

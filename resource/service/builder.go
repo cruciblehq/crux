@@ -11,7 +11,7 @@ import (
 
 // Builds a Crucible service resource from its configuration.
 //
-// Drives the shared recipe pipeline against the local compute backend, wiring
+// Drives the shared recipe pipeline against the local machine, wiring
 // the configured entrypoint into the produced image.
 type Builder struct {
 	src     hub.Source // Registry access for pulling base images.
@@ -29,14 +29,14 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 
 // Builds the service described by cfg into the output directory.
 //
-// Connects to the local compute backend and runs the recipe with the service
+// Connects to the local machine and runs the recipe with the service
 // entrypoint. Returns the build directory on success.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Service, output string) (string, error) {
-	backend, err := compute.BackendFor(compute.Local)
+	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return "", err
 	}
-	client, err := backend.Compute().Connect(ctx, compute.DefaultLocalInstanceID())
+	client, err := provider.Connect(ctx, compute.DefaultLocalMachineID())
 	if err != nil {
 		return "", err
 	}

@@ -16,15 +16,15 @@ type LocalExecCmd struct {
 //
 // The process exit code is propagated from the executed command.
 func (c *LocalExecCmd) Run(ctx context.Context) error {
-	b, err := compute.BackendFor(compute.Local)
+	p, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := compute.DefaultLocalInstanceID()
+	name := compute.DefaultLocalMachineID()
 
 	cmd := stripArgSeparator(c.Command)
 
-	exitCode, err := b.Compute().Exec(ctx, name, os.Stdout, os.Stderr, cmd[0], cmd[1:]...)
+	exitCode, err := p.Exec(ctx, name, os.Stdout, os.Stderr, cmd[0], cmd[1:]...)
 	if err != nil {
 		return localError(err, "cannot run command in local environment", "Run 'crux local start' to start the local environment first.")
 	}

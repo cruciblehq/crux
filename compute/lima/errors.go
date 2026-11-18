@@ -11,7 +11,6 @@ var (
 	ErrMachineStart              = crex.New("failed to start machine")
 	ErrMachineStop               = crex.New("failed to stop machine")
 	ErrMachineDestroy            = crex.New("failed to destroy machine")
-	ErrMachineImageMissing       = crex.New("machine image not in cache")
 	ErrImageUpload               = crex.New("failed to upload image")
 	ErrMachineExec               = crex.New("failed to execute command in machine")
 	ErrMachineConfig             = crex.New("failed to generate machine configuration")

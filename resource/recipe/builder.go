@@ -15,7 +15,7 @@ import (
 // Author label recorded in the OCI history of the final exported image.
 const commitAuthorExport = "export"
 
-// Orchestrates a recipe build pipeline against a compute backend.
+// Orchestrates a recipe build pipeline against a machine.
 //
 // Drives the stage pipeline: imports base images and executes each step in
 // order. The final image is exported as an OCI tar archive.

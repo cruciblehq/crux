@@ -8,7 +8,6 @@ import (
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/crux/compute/local"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -25,12 +24,12 @@ type LocalResetCmd struct{}
 func (c *LocalResetCmd) Run(ctx context.Context) error {
 	slog.Info("resetting local environment...")
 
-	b, err := compute.BackendFor(compute.Local)
+	p, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return err
 	}
 
-	name := compute.DefaultLocalInstanceID()
+	name := compute.DefaultLocalMachineID()
 	registryURL, err := url.Parse(internal.DefaultRegistryURL)
 	if err != nil {
 		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
@@ -38,11 +37,11 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := b.Compute().Deprovision(ctx, name); err != nil {
+	if err := p.Deprovision(ctx, name); err != nil {
 		return localResetError(err)
 	}
 
-	imagePath, err := local.EnsureMachineImage(ctx, registryURL)
+	imagePath, err := compute.EnsureMachineImage(ctx, registryURL)
 	if err != nil {
 		return localResetError(err)
 	}
@@ -54,11 +53,11 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 			Err()
 	}
 	defer f.Close()
-	imageID, err := b.Compute().UploadImage(ctx, f)
+	imageID, err := p.UploadImage(ctx, f)
 	if err != nil {
 		return localResetError(err)
 	}
-	if _, err := b.Compute().Provision(ctx, imageID, localPlanOptions()); err != nil {
+	if _, err := p.Provision(ctx, imageID, compute.ProvisionOptions{}); err != nil {
 		return localResetError(err)
 	}
 

@@ -5,18 +5,15 @@
 // returns [ErrUnsupportedPlatform]. There is one VM, named after
 // [limaInstanceName], and every operation blocks until it completes.
 //
-//	path, err := lima.EnsureMachineImage(ctx, registryURL)
-//	err = lima.Provision(ctx, path, enrollment)
+//	err := lima.Provision(ctx, imagePath, enrollment)
 //	state, err := lima.Status(ctx)
 //	code, err := lima.Exec(ctx, os.Stdout, os.Stderr, "uname", "-a")
 //	err = lima.Stop(ctx)
 //	err = lima.Start(ctx)
 //	err = lima.Deprovision(ctx)
 //
-// The machine disk image is pulled as a machine resource from the Crucible
-// registry and cached locally before provisioning. The extracted archive must
-// contain architecture-specific qcow2 files named after Lima's conventions,
-// such as aarch64.qcow2 and x86_64.qcow2.
+// imagePath is a qcow2 disk image on this computer. The compute package pulls
+// it from the Crucible registry before provisioning.
 //
 // Note: Lima (limactl) is used for VM lifecycle management, but it requires a
 // ~30 MB download on first use and the use of SSH with ControlMaster for host-

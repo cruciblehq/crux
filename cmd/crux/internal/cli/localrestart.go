@@ -20,17 +20,17 @@ type LocalRestartCmd struct{}
 func (c *LocalRestartCmd) Run(ctx context.Context) error {
 	slog.Info("restarting local environment...")
 
-	b, err := compute.BackendFor(compute.Local)
+	p, err := compute.ProviderFor(compute.Local)
 	if err != nil {
 		return err
 	}
-	name := compute.DefaultLocalInstanceID()
+	name := compute.DefaultLocalMachineID()
 
-	if err := b.Compute().Stop(ctx, name); err != nil {
+	if err := p.Stop(ctx, name); err != nil {
 		return localRestartError(err)
 	}
 
-	if err := b.Compute().Start(ctx, name); err != nil {
+	if err := p.Start(ctx, name); err != nil {
 		return localRestartError(err)
 	}
 

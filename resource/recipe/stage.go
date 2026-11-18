@@ -61,7 +61,7 @@ func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, 
 //
 // When stage.From is nil the stage starts from scratch and a minimal empty
 // OCI image is imported. When From is set, the referenced runtime is pulled
-// and its image.tar is imported into the compute backend.
+// and its image.tar is imported into the machine.
 func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts speccompute.Options) (speccompute.Container, error) {
 	if stage.From == "" {
 		return b.importScratch(ctx, opts)
@@ -94,7 +94,7 @@ func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts sp
 // Creates and imports a minimal empty (scratch) OCI image.
 //
 // The image has no layers and an empty configuration. It is imported into the
-// compute backend and a container is opened from it.
+// machine and a container is opened from it.
 func (b *Builder) importScratch(ctx context.Context, opts speccompute.Options) (speccompute.Container, error) {
 	pr, pw := io.Pipe()
 	go func() {
