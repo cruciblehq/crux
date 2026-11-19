@@ -9,9 +9,9 @@ import (
 
 // Verifies that a build directory contains the expected artifacts.
 //
-// Every resource type requires a valid manifest matching t. Types that emit a
-// signature artifact also require that file: runtimes and services produce an
-// image, widgets a main bundle, and blueprints a plan.
+// Every resource type requires a valid manifest matching t. Each type also
+// requires its main artifact: runtimes and services an image, widgets a main
+// bundle, and blueprints a plan.
 func Verify(buildDir string, t manifest.ResourceType) error {
 	switch t {
 	case manifest.TypeRuntime:
@@ -30,7 +30,7 @@ func Verify(buildDir string, t manifest.ResourceType) error {
 // Verifies that a build directory contains the expected artifacts.
 //
 // Every resource type must have a valid manifest matching the expected type.
-// When artifact is non-empty, verifies that the file at that path also exists.
+// When artifact is not empty, verifies that the file at that path also exists.
 func verify(buildDir string, resourceType manifest.ResourceType, artifact string) error {
 	if _, err := verifyBuildDir(buildDir, resourceType); err != nil {
 		return err
@@ -64,7 +64,7 @@ func verifyBuildDir(buildDir string, expected manifest.ResourceType) (*manifest.
 	}
 
 	if m.Resource.Type != expected {
-		return nil, crex.Newf(ErrResourceTypeMismatch, "expected %s but got %s", expected, m.Resource.Type)
+		return nil, crex.Newf(ErrResourceTypeMismatch, "manifest declares resource type %q where %q is expected", m.Resource.Type, expected)
 	}
 
 	return m, nil

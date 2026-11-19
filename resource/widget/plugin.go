@@ -13,9 +13,7 @@ import (
 )
 
 const (
-
-	// Identifier registered with esbuild for the internal module resolution plugin.
-	pluginName = "crux-internal-es-plugin"
+	pluginName = "crux-internal-es-plugin" // Identifier registered with esbuild for the internal module resolution plugin.
 
 	// Directory where third-party widget dependencies are resolved from
 	// during esbuild module resolution.
@@ -28,7 +26,7 @@ const (
 // whatever is set by dependenciesDirName), except for modules used by the
 // Crucible stack, like react, react-reconciler, @cruciblehq/ui, and
 // @cruciblehq/ui-web. These are treated as externals to avoid bundling them,
-// since they are expected to be provided by the Crucible runtime.
+// since Crucible provides them where the widget runs.
 var plugin = es.Plugin{
 	Name: pluginName,
 	Setup: func(build es.PluginBuild) {
@@ -73,11 +71,11 @@ func resolveEntryPoint(args es.OnResolveArgs) (es.OnResolveResult, error) {
 
 // Handles the resolution of imports.
 //
-// It treats certain modules as externals and resolves other imports from the
-// local dependencies directory. It also handles relative and non-relative
-// imports appropriately. External modules are marked to avoid bundling, while
-// other modules are resolved to their actual file paths. Those modules are
-// react, react-reconciler, @cruciblehq/ui, and @cruciblehq/ui-web.
+// Modules used by the Crucible stack are treated as externals and not bundled.
+// Relative imports are resolved from the importing file, and other imports
+// from the local dependencies directory, to their actual file paths. The
+// external modules are react, react-reconciler, @cruciblehq/ui, and
+// @cruciblehq/ui-web.
 func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolveResult, error) {
 	for _, e := range options.External {
 		if args.Path == e || strings.HasPrefix(args.Path, fmt.Sprintf("%s/", e)) {

@@ -7,12 +7,12 @@ import (
 )
 
 var (
-	ErrUnexpectedState = crex.New("unexpected runtime state")
+	ErrUnexpectedState = crex.New("unexpected local environment state")
 	ErrImport          = crex.New("import failed")
 )
 
-// Returns err unchanged when it is already structured (crex), otherwise, wraps
-// it in a generic CLI error.
+// Returns err unchanged when it is already a crex error. Otherwise wraps it in
+// a generic CLI error.
 func ensureCLIError(err error) error {
 	if err == nil {
 		return nil

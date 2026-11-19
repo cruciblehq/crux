@@ -113,7 +113,7 @@ func TestBinPack(t *testing.T) {
 		t.Fatalf("binPack = %v, want both on \"only\"", got)
 	}
 
-	// With no compute units, services map to the empty assignment.
+	// With no compute entries, services map to the empty assignment.
 	empty := binPack(results, map[string]manifest.Compute{})
 	if empty["a"] != "" || empty["b"] != "" {
 		t.Fatalf("binPack empty computes = %v, want empty assignments", empty)

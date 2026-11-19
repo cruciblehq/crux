@@ -17,15 +17,14 @@ import (
 
 // Represents the 'crux local deploy' command.
 type LocalDeployCmd struct {
-	Registry    string `help:"Hub registry URL for fetching runtimes (default: http://hub.cruciblehq.xyz:8080)."`
+	Registry    string `help:"Hub registry URL for fetching resources (default: http://hub.cruciblehq.xyz:8080)."`
 	Environment string `short:"e" help:"Blueprint environment to deploy." default:""`
 }
 
-// Builds the local blueprint into a deployment plan and writes it to disk.
+// Compiles the local blueprint into a deployment plan and writes it to disk.
 //
-// Writes the resulting plan to the local build directory. The plan records
-// what the environment must look like; actual container lifecycle management is
-// a separate concern.
+// Writes the plan to the local build directory. The plan records what the
+// environment must look like. Applying it to the machine is a separate step.
 func (c *LocalDeployCmd) Run(ctx context.Context) error {
 	slog.Info("building local deployment plan...")
 

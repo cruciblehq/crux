@@ -172,7 +172,6 @@ func TestLockedReadCloser_ImplementsReadCloser(t *testing.T) {
 	rc.Close()
 }
 
-// Creates a temporary file containing content and returns an open handle to it.
 func tempFileWithContent(t *testing.T, content string) *os.File {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "testfile")

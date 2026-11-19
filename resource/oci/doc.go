@@ -1,3 +1,3 @@
-// Package oci writes OCI image tar archives used during resource builds,
-// including scratch images and file copy layers.
+// Package oci writes the empty (scratch) OCI image archive that a build stage
+// starts from when it has no base runtime.
 package oci

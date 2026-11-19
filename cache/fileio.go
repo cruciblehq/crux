@@ -14,7 +14,7 @@ import (
 	"github.com/cruciblehq/utils-go/file"
 )
 
-// Opens a file, returning ErrNotFound if it doesn't exist.
+// Opens a file, returning [ErrNotFound] if it doesn't exist.
 func openFile(path string) (*os.File, error) {
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {

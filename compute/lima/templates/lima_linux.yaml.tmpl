@@ -73,8 +73,8 @@ provision:
   # Installs cruxd from the mounted machine resource and runs it as a service.
   # The binary is reinstalled and the service restarted on every boot, so the
   # VM always runs the cruxd shipped with its machine resource. The enrollment
-  # data is written first, readable only by root; an enrolled cruxd deletes it
-  # on start.
+  # data is written first, readable only by root, and cruxd is told its path;
+  # an enrolled cruxd deletes it on start.
   - mode: system
     script: |
       #!/bin/sh
@@ -93,6 +93,7 @@ provision:
       Requires=containerd.service
 
       [Service]
+      Environment=CRUXD_ENROLLMENT={{ .EnrollmentPath }}
       ExecStart=/usr/local/bin/cruxd
       Restart=on-failure
 
@@ -107,6 +108,7 @@ provision:
       #!/sbin/openrc-run
       description="Crucible machine agent"
       command="/usr/local/bin/cruxd"
+      export CRUXD_ENROLLMENT="{{ .EnrollmentPath }}"
       command_background=true
       pidfile="/run/cruxd.pid"
       depend() {

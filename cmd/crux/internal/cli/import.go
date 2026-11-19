@@ -17,7 +17,7 @@ import (
 type ImportCmd struct {
 	Image    string `arg:"" help:"OCI image reference (e.g., alpine:3.21)."`
 	Output   string `short:"o" required:"" help:"Output file path for the OCI archive."`
-	Platform string `short:"p" help:"Target platform (e.g., linux/amd64). Defaults to the host platform."`
+	Platform string `short:"p" help:"Target platform (e.g., linux/amd64). Defaults to linux with the architecture of this computer."`
 }
 
 // Pulls a remote OCI image and saves it as a local OCI archive.

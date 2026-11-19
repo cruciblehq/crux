@@ -17,7 +17,6 @@ import (
 )
 
 func TestExtractLima(t *testing.T) {
-	// Create a fake tar.gz archive with a bin/limactl entry and a guest agent.
 	var archiveBuf bytes.Buffer
 	gw := gzip.NewWriter(&archiveBuf)
 	tw := tar.NewWriter(gw)
@@ -43,13 +42,11 @@ func TestExtractLima(t *testing.T) {
 	tw.Close()
 	gw.Close()
 
-	// Extract to temp dir.
 	tmpDir := t.TempDir()
 	if err := extractLima(&archiveBuf, tmpDir); err != nil {
 		t.Fatalf("extractLima: %v", err)
 	}
 
-	// Verify limactl was extracted.
 	limactlPath := filepath.Join(tmpDir, "bin", "limactl")
 	got, err := os.ReadFile(limactlPath)
 	if err != nil {
@@ -59,7 +56,6 @@ func TestExtractLima(t *testing.T) {
 		t.Errorf("limactl: expected %q, got %q", string(limactlContent), string(got))
 	}
 
-	// Verify it's executable.
 	info, err := os.Stat(limactlPath)
 	if err != nil {
 		t.Fatalf("stat limactl: %v", err)
@@ -68,7 +64,6 @@ func TestExtractLima(t *testing.T) {
 		t.Error("expected executable permissions on limactl")
 	}
 
-	// Verify guest agent was also extracted.
 	agentPath := filepath.Join(tmpDir, "share", "lima", "lima-guestagent.Linux-aarch64.gz")
 	gotAgent, err := os.ReadFile(agentPath)
 	if err != nil {

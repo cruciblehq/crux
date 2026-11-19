@@ -4,9 +4,10 @@ import (
 	"context"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/cruciblehq/crux/resource/oci"
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -27,12 +28,12 @@ type stageState struct {
 // Imports the base image and executes each step in order. stageImages is
 // updated with the final committed image ref under the stage name when the
 // stage has a name, making it available as a copy source for later stages.
-// The caller is responsible for closing the returned container.
-func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, stageImages map[string]speccompute.ImageRef) (speccompute.Container, error) {
-	// Build steps need network access (e.g. to fetch packages). Until the
-	// manifest/security model declares per-resource network policy, the build
-	// driver relaxes the restrictive default to the host network here.
-	ctr, err := b.importBase(ctx, stage, speccompute.Options{HostNetwork: true})
+// The caller is responsible for destroying the returned container.
+func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, stageImages map[string]agent.ImageRef) (agent.Container, error) {
+	// Build steps need network access (e.g. to fetch packages). Until manifests
+	// can declare a network policy for each resource, the build uses the
+	// machine's network instead of the restrictive default.
+	ctr, err := b.importBase(ctx, stage, agent.Options{HostNetwork: true})
 	if err != nil {
 		return nil, crex.At(crex.Wrap(ErrBuild, err), "stage", num)
 	}
@@ -59,10 +60,10 @@ func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, 
 
 // Resolves and imports the base image for a stage.
 //
-// When stage.From is nil the stage starts from scratch and a minimal empty
+// When stage.From is empty the stage starts from scratch and a minimal empty
 // OCI image is imported. When From is set, the referenced runtime is pulled
-// and its image.tar is imported into the machine.
-func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts speccompute.Options) (speccompute.Container, error) {
+// and its image archive ([manifest.ImagePath]) is imported through the agent.
+func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts agent.Options) (agent.Container, error) {
 	if stage.From == "" {
 		return b.importScratch(ctx, opts)
 	}
@@ -84,25 +85,25 @@ func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts sp
 	}
 	defer f.Close()
 
-	imgRef, err := b.runtime.Import(ctx, f)
+	imgRef, err := b.agent.Import(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-	return b.runtime.Load(ctx, imgRef, opts)
+	return b.agent.Load(ctx, imgRef, opts)
 }
 
 // Creates and imports a minimal empty (scratch) OCI image.
 //
-// The image has no layers and an empty configuration. It is imported into the
-// machine and a container is opened from it.
-func (b *Builder) importScratch(ctx context.Context, opts speccompute.Options) (speccompute.Container, error) {
+// The image has no layers and an empty configuration. It is imported through
+// the agent and a container is loaded from it.
+func (b *Builder) importScratch(ctx context.Context, opts agent.Options) (agent.Container, error) {
 	pr, pw := io.Pipe()
 	go func() {
-		pw.CloseWithError(oci.WriteScratchTar(pw))
+		pw.CloseWithError(oci.WriteScratchTar(pw, runtime.GOARCH))
 	}()
-	ref, err := b.runtime.Import(ctx, pr)
+	ref, err := b.agent.Import(ctx, pr)
 	if err != nil {
 		return nil, err
 	}
-	return b.runtime.Load(ctx, ref, opts)
+	return b.agent.Load(ctx, ref, opts)
 }

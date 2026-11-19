@@ -9,6 +9,7 @@ import (
 	"github.com/cruciblehq/crux/compute/lima"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/crux/machines"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -30,14 +31,15 @@ type localProvider struct{}
 
 // Uploads a disk image to the local provider.
 //
-// Writes r to a temporary file and passes the path to the Lima driver. The
+// When r is an open file, its path is passed to the Lima driver directly.
+// Otherwise r is written to a temporary file and that path is passed. The
 // file stays until [localProvider.RemoveImage], because Provision reads it.
 func (p localProvider) UploadImage(ctx context.Context, r io.Reader) (string, error) {
 	const description = "cannot stage machine image"
 	const recoveryDiskSpace = "Free up disk space, then try again."
 
 	// Local provisioning consumes an image path during a later call to
-	// Provision, so this path must remain valid after Upload returns.
+	// Provision, so this path must remain valid after UploadImage returns.
 	if f, ok := r.(*os.File); ok {
 		return lima.UploadImage(ctx, f.Name())
 	}
@@ -94,12 +96,19 @@ func (p localProvider) Provision(ctx context.Context, img string, opts Provision
 	return id, nil
 }
 
-// Tears down the machine and removes all associated persistent state.
+// Tears down the machine and removes all its persistent state and its record.
+//
+// Returns [ErrMachineNotProvisioned] if the machine does not exist. Its record
+// is removed even then.
 func (p localProvider) Deprovision(ctx context.Context, id string) error {
-	if err := lima.Deprovision(ctx); err != nil {
+	err := limaError(lima.Deprovision(ctx))
+	if err != nil && !errors.Is(err, ErrMachineNotProvisioned) {
 		return err
 	}
-	return machines.Remove(dirs.Machines(), id)
+	if rerr := machines.Remove(dirs.Machines(), id); rerr != nil {
+		return rerr
+	}
+	return err
 }
 
 // Starts the machine and blocks until it is reachable.
@@ -118,7 +127,7 @@ func (p localProvider) Stop(ctx context.Context, id string) error {
 // Returns the current lifecycle state of the machine.
 //
 // A running VM counts as running only when cruxd answers its health check
-// over mutual TLS.
+// over mutual TLS. Otherwise it counts as stopped.
 func (p localProvider) Status(ctx context.Context, id string) (State, error) {
 	state, err := lima.Status(ctx)
 	if err != nil {
@@ -144,7 +153,7 @@ func (p localProvider) Exec(ctx context.Context, id string, stdout, stderr io.Wr
 }
 
 // Opens a session with cruxd on the machine over mutual TLS.
-func (p localProvider) Connect(ctx context.Context, id string) (Machine, error) {
+func (p localProvider) Connect(ctx context.Context, id string) (agent.Agent, error) {
 	return connectMachine(ctx, id, lima.CruxdAddress())
 }
 
@@ -179,7 +188,7 @@ func limaStateToState(s lima.State) State {
 	}
 }
 
-// Creates a temporary file for local compute staging.
+// Creates a temporary file in the crux temporary directory.
 func createTemp(pattern string) (*os.File, error) {
 	dir := dirs.Temp()
 	if err := os.MkdirAll(dir, file.OwnerDirMode); err != nil {

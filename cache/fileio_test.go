@@ -111,7 +111,6 @@ func TestWriteMeta(t *testing.T) {
 		t.Fatal("expected non-zero timestamps")
 	}
 
-	// Verify the file was written and is valid JSON.
 	got, err := readMeta(path)
 	if err != nil {
 		t.Fatal(err)

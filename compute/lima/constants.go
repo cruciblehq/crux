@@ -5,12 +5,12 @@ const (
 	InterfaceNameMax = 15 // Maximum interface name length on Linux.
 )
 
-// Naming prefixes for provider-assigned identifiers.
+// Prefixes of the identifiers the provider assigns.
 const (
 	NetworkIDPrefix = "net-" // Prefix for network identifiers.
 	BridgePrefix    = "br-"  // Prefix for bridge interface names.
-	VethPrefix      = "ve-"  // Prefix for host-side veth interface names.
-	PeerPrefix      = "vp-"  // Prefix for namespace-side veth interface names.
+	VethPrefix      = "ve-"  // Prefix for veth interface names in the VM's root namespace.
+	PeerPrefix      = "vp-"  // Prefix for veth interface names inside a container's namespace.
 	VolumeIDPrefix  = "vol-" // Prefix for volume identifiers.
 )
 

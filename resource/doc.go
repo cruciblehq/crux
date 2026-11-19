@@ -1,14 +1,14 @@
 // Package resource handles artifact operations for Crucible resources.
 //
 // The package is organized in two layers. The manifest layer exposes four
-// operations for the manifest resource type: [Build] compiles a resource,
-// [Verify] checks a build directory, [Pack] produces an archive, and [Push]
-// uploads it to the registry. [Build] unwraps the typed config from the
-// manifest, dispatches to the matching type builder, and writes the resolved
-// manifest alongside the artifacts. Some resource types, such as machine,
-// currently participate only in packaging and registry operations and do not
-// have a builder yet. Lifecycle operations (start, stop, exec, etc.) are all
-// handled directly via the runtime.
+// operations that work from a manifest: [Build] compiles a resource, [Verify]
+// checks a build directory, [Pack] produces an archive, and [Push] uploads it
+// to the registry. [Build] unwraps the typed config from the manifest,
+// dispatches to the matching type builder, and writes the resolved manifest
+// alongside the artifacts. Some resource types, such as machine, currently
+// participate only in packaging and registry operations and do not have a
+// builder yet. Container lifecycle operations (start, stop, exec, and so on)
+// go through the agent on the machine, not through this package.
 //
 // The type builder layer lives in subpackages, one per resource type, each
 // taking a typed config rather than a manifest: [runtime], [service], [widget],

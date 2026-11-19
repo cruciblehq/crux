@@ -5,10 +5,6 @@ const Name = "crux"
 
 // Defaults for the registry and namespace.
 const (
-
-	// Default Crucible Hub registry URL.
-	DefaultRegistryURL = "http://hub.cruciblehq.xyz:8080"
-
-	// Default namespace for resources in the registry.
-	DefaultNamespace = "official"
+	DefaultRegistryURL = "http://hub.cruciblehq.xyz:8080" // Default Crucible Hub registry URL.
+	DefaultNamespace   = "official"                       // Default namespace for resources in the registry.
 )

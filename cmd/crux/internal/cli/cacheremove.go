@@ -15,7 +15,7 @@ import (
 
 // Represents the 'crux cache remove' command.
 type CacheRemoveCmd struct {
-	Type       string   `arg:"" help:"Resource type (widget, service)."`
+	Type       string   `arg:"" help:"Resource type (machine, runtime, service, interface, template, widget, or blueprint)."`
 	References []string `arg:"" help:"References to remove (e.g., namespace/resource 1.0.0)."`
 }
 

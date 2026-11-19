@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/url"
 	"os"
@@ -20,7 +21,7 @@ func localResetError(err error) error {
 // Represents the 'crux local reset' command.
 type LocalResetCmd struct{}
 
-// Deprovisions and re-provisions the local environment from scratch.
+// Deprovisions the local machine and provisions it again from scratch.
 func (c *LocalResetCmd) Run(ctx context.Context) error {
 	slog.Info("resetting local environment...")
 
@@ -37,7 +38,7 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := p.Deprovision(ctx, name); err != nil {
+	if err := p.Deprovision(ctx, name); err != nil && !errors.Is(err, compute.ErrMachineNotProvisioned) {
 		return localResetError(err)
 	}
 

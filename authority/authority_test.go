@@ -133,7 +133,7 @@ func TestClient(t *testing.T) {
 	}
 }
 
-func TestSignMachine(t *testing.T) {
+func TestSignAgent(t *testing.T) {
 	a, _, _ := openTest(t)
 	_, key, _ := ed25519.GenerateKey(rand.Reader)
 	der, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
@@ -146,9 +146,9 @@ func TestSignMachine(t *testing.T) {
 	}
 	id := trust.NewMachineID()
 
-	signed, err := a.SignMachine(csr, id)
+	signed, err := a.SignAgent(csr, id)
 	if err != nil {
-		t.Fatalf("SignMachine() = %v, want nil", err)
+		t.Fatalf("SignAgent() = %v, want nil", err)
 	}
 	cert, err := x509.ParseCertificate(signed)
 	if err != nil {
@@ -162,12 +162,12 @@ func TestSignMachine(t *testing.T) {
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	})
 	if err != nil {
-		t.Fatalf("machine certificate does not verify: %v", err)
+		t.Fatalf("agent certificate does not verify: %v", err)
 	}
 	if err := trust.VerifyServer(chains, a.Revocations()); err != nil {
 		t.Errorf("VerifyServer() = %v, want nil", err)
 	}
-	if !cert.NotAfter.Equal(machineNotAfter) {
-		t.Errorf("NotAfter = %v, want %v", cert.NotAfter, machineNotAfter)
+	if !cert.NotAfter.Equal(agentNotAfter) {
+		t.Errorf("NotAfter = %v, want %v", cert.NotAfter, agentNotAfter)
 	}
 }

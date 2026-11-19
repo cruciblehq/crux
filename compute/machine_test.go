@@ -17,7 +17,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/crux/machines"
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/httpx"
@@ -60,13 +60,13 @@ func startMachine(t *testing.T, enrollment []byte, token []byte) string {
 	m := &fakeMachine{key: key, cert: &tls.Certificate{Certificate: [][]byte{self.Raw}, PrivateKey: key}, token: token, id: e.Machine}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointEnroll, m.enroll)
-	mux.HandleFunc(speccompute.EndpointCertify, m.certify)
-	mux.HandleFunc(speccompute.EndpointHandshake, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: speccompute.Version})
+	mux.HandleFunc(agent.EndpointEnroll, m.enroll)
+	mux.HandleFunc(agent.EndpointCertify, m.certify)
+	mux.HandleFunc(agent.EndpointHandshake, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeHandshakeResponse, agent.HandshakeResponse{Version: agent.Version})
 	})
-	mux.HandleFunc(speccompute.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+	mux.HandleFunc(agent.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeHealthResponse, agent.HealthResponse{})
 	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -99,26 +99,26 @@ func (m *fakeMachine) enroll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	data, _ := codec.Encode(speccompute.EnrollResponse{Request: request, Proof: trust.TokenProof(m.token, ekm)}, speccompute.BodyFormat)
-	w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeEnrollResponse.With(speccompute.BodyFormat))
+	data, _ := codec.Encode(agent.EnrollResponse{Request: request, Proof: trust.TokenProof(m.token, ekm)}, agent.BodyFormat)
+	w.Header().Set(httpx.HeaderContentType, agent.MediaTypeEnrollResponse.With(agent.BodyFormat))
 	w.Write(data)
 }
 
 func (m *fakeMachine) certify(w http.ResponseWriter, r *http.Request) {
-	var req speccompute.CertifyRequest
+	var req agent.CertifyRequest
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := codec.Decode(data, &req, speccompute.BodyFormat); err != nil {
+	if err := codec.Decode(data, &req, agent.BodyFormat); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	m.mu.Lock()
 	m.cert = &tls.Certificate{Certificate: [][]byte{req.Certificate}, PrivateKey: m.key}
 	m.mu.Unlock()
-	w.WriteHeader(http.StatusOK)
+	_ = httpx.Write(w, agent.MediaTypeCertifyResponse, agent.BodyFormat, http.StatusOK, agent.CertifyResponse{})
 }
 
 func TestNewMachine(t *testing.T) {

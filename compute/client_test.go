@@ -8,9 +8,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/httpx"
 	"github.com/cruciblehq/utils-go/mediatype"
@@ -18,14 +19,14 @@ import (
 
 func writeJSON(t *testing.T, w http.ResponseWriter, mt mediatype.MediaType, v any) {
 	t.Helper()
-	if err := httpx.Write(w, mt, speccompute.BodyFormat, http.StatusOK, v); err != nil {
+	if err := httpx.Write(w, mt, agent.BodyFormat, http.StatusOK, v); err != nil {
 		t.Fatalf("write response: %v", err)
 	}
 }
 
-func writeError(t *testing.T, w http.ResponseWriter, status int, code speccompute.ErrorCode, message string) {
+func writeError(t *testing.T, w http.ResponseWriter, status int, code agent.ErrorCode, message string) {
 	t.Helper()
-	if err := httpx.Write(w, speccompute.MediaTypeError, speccompute.BodyFormat, status, speccompute.Error{Code: code, Message: message}); err != nil {
+	if err := httpx.Write(w, agent.MediaTypeError, agent.BodyFormat, status, agent.Error{Code: code, Message: message}); err != nil {
 		t.Fatalf("write error: %v", err)
 	}
 }
@@ -36,8 +37,30 @@ func readJSON(t *testing.T, r *http.Request, v any) {
 	if err != nil {
 		t.Fatalf("read request: %v", err)
 	}
-	if err := codec.Decode(data, v, speccompute.BodyFormat); err != nil {
+	if err := codec.Decode(data, v, agent.BodyFormat); err != nil {
 		t.Fatalf("decode request: %v", err)
+	}
+}
+
+func readData(t *testing.T, r *http.Request, mt mediatype.MediaType, v any, dataType mediatype.MediaType) string {
+	t.Helper()
+	data, err := httpx.ReadMultipart(r.Header.Get(httpx.HeaderContentType), r.Body, mt, agent.BodyFormat, v, dataType)
+	if err != nil {
+		t.Fatalf("read multipart request: %v", err)
+	}
+	b, err := io.ReadAll(data)
+	if err != nil {
+		t.Fatalf("read data: %v", err)
+	}
+	return string(b)
+}
+
+func writeData(t *testing.T, w http.ResponseWriter, mt mediatype.MediaType, v any, dataType mediatype.MediaType, data string) {
+	t.Helper()
+	mw := httpx.NewMultipartWriter(w, mt, agent.BodyFormat)
+	w.Header().Set(httpx.HeaderContentType, mw.ContentType())
+	if err := mw.Write(v, dataType, strings.NewReader(data)); err != nil {
+		t.Fatalf("write multipart response: %v", err)
 	}
 }
 
@@ -45,10 +68,10 @@ func tlsConfig(srv *httptest.Server) *tls.Config {
 	return srv.Client().Transport.(*http.Transport).TLSClientConfig
 }
 
-func serveCruxd(t *testing.T, mux *http.ServeMux) *cruxdRuntime {
+func serveClient(t *testing.T, mux *http.ServeMux) *client {
 	t.Helper()
-	mux.HandleFunc(speccompute.EndpointHandshake, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: speccompute.Version})
+	mux.HandleFunc(agent.EndpointHandshake, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeHandshakeResponse, agent.HandshakeResponse{Version: agent.Version})
 	})
 	srv := httptest.NewTLSServer(mux)
 	t.Cleanup(srv.Close)
@@ -56,21 +79,21 @@ func serveCruxd(t *testing.T, mux *http.ServeMux) *cruxdRuntime {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	return rt.(*cruxdRuntime)
+	return rt.(*client)
 }
 
 func TestDial(t *testing.T) {
-	rt := serveCruxd(t, http.NewServeMux())
+	rt := serveClient(t, http.NewServeMux())
 	if err := rt.Close(); err != nil {
 		t.Errorf("close: %v", err)
 	}
 }
 
 func TestDialSendsRevocations(t *testing.T) {
-	var got speccompute.HandshakeRequest
+	var got agent.HandshakeRequest
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		readJSON(t, r, &got)
-		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: speccompute.Version})
+		writeJSON(t, w, agent.MediaTypeHandshakeResponse, agent.HandshakeResponse{Version: agent.Version})
 	}))
 	defer srv.Close()
 
@@ -84,7 +107,7 @@ func TestDialSendsRevocations(t *testing.T) {
 
 func TestDialIncompatibleVersion(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeHandshakeResponse, speccompute.HandshakeResponse{Version: "999"})
+		writeJSON(t, w, agent.MediaTypeHandshakeResponse, agent.HandshakeResponse{Version: "999"})
 	}))
 	defer srv.Close()
 
@@ -107,17 +130,14 @@ func TestDialUnreachable(t *testing.T) {
 
 func TestRuntimeImport(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointImport, func(w http.ResponseWriter, r *http.Request) {
-		if ct := r.Header.Get(httpx.HeaderContentType); ct != speccompute.MediaTypeImageArchive.String() {
-			t.Errorf("content type = %q, want %q", ct, speccompute.MediaTypeImageArchive.String())
+	mux.HandleFunc(agent.EndpointImport, func(w http.ResponseWriter, r *http.Request) {
+		var req agent.ImportRequest
+		if data := readData(t, r, agent.MediaTypeImportRequest, &req, agent.MediaTypeImageArchive); data != "archive" {
+			t.Errorf("data = %q, want %q", data, "archive")
 		}
-		body, _ := io.ReadAll(r.Body)
-		if string(body) != "archive" {
-			t.Errorf("body = %q, want %q", body, "archive")
-		}
-		writeJSON(t, w, speccompute.MediaTypeImportResponse, speccompute.ImportResponse{Ref: "img:1"})
+		writeJSON(t, w, agent.MediaTypeImportResponse, agent.ImportResponse{Ref: "img:1"})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	ref, err := rt.Import(context.Background(), bytes.NewReader([]byte("archive")))
 	if err != nil {
@@ -130,16 +150,15 @@ func TestRuntimeImport(t *testing.T) {
 
 func TestRuntimeExport(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointExport, func(w http.ResponseWriter, r *http.Request) {
-		var req speccompute.ExportRequest
+	mux.HandleFunc(agent.EndpointExport, func(w http.ResponseWriter, r *http.Request) {
+		var req agent.ExportRequest
 		readJSON(t, r, &req)
 		if req.Ref != "img:1" {
 			t.Errorf("ref = %q, want %q", req.Ref, "img:1")
 		}
-		w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeImageArchive.String())
-		_, _ = w.Write([]byte("archive"))
+		writeData(t, w, agent.MediaTypeExportResponse, agent.ExportResponse{}, agent.MediaTypeImageArchive, "archive")
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	var buf bytes.Buffer
 	if err := rt.Export(context.Background(), "img:1", &buf); err != nil {
@@ -152,16 +171,15 @@ func TestRuntimeExport(t *testing.T) {
 
 func TestRuntimeExtract(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointExtract, func(w http.ResponseWriter, r *http.Request) {
-		var req speccompute.ExtractRequest
+	mux.HandleFunc(agent.EndpointExtract, func(w http.ResponseWriter, r *http.Request) {
+		var req agent.ExtractRequest
 		readJSON(t, r, &req)
 		if req.Path != "/app" {
 			t.Errorf("path = %q, want %q", req.Path, "/app")
 		}
-		w.Header().Set(httpx.HeaderContentType, speccompute.MediaTypeFileTree.String())
-		_, _ = w.Write([]byte("tar"))
+		writeData(t, w, agent.MediaTypeExtractResponse, agent.ExtractResponse{}, agent.MediaTypeFileTree, "tar")
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	rc, err := rt.Extract(context.Background(), "img:1", "/app")
 	if err != nil {
@@ -176,10 +194,10 @@ func TestRuntimeExtract(t *testing.T) {
 
 func TestRuntimeInspect(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeInspectImageResponse, speccompute.InspectImageResponse{Config: speccompute.ImageConfig{User: "image"}})
+	mux.HandleFunc(agent.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeInspectImageResponse, agent.InspectImageResponse{Config: agent.ImageConfig{User: "image"}})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	cfg, err := rt.Inspect(context.Background(), "img:1")
 	if err != nil {
@@ -192,10 +210,10 @@ func TestRuntimeInspect(t *testing.T) {
 
 func TestRuntimeRemove(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointRemove, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+	mux.HandleFunc(agent.EndpointRemove, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeRemoveResponse, agent.RemoveResponse{})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	if err := rt.Remove(context.Background(), "img:1"); err != nil {
 		t.Errorf("remove: %v", err)
@@ -204,68 +222,68 @@ func TestRuntimeRemove(t *testing.T) {
 
 func TestRuntimeLoad(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointLoad, func(w http.ResponseWriter, r *http.Request) {
-		var req speccompute.LoadRequest
+	mux.HandleFunc(agent.EndpointLoad, func(w http.ResponseWriter, r *http.Request) {
+		var req agent.LoadRequest
 		readJSON(t, r, &req)
 		if !req.Options.HostNetwork {
 			t.Error("host network option was not sent")
 		}
-		writeJSON(t, w, speccompute.MediaTypeLoadResponse, speccompute.LoadResponse{ID: "c1"})
+		writeJSON(t, w, agent.MediaTypeLoadResponse, agent.LoadResponse{ID: "c1"})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
-	ctr, err := rt.Load(context.Background(), "img:1", speccompute.Options{HostNetwork: true})
+	ctr, err := rt.Load(context.Background(), "img:1", agent.Options{HostNetwork: true})
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if id := ctr.(*cruxdContainer).id; id != "c1" {
+	if id := ctr.(*container).id; id != "c1" {
 		t.Errorf("id = %q, want %q", id, "c1")
 	}
 }
 
 func TestRuntimeOperationError(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
-		writeError(t, w, http.StatusNotFound, speccompute.ErrorCodeNotFound, "image not found")
+	mux.HandleFunc(agent.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
+		writeError(t, w, http.StatusNotFound, agent.ErrorCodeNotFound, "image not found")
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	_, err := rt.Inspect(context.Background(), "img:missing")
 	if !errors.Is(err, ErrCruxd) {
 		t.Fatalf("inspect = %v, want ErrCruxd", err)
 	}
-	var opErr *speccompute.Error
+	var opErr *agent.Error
 	if !errors.As(err, &opErr) {
 		t.Fatalf("inspect = %v, want a spec error", err)
 	}
-	if opErr.Code != speccompute.ErrorCodeNotFound {
-		t.Errorf("code = %q, want %q", opErr.Code, speccompute.ErrorCodeNotFound)
+	if opErr.Code != agent.ErrorCodeNotFound {
+		t.Errorf("code = %q, want %q", opErr.Code, agent.ErrorCodeNotFound)
 	}
 }
 
 func TestRuntimeOperationErrorAtStatusOK(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
-		writeError(t, w, http.StatusOK, speccompute.ErrorCodeNotFound, "image not found")
+	mux.HandleFunc(agent.EndpointInspect, func(w http.ResponseWriter, r *http.Request) {
+		writeError(t, w, http.StatusOK, agent.ErrorCodeNotFound, "image not found")
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	_, err := rt.Inspect(context.Background(), "img:missing")
-	var opErr *speccompute.Error
-	if !errors.As(err, &opErr) || opErr.Code != speccompute.ErrorCodeNotFound {
+	var opErr *agent.Error
+	if !errors.As(err, &opErr) || opErr.Code != agent.ErrorCodeNotFound {
 		t.Fatalf("inspect = %v, want a not_found spec error", err)
 	}
 }
 
 func TestRuntimeTransportError(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointRemove, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(agent.EndpointRemove, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "disk full", http.StatusInternalServerError)
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	err := rt.Remove(context.Background(), "img:1")
-	var opErr *speccompute.Error
+	var opErr *agent.Error
 	if !errors.Is(err, ErrCruxd) || errors.As(err, &opErr) {
 		t.Errorf("remove = %v, want a transport ErrCruxd", err)
 	}
@@ -273,13 +291,12 @@ func TestRuntimeTransportError(t *testing.T) {
 
 func TestRuntimeHealth(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Errorf("method = %q, want %q", r.Method, http.MethodGet)
-		}
-		w.WriteHeader(http.StatusOK)
+	mux.HandleFunc(agent.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
+		var req agent.HealthRequest
+		readJSON(t, r, &req)
+		writeJSON(t, w, agent.MediaTypeHealthResponse, agent.HealthResponse{})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	if err := rt.Health(context.Background()); err != nil {
 		t.Errorf("health: %v", err)
@@ -288,10 +305,10 @@ func TestRuntimeHealth(t *testing.T) {
 
 func TestRuntimeHealthUnavailable(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(agent.EndpointHealth, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "containerd is not serving", http.StatusServiceUnavailable)
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
 	if err := rt.Health(context.Background()); !errors.Is(err, ErrCruxd) {
 		t.Errorf("health = %v, want ErrCruxd", err)
@@ -300,12 +317,12 @@ func TestRuntimeHealthUnavailable(t *testing.T) {
 
 func TestRuntimeUnexpectedContentType(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc(speccompute.EndpointLoad, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, speccompute.MediaTypeCommitResponse, speccompute.CommitResponse{Ref: "x"})
+	mux.HandleFunc(agent.EndpointLoad, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, agent.MediaTypeCommitResponse, agent.CommitResponse{Ref: "x"})
 	})
-	rt := serveCruxd(t, mux)
+	rt := serveClient(t, mux)
 
-	_, err := rt.Load(context.Background(), "img:1", speccompute.Options{})
+	_, err := rt.Load(context.Background(), "img:1", agent.Options{})
 	if !errors.Is(err, ErrCruxd) {
 		t.Errorf("load = %v, want ErrCruxd", err)
 	}

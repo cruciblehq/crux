@@ -2,8 +2,8 @@
 //
 // On macOS the VM uses Apple's Virtualization framework (vmType: vz). On
 // Linux it uses QEMU (vmType: qemu). On other platforms every operation
-// returns [ErrUnsupportedPlatform]. There is one VM, named after
-// [limaInstanceName], and every operation blocks until it completes.
+// returns [ErrUnsupportedPlatform]. There is one VM, named [limaInstanceName],
+// and every operation blocks until it completes.
 //
 //	err := lima.Provision(ctx, imagePath, enrollment)
 //	state, err := lima.Status(ctx)
@@ -24,11 +24,11 @@
 // bindings (github.com/Code-Hex/vz) on macOS and QEMU/KVM on Linux, using vsock
 // for host-to-guest communication instead of SSH. vsock crosses the VM boundary
 // at the kernel level with no daemon, no ControlMaster timing constraints, and
-// no group membership issues. The containerd socket would be proxied over vsock,
-// and the image would ship pre-configured so no runtime provisioning scripts
-// would be needed, avoiding several race conditions. Furthermore, this is well
-// aligned with the planned "machine" resource type, which would define VM images
-// declaratively and make the hypervisor layer an implementation detail of each
-// compute provider. It would also enable deriving the exact VM configuration
+// no group membership issues. cruxd's endpoint would be reached over vsock,
+// and the image would ship configured so no provisioning scripts would be
+// needed at boot, avoiding several race conditions. Furthermore, this is well
+// aligned with the machine resource type, which defines VM images
+// declaratively and makes the hypervisor layer an implementation detail of
+// each provider. It would also enable deriving the exact VM configuration
 // from affordances, which currently isn't possible.
 package lima

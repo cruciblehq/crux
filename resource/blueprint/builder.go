@@ -10,27 +10,23 @@ import (
 )
 
 const (
-
-	// Hostname used for the single local compute unit in a blueprint plan.
-	localComputeHost = "localhost"
-
-	// Identifier for the default compute unit created in a blueprint plan.
-	defaultComputeID = "default"
+	localComputeHost = "localhost" // Hostname of the single local machine in a blueprint plan.
+	defaultComputeID = "default"   // Identifier of the default compute entry created in a blueprint plan.
 )
 
 // Builds a Crucible blueprint resource from its configuration.
 type Builder struct {
 	src     hub.Source       // Registry access for resolving service references.
 	env     string           // Environment selector for the blueprint.
-	compute manifest.Compute // Compute instance assigned to the plan's default compute unit.
+	compute manifest.Compute // Compute entry used as the plan's default.
 }
 
 // Returns a new Builder.
 //
-// source provides registry access for resolving service references. env
-// selects the blueprint environment to resolve. compute is the default compute
-// instance assigned to the plan; when its type is empty it defaults to the
-// local machine provider on the loopback host.
+// src provides registry access for resolving service references. env selects
+// the blueprint environment to resolve. compute is the plan's default compute
+// entry. When its type is empty, it defaults to the
+// local provider on localhost.
 func NewBuilder(src hub.Source, env string, compute manifest.Compute) *Builder {
 	if compute.Type == "" {
 		compute = defaultCompute()
@@ -40,10 +36,9 @@ func NewBuilder(src hub.Source, env string, compute manifest.Compute) *Builder {
 
 // Builds the blueprint described by cfg.
 //
-// Writes plan.yaml to the output directory. The plan includes references to
-// all services and their resolved manifests, but does not include the service
-// or runtime configs themselves. Those are expected to be pulled separately by
-// the deployer when needed.
+// Writes the plan to the output directory ([manifest.PlanPath]). The plan
+// references every service but does not include the service manifests or
+// their runtime configs. The deployer pulls those separately when needed.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, output string) error {
 	p, err := resolvePlan(ctx, cfg, b.env, b.src, b.compute)
 	if err != nil {
@@ -62,11 +57,11 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, output str
 //
 // The selected environment is located by envID, then every service is resolved
 // against src: its manifest is pulled, its environment variables are validated,
-// and a deployment entry is emitted. Resolved services are bin-packed onto
-// compute units, and cloud network entries are derived from per-container
-// network specs. computeHost is set as the Host of the single local compute
-// unit. Returns the assembled plan, or an error from environment lookup or any
-// service resolution.
+// and a deployment entry is emitted. compute becomes the plan's default compute
+// entry, and every service is assigned to a compute entry ([binPack]). Network
+// entries of the infrastructure are derived from the network specs of the
+// containers. Returns the assembled plan, or an error from environment lookup
+// or any service resolution.
 func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src hub.Source, compute manifest.Compute) (*manifest.Plan, error) {
 	env, err := findEnvironment(cfg, envID)
 	if err != nil {
@@ -128,7 +123,7 @@ func resolveServices(ctx context.Context, services []manifest.Ref, env *manifest
 	return results, nil
 }
 
-// Appends deployment entries derived from the assigned compute units.
+// Appends deployment entries derived from the assigned compute entries.
 func addDeployments(p *manifest.Plan, envID string, results []serviceResult, assignments map[string]string) {
 	for _, r := range results {
 		computeID := assignments[r.serviceID]
@@ -144,14 +139,15 @@ func addDeployments(p *manifest.Plan, envID string, results []serviceResult, ass
 
 // Resolved planning data for a single service.
 type serviceResult struct {
-	serviceID string             // manifest service identifier
-	target    string             // resolved reference string for the service image
-	container manifest.Container // resolved container config
+	serviceID string             // Service identifier in the blueprint.
+	target    string             // Resolved reference of the service.
+	container manifest.Container // Resolved container config.
 }
 
 // Resolves a single service reference into a serviceResult.
 //
-// Pulls the service manifest and validates the environment variables.
+// Pulls the service manifest, validates the environment variables, and checks
+// that the service has an output stage.
 func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src hub.Source) (serviceResult, error) {
 	ref, err := src.Parse(string(manifest.TypeService), service.Ref)
 	if err != nil {
@@ -180,7 +176,9 @@ func planService(ctx context.Context, service manifest.Ref, env *manifest.Enviro
 
 // Locates the selected environment in the blueprint.
 //
-// Returns an error if no environment with that ID is declared.
+// Returns an error if no environment with that ID is declared. When the
+// blueprint declares no environments, returns an empty environment with that
+// ID.
 func findEnvironment(cfg *manifest.Blueprint, envID string) (*manifest.Environment, error) {
 	for i := range cfg.Environments {
 		if cfg.Environments[i].ID == envID {
@@ -213,11 +211,11 @@ func validateEnvironment(schema *manifest.Schema, env *manifest.Environment) err
 	return nil
 }
 
-// Assigns services to compute units using first-fit bin-packing.
+// Assigns services to compute entries.
 //
-// All services are assigned to the first compute unit in iteration order.
-// This is a simple placeholder that satisfies the interface; a more
-// sophisticated packer can be substituted here without changing callers.
+// All services go to one compute entry, picked in map order, which is
+// arbitrary when computes holds more than one. This is a placeholder. A real
+// packer can replace it without changing callers.
 func binPack(results []serviceResult, computes map[string]manifest.Compute) map[string]string {
 	var computeID string
 	for id := range computes {

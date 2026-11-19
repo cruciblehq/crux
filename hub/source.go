@@ -58,8 +58,9 @@ func (s Source) Pull(ctx context.Context, ref *reference.Reference) (*PullResult
 
 // Pushes a resource package to the registry.
 //
-// Creates the resource and version in the registry if they do not already
-// exist, then uploads the archive at packagePath.
+// Creates the resource if it does not exist yet, creates the version, then
+// uploads the archive at packagePath. Returns [ErrVersionExists] if the
+// version already exists.
 func (s Source) Push(ctx context.Context, name, resourceType, version, packagePath string) error {
 	return push(ctx, s.Registry, name, resourceType, version, packagePath)
 }

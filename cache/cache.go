@@ -16,28 +16,19 @@ import (
 )
 
 const (
-
-	// The lock filename within the cache directory.
-	lockFilename = "cache.lock"
-
-	// The archives subdirectory within the cache directory.
-	archivesDir = "archives"
-
-	// The extracted subdirectory within the cache directory.
-	extractedDir = "extracted"
-
-	// Metadata filename within each version directory.
-	metaFilename = "meta.json"
-
-	// Archive filename within each version directory.
-	archiveFilename = "archive.tar.zst"
+	lockFilename    = "cache.lock"      // The lock filename within the cache directory.
+	archivesDir     = "archives"        // The archives subdirectory within the cache directory.
+	extractedDir    = "extracted"       // The extracted subdirectory within the cache directory.
+	metaFilename    = "meta.json"       // Metadata filename within each version directory.
+	archiveFilename = "archive.tar.zst" // Archive filename within each version directory.
 )
 
-// Provides thread-safe and process-safe access to the local cache.
+// Local cache, safe to use from many goroutines and processes.
 //
 // Stores cached artifacts as files organized into <namespace>/<resource>/<version>
-// directories. Operations are protected by both an in-process mutex and a file
-// lock. The cache must be closed when no longer needed to release the file lock.
+// directories. Operations are protected by a mutex within the process and by a
+// file lock across processes. The cache must be closed when no longer needed to
+// release the file lock.
 type Cache struct {
 	root string       // Cache root directory
 	lock *os.File     // File lock handle
@@ -46,16 +37,18 @@ type Cache struct {
 
 // Opens the local cache, creating it if necessary.
 //
-// A file lock is acquired to ensure exclusive write access across processes.
-// The caller must call Close when done with the cache.
+// An exclusive file lock is held until Close, so only one process uses the
+// cache at a time. Blocks until the lock is available. The caller must call
+// Close when done with the cache.
 func Open() (*Cache, error) {
 	return OpenAt(dirs.Registry())
 }
 
 // Opens a cache at the specified directory.
 //
-// A file lock is acquired to ensure exclusive write access across processes.
-// The caller must call Close when done with the cache.
+// An exclusive file lock is held until Close, so only one process uses the
+// cache at a time. Blocks until the lock is available. The caller must call
+// Close when done with the cache.
 func OpenAt(root string) (*Cache, error) {
 	const description = "cannot open cache"
 
@@ -165,7 +158,8 @@ func (c *Cache) HasExtracted(namespace, resource, version string) (bool, error) 
 //
 // If the archive has already been extracted, the existing path is returned.
 // Otherwise, the archive is extracted atomically into the extracted tree.
-// The archive format is assumed to be Zstandard-compressed tar (tar.zst).
+// The archive is assumed to be a tar archive compressed with Zstandard
+// (tar.zst).
 func (c *Cache) Extract(namespace, resource, version string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -185,7 +179,7 @@ func (c *Cache) Put(namespace, resource, version string, archive io.Reader) (*Ve
 
 // Stores an entry in the cache, verifying the digest.
 //
-// Like [Put], but verifies that the archive's computed digest matches
+// Like [Cache.Put], but verifies that the archive's computed digest matches
 // expectedDigest. Returns [ErrDigestMismatch] if they don't match; the
 // partially stored entry is removed before returning.
 func (c *Cache) PutWithDigest(namespace, resource, version, expectedDigest string, archive io.Reader) (*Version, error) {
@@ -279,7 +273,8 @@ func (c *Cache) openArchiveFile(namespace, resource, version string) (*os.File, 
 	return openFile(path)
 }
 
-// Extracts a cached archive into the extracted tree and returns the directory path.
+// Extracts a cached archive into the extracted tree and returns the directory
+// path.
 //
 // If the archive has already been extracted, the existing directory is returned
 // immediately without re-extracting.

@@ -16,7 +16,7 @@ import (
 	"github.com/cruciblehq/utils-go/crex"
 )
 
-// Default machine image info.
+// Registry coordinates of the default machine image.
 const (
 	machineType      = "machine"         // Registry resource type for the machine image.
 	machineNamespace = "crucible"        // Registry namespace for the machine image.
@@ -36,7 +36,7 @@ const (
 
 // Ensures the default machine disk image is available in the local cache.
 //
-// Downloads from a given registry if not already cached. Returns the local
+// Downloads it from registryURL if it is not cached yet. Returns the local
 // filesystem path to the image file.
 func EnsureMachineImage(ctx context.Context, registryURL *url.URL) (string, error) {
 	path, err := cachedMachineImagePath()
@@ -59,10 +59,11 @@ func EnsureMachineImage(ctx context.Context, registryURL *url.URL) (string, erro
 
 // Downloads and caches the machine disk image from the registry.
 //
-// Pulls the pinned machine version and extracts it into the local registry
-// cache. After this returns, [cachedMachineImagePath] should resolve. The
-// image is built and published by the Crucible team. It's an Alpine image
-// with containerd installed and used as the base for provisioning the VM.
+// Pulls the pinned machine image version and extracts it into the local
+// registry cache. After this returns, [cachedMachineImagePath] should resolve.
+// The image is built and published by the Crucible team. It is an Ubuntu
+// cloud image, shipped with the cruxd binaries, that the local provider boots
+// the VM from.
 func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 	const description = "cannot download machine image"
 	if registryURL == nil {

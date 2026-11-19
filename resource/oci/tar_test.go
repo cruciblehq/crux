@@ -13,7 +13,6 @@ import (
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// Reads an uncompressed tar stream and returns its entries keyed by name.
 func readTarEntries(t *testing.T, data []byte) map[string][]byte {
 	t.Helper()
 	entries := make(map[string][]byte)
@@ -37,7 +36,7 @@ func readTarEntries(t *testing.T, data []byte) map[string][]byte {
 
 func TestWriteScratchTar(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteScratchTar(&buf); err != nil {
+	if err := WriteScratchTar(&buf, "arm64"); err != nil {
 		t.Fatalf("WriteScratchTar: %v", err)
 	}
 	entries := readTarEntries(t, buf.Bytes())
@@ -78,7 +77,15 @@ func TestWriteScratchTar(t *testing.T) {
 	if len(mfst.Layers) != 0 {
 		t.Fatalf("scratch image must have no layers, got %d", len(mfst.Layers))
 	}
-	if _, ok := entries[fmt.Sprintf("blobs/sha256/%s", mfst.Config.Digest.Hex())]; !ok {
+	configBytes, ok := entries[fmt.Sprintf("blobs/sha256/%s", mfst.Config.Digest.Hex())]
+	if !ok {
 		t.Fatalf("config blob %s not found", mfst.Config.Digest)
+	}
+	var cfg ocispecv1.Image
+	if err := json.Unmarshal(configBytes, &cfg); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+	if cfg.Architecture != "arm64" || cfg.OS != "linux" {
+		t.Fatalf("platform = %s/%s, want linux/arm64", cfg.OS, cfg.Architecture)
 	}
 }

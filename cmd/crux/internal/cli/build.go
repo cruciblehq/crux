@@ -18,7 +18,7 @@ import (
 // Represents the 'crux build' command.
 type BuildCmd struct {
 	Watch       bool   `short:"w" help:"Watch for changes and rebuild automatically."`
-	Registry    string `help:"Hub registry URL for fetching runtimes (default: http://hub.cruciblehq.xyz:8080)."`
+	Registry    string `help:"Hub registry URL for fetching resources (default: http://hub.cruciblehq.xyz:8080)."`
 	Environment string `short:"e" help:"Blueprint environment to build against." default:""`
 }
 
@@ -86,7 +86,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 	return ctx.Err()
 }
 
-// Resolves the builder, creates the output directory, and builds the resource.
+// Reads the manifest, creates the output directory, and builds the resource.
 func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.BuildResult, error) {
 	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
 	if err != nil {

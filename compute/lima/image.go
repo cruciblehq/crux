@@ -8,8 +8,9 @@ import (
 	"github.com/cruciblehq/utils-go/file"
 )
 
-// Resolves a machine image path, removing the staged copy if it resides in
-// the given temp directory.
+// Removes the staged image file id if it lies inside tempDir.
+//
+// Images outside tempDir belong to the caller and are left in place.
 func RemoveImageIfStaged(ctx context.Context, id, tempDir string) error {
 	abs, err := filepath.Abs(id)
 	if err != nil {

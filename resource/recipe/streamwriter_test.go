@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Collects log records emitted during a test.
 type captureHandler struct {
 	records *[]slog.Record
 }
@@ -31,7 +30,7 @@ func TestStreamWriter(t *testing.T) {
 	slog.SetDefault(slog.New(captureHandler{records: &records}))
 	defer slog.SetDefault(prev)
 
-	w := newStreamWriter(context.Background(), slog.LevelInfo, "stdout")
+	w := newStreamWriter(slog.LevelInfo, "stdout")
 
 	// Partial write without a newline must not emit yet.
 	if n, err := w.Write([]byte("hello ")); err != nil || n != 6 {

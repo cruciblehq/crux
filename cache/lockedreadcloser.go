@@ -4,8 +4,8 @@ import "os"
 
 // Wraps an [os.File] with an unlock function that is called on [Close].
 type lockedReadCloser struct {
-	file   *os.File
-	unlock func()
+	file   *os.File // File being read.
+	unlock func()   // Releases the lock held while reading.
 }
 
 // Reads from the underlying file.

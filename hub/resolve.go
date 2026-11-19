@@ -11,9 +11,11 @@ import (
 
 // Resolves a reference to a specific version with full metadata.
 //
-// For channel-based references, follows the channel to get the version. For
-// version-constrained references, lists all versions and finds the highest
-// matching version. Returns the full Version with digest and archive details.
+// First checks that the resource has the type of the reference, and returns
+// [ErrTypeMismatch] if not. For channel-based references, follows the channel
+// to get the version. For version-constrained references, lists all versions
+// and finds the highest matching version. Returns the full [registry.Version]
+// with digest and archive details.
 func ResolveVersion(ctx context.Context, client *Client, ref *reference.Reference) (*registry.Version, error) {
 	if err := validateResourceType(ctx, client, ref); err != nil {
 		return nil, err

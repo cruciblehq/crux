@@ -16,7 +16,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-// Builds a zstd-compressed tar archive in memory from the given file map.
 func testArchive(t *testing.T, files map[string]string) *bytes.Reader {
 	t.Helper()
 
@@ -49,14 +48,12 @@ func testArchive(t *testing.T, files map[string]string) *bytes.Reader {
 	return bytes.NewReader(buf.Bytes())
 }
 
-// Returns the sha256 digest string for the given data.
 func testDigest(t *testing.T, data []byte) string {
 	t.Helper()
 	h := sha256.Sum256(data)
 	return fmt.Sprintf("sha256:%s", hex.EncodeToString(h[:]))
 }
 
-// Opens a new cache in a temporary directory.
 func testOpen(t *testing.T) *Cache {
 	t.Helper()
 	dir := t.TempDir()
@@ -103,7 +100,6 @@ func TestCloseIdempotent(t *testing.T) {
 	if err := c.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// Second close should be a no-op.
 	if err := c.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +192,6 @@ func TestPutInvalidatesExtraction(t *testing.T) {
 		t.Fatal("expected HasExtracted=false after Put replacement")
 	}
 
-	// Re-extract should produce new contents.
 	dir2, err := c.Extract("ns", "res", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +211,6 @@ func TestPutWithDigestMismatchPrunes(t *testing.T) {
 		t.Fatalf("expected ErrDigestMismatch, got %v", err)
 	}
 
-	// Parent directories should have been pruned.
 	nsDir, _ := safeJoin(c.archivesRoot(), "ns")
 	if _, err := os.Stat(nsDir); !os.IsNotExist(err) {
 		t.Fatal("expected namespace directory to be pruned after digest mismatch")
@@ -318,7 +312,6 @@ func TestPutWithDigestMismatch(t *testing.T) {
 		t.Fatalf("expected ErrDigestMismatch, got %v", err)
 	}
 
-	// Entry should have been cleaned up.
 	ok, _ := c.Has("ns", "res", "1.0.0")
 	if ok {
 		t.Fatal("entry should have been removed after digest mismatch")
@@ -345,7 +338,6 @@ func TestDelete(t *testing.T) {
 
 func TestDeleteIdempotent(t *testing.T) {
 	c := testOpen(t)
-	// Deleting a non-existent entry should not error.
 	if err := c.Delete("ns", "res", "1.0.0"); err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +355,6 @@ func TestDeletePrunesEmptyDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The namespace directory should have been pruned.
 	nsDir, _ := safeJoin(c.archivesRoot(), "ns")
 	if _, err := os.Stat(nsDir); !os.IsNotExist(err) {
 		t.Fatal("expected namespace directory to be pruned")
@@ -479,7 +470,6 @@ func TestExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify extracted files exist.
 	content, err := os.ReadFile(filepath.Join(dir, "hello.txt"))
 	if err != nil {
 		t.Fatalf("expected hello.txt in extracted dir: %v", err)
@@ -496,7 +486,6 @@ func TestExtract(t *testing.T) {
 		t.Fatalf("unexpected nested content: %q", nested)
 	}
 
-	// Verify the extracted path is under the extracted tree.
 	if !strings.Contains(dir, extractedDir) {
 		t.Fatalf("expected extracted path to contain %q, got %q", extractedDir, dir)
 	}
@@ -584,7 +573,6 @@ func TestExtractedInParallelTree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Extracted path should be under extracted/, not archives/.
 	if strings.Contains(dir, archivesDir) {
 		t.Fatalf("extracted path should not be under %q: %s", archivesDir, dir)
 	}
@@ -601,7 +589,6 @@ func TestDirectoryLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify archive tree structure.
 	metPath, err := c.metaPath("ns", "res", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
@@ -618,7 +605,6 @@ func TestDirectoryLayout(t *testing.T) {
 		t.Fatalf("archive.tar.zst should exist: %v", err)
 	}
 
-	// Verify paths are structured correctly.
 	vDir, _ := c.versionDir("ns", "res", "1.0.0")
 	expected := filepath.Join(c.root, archivesDir, "ns", "res", "1.0.0")
 	if vDir != expected {
@@ -657,7 +643,6 @@ func TestMultipleNamespacesAndResources(t *testing.T) {
 		t.Fatalf("expected 4 versions, got %d", len(versions))
 	}
 
-	// Delete one, verify the rest are intact.
 	if err := c.Delete("alpha", "widget", "1.0.0"); err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +665,6 @@ func TestMultipleNamespacesAndResources(t *testing.T) {
 func TestDeletePrunesOnlyEmptyDirs(t *testing.T) {
 	c := testOpen(t)
 
-	// Two versions under the same namespace/resource.
 	for _, ver := range []string{"1.0.0", "2.0.0"} {
 		a := testArchive(t, map[string]string{"f": ver})
 		if _, err := c.Put("ns", "res", ver, a); err != nil {
@@ -698,12 +682,10 @@ func TestDeletePrunesOnlyEmptyDirs(t *testing.T) {
 		t.Fatal("resource dir should not be pruned while versions remain")
 	}
 
-	// Now delete the last one.
 	if err := c.Delete("ns", "res", "2.0.0"); err != nil {
 		t.Fatal(err)
 	}
 
-	// Now the whole tree should be pruned.
 	nsDir, _ := safeJoin(c.archivesRoot(), "ns")
 	if _, err := os.Stat(nsDir); !os.IsNotExist(err) {
 		t.Fatal("namespace dir should be pruned when empty")

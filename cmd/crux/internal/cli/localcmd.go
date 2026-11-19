@@ -18,8 +18,8 @@ const localLockFile = "blueprint.lock"
 
 // Manages the local Crucible environment.
 //
-// The local environment combines compute infrastructure (start, stop, exec,
-// etc.) with the blueprint that tracks which services are registered. Both
+// The local environment combines the local machine (start, stop, exec, and so
+// on) with the blueprint that tracks which services are registered. Both
 // concerns are part of the same environment from the developer's perspective.
 type LocalCmd struct {
 	Start   LocalStartCmd   `cmd:"" help:"Provision and start the local environment."`
@@ -29,7 +29,6 @@ type LocalCmd struct {
 	Destroy LocalDestroyCmd `cmd:"" help:"Destroy the local environment and all its data."`
 	Status  LocalStatusCmd  `cmd:"" help:"Show local environment status."`
 	Exec    LocalExecCmd    `cmd:"" help:"Run a command inside the local environment."`
-	Logs    LocalLogsCmd    `cmd:"" help:"Print the output of a unit in the local environment."`
 	Add     LocalAddCmd     `cmd:"" help:"Add a service to the local blueprint."`
 	Remove  LocalRemoveCmd  `cmd:"" aliases:"rm" help:"Remove a service from the local blueprint."`
 	List    LocalListCmd    `cmd:"" aliases:"ls" help:"List services in the local blueprint."`
@@ -129,7 +128,7 @@ func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
 	return m, bp, nil
 }
 
-// Maps the Lima lifecycle errors to user errors.
+// Maps the machine lifecycle errors of the provider to user errors.
 //
 // description says what failed. notRunning is the recovery offered when the
 // environment is not running, because the right next step depends on the

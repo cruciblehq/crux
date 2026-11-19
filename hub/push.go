@@ -14,9 +14,9 @@ import (
 
 // Pushes a resource package to the Hub registry.
 //
-// Verifies the package file exists, resolves the resource identifier, ensures
-// the namespace, resource, and version exist in the registry, then uploads
-// the archive.
+// Verifies the package file exists, resolves the resource identifier, checks
+// that the namespace exists, creates the resource if needed, creates the
+// version, then uploads the archive.
 func push(ctx context.Context, registryURL, name, resourceType, version, packagePath string) error {
 	if _, err := os.Stat(packagePath); err != nil {
 		return crex.Wrap(ErrFileSystemOperation, err)

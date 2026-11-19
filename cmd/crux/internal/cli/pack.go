@@ -15,10 +15,9 @@ type PackCmd struct{}
 
 // Executes the pack command.
 //
-// Packages the built resources into a deployable artifact. The command assumes
-// that the build step has already been completed successfully. If not, it will
-// return an error. Upon successful packaging, it logs the output path of the
-// created package.
+// Packages the built resource into an archive at the package path. The build
+// step must have completed first, or an error is returned. On success, logs
+// the path of the created package.
 func (c *PackCmd) Run(ctx context.Context) error {
 
 	slog.Info("packaging resource...", "output", manifest.PackagePath(RootCmd.Context))

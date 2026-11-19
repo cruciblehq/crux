@@ -11,7 +11,7 @@ import (
 	"github.com/cruciblehq/crux/authority"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/crux/machines"
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
@@ -37,8 +37,8 @@ func openAuthority() (*authority.Authority, error) {
 // Creates the record for a new machine and returns its enrollment data.
 //
 // The record keeps the machine identifier and token so crux can enroll the
-// machine once it boots. The returned JSON goes into the data the machine
-// boots from, at [trust.EnrollmentPath].
+// machine once it boots. The provider places the returned JSON where the
+// agent on the machine reads it.
 func newMachine(name string) ([]byte, error) {
 	auth, err := openAuthority()
 	if err != nil {
@@ -56,11 +56,11 @@ func newMachine(name string) ([]byte, error) {
 	}, codec.JSON)
 }
 
-// Connects to the enrolled machine name at addr over mutual TLS.
+// Connects to the agent on the enrolled machine name at addr over mutual TLS.
 //
-// crux accepts only the certificate the root signed for this machine, and
-// sends its revocation list in the handshake.
-func connectMachine(ctx context.Context, name, addr string) (Machine, error) {
+// crux accepts only the agent certificate the root signed for this machine,
+// and sends its revocation list in the handshake.
+func connectMachine(ctx context.Context, name, addr string) (agent.Agent, error) {
 	auth, err := openAuthority()
 	if err != nil {
 		return nil, err
@@ -82,8 +82,9 @@ func connectMachine(ctx context.Context, name, addr string) (Machine, error) {
 
 // Enrolls the machine name at addr.
 //
-// The machine proves it holds the token from its record, crux signs its
-// certificate and installs it, and the token is then dropped from the record.
+// The agent proves it holds the token from the machine's record, crux signs
+// the agent's certificate and installs it, and the token is then dropped from
+// the record.
 func enrollMachine(ctx context.Context, name, addr string) error {
 	auth, err := openAuthority()
 	if err != nil {
@@ -111,16 +112,16 @@ func enrollMachine(ctx context.Context, name, addr string) error {
 	return machines.Save(dirs.Machines(), name, rec)
 }
 
-// Returns a runtime for enrolling the machine at addr.
+// Returns a client for enrolling the agent on the machine at addr.
 //
-// TLS cannot verify a machine that has not enrolled, so crux trusts it through
+// TLS cannot verify an agent that has not enrolled, so crux trusts it through
 // the token proof instead (see [trust.EnrollConfig]).
-func dialEnrollment(auth *authority.Authority, addr string) (*cruxdRuntime, error) {
+func dialEnrollment(auth *authority.Authority, addr string) (*client, error) {
 	cert, err := auth.Client()
 	if err != nil {
 		return nil, err
 	}
-	return &cruxdRuntime{
+	return &client{
 		base: (&url.URL{Scheme: "https", Host: addr}).String(),
 		client: &http.Client{Transport: &http.Transport{
 			TLSClientConfig:   trust.EnrollConfig(cert),
@@ -129,18 +130,19 @@ func dialEnrollment(auth *authority.Authority, addr string) (*cruxdRuntime, erro
 	}, nil
 }
 
-// Asks the machine name for its certificate request and checks it.
+// Asks the agent on the machine name for its certificate request and checks
+// it.
 //
-// The machine must prove it holds token on this TLS session, and the request
-// must carry the key the machine used in TLS.
-func requestEnrollment(ctx context.Context, r *cruxdRuntime, name string, token []byte) (*x509.CertificateRequest, error) {
-	resp, err := r.post(ctx, speccompute.EndpointEnroll, nil, "", nil)
+// The agent must prove it holds token on this TLS session, and the request
+// must carry the key the agent used in TLS.
+func requestEnrollment(ctx context.Context, r *client, name string, token []byte) (*x509.CertificateRequest, error) {
+	resp, err := r.send(ctx, agent.EndpointEnroll, agent.MediaTypeEnrollRequest, agent.EnrollRequest{})
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var er speccompute.EnrollResponse
-	if err := decodeResponse(resp, speccompute.MediaTypeEnrollResponse, &er); err != nil {
+	var er agent.EnrollResponse
+	if err := decodeResponse(resp, agent.MediaTypeEnrollResponse, &er); err != nil {
 		return nil, err
 	}
 	if resp.TLS == nil {
@@ -149,14 +151,15 @@ func requestEnrollment(ctx context.Context, r *cruxdRuntime, name string, token 
 	return trust.VerifyEnrollment(*resp.TLS, er.Request, er.Proof, token)
 }
 
-// Signs the machine certificate for csr with the root and installs it.
-func certifyMachine(ctx context.Context, r *cruxdRuntime, auth *authority.Authority, csr *x509.CertificateRequest, id trust.MachineID) error {
-	der, err := auth.SignMachine(csr, id)
+// Signs the agent certificate for csr with the root and sends it to the agent
+// to install.
+func certifyMachine(ctx context.Context, r *client, auth *authority.Authority, csr *x509.CertificateRequest, id trust.MachineID) error {
+	der, err := auth.SignAgent(csr, id)
 	if err != nil {
 		return err
 	}
-	req := speccompute.CertifyRequest{Certificate: der}
-	return r.call(ctx, speccompute.EndpointCertify, speccompute.MediaTypeCertifyRequest, req, "", nil)
+	req := agent.CertifyRequest{Certificate: der}
+	return r.call(ctx, agent.EndpointCertify, agent.MediaTypeCertifyRequest, req, agent.MediaTypeCertifyResponse, &agent.CertifyResponse{})
 }
 
 // Blocks until the machine name at addr is enrolled and healthy.
@@ -193,15 +196,15 @@ func machineReady(ctx context.Context, name, addr string) error {
 	return machineHealthy(ctx, name, addr)
 }
 
-// Connects to the enrolled machine and checks its health.
+// Connects to the agent on the enrolled machine and checks its health.
 func machineHealthy(ctx context.Context, name, addr string) error {
 	ctx, cancel := context.WithTimeout(ctx, machineTryTimeout)
 	defer cancel()
 
-	rt, err := connectMachine(ctx, name, addr)
+	a, err := connectMachine(ctx, name, addr)
 	if err != nil {
 		return err
 	}
-	defer rt.Close()
-	return rt.Health(ctx)
+	defer a.Close()
+	return a.Health(ctx)
 }

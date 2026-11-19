@@ -11,8 +11,8 @@ import (
 
 // Builds a Crucible service resource from its configuration.
 //
-// Drives the shared recipe pipeline against the local machine, wiring
-// the configured entrypoint into the produced image.
+// Drives the shared recipe pipeline against the local machine, wiring the
+// configured entrypoint into the produced image.
 type Builder struct {
 	src     hub.Source // Registry access for pulling base images.
 	workdir string     // Manifest directory, used as the root for resolving copy step sources.
@@ -20,7 +20,7 @@ type Builder struct {
 
 // Returns a new Builder.
 //
-// source provides registry access for pulling base images. workdir is the
+// src provides registry access for pulling base images. workdir is the
 // directory containing the manifest and is the root for resolving copy step
 // sources.
 func NewBuilder(src hub.Source, workdir string) *Builder {
@@ -29,8 +29,8 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 
 // Builds the service described by cfg into the output directory.
 //
-// Connects to the local machine and runs the recipe with the service
-// entrypoint. Returns the build directory on success.
+// Connects to the agent on the local machine and runs the recipe with the
+// service entrypoint. Returns the build directory on success.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Service, output string) (string, error) {
 	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {

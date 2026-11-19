@@ -18,6 +18,7 @@ var RootCmd struct {
 	Verbose bool   `short:"v" help:"Enable verbose output."`
 	Debug   bool   `short:"d" help:"Enable debug output."`
 
+	Init    InitCmd    `cmd:"" help:"Scaffold a new resource in the working directory."`
 	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
 	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
 	Push    PushCmd    `cmd:"" help:"Push a resource package to the registry."`

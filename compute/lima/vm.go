@@ -4,21 +4,20 @@ package lima
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strconv"
 
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Host interface Lima forwards cruxd's port to.
 const cruxdHost = "127.0.0.1"
 
-// Checks that a machine disk image is readable and returns its image ID.
+// Checks that a machine disk image exists and returns its image ID.
 //
 // The local provider uses the image directly from the local filesystem, so this
 // function only verifies the file exists and is accessible. The returned path
@@ -53,7 +52,7 @@ func Provision(ctx context.Context, imageID string, enrollment []byte) error {
 // Starts the VM.
 //
 // The VM must already be provisioned. If already running this is a no-op, and
-// if it exists but is stopped, it is resumed. Returns [ErrMachineNotCreated] if
+// if it exists but is stopped, it is started. Returns [ErrMachineNotCreated] if
 // the VM has not been provisioned.
 func Start(ctx context.Context) error {
 	state := machineStatus(ctx)
@@ -97,13 +96,10 @@ func Stop(ctx context.Context) error {
 //
 // After this, the VM no longer appears in limactl list and all resources it
 // consumed are freed. If the VM exists, it is terminated and deleted along
-// with its disk image. Returns nil if the VM does not exist.
+// with its disk image. Returns [ErrMachineNotCreated] if the VM does not
+// exist.
 func Deprovision(ctx context.Context) error {
-	err := destroyMachine(ctx)
-	if errors.Is(err, ErrMachineNotCreated) {
-		return nil
-	}
-	return err
+	return destroyMachine(ctx)
 }
 
 // Queries the current state of the VM.
@@ -116,11 +112,11 @@ func Status(ctx context.Context) (State, error) {
 
 // Runs a command inside the VM.
 //
-// Used for setup and teardown tasks that must run on the host. The output is
+// Used for setup and teardown tasks that must run in the VM. The output is
 // streamed to stdout and stderr as it is produced. Returns the exit code and
-// a nil error when the process exits normally, regardless of exit code. Also
-// returns a non-nil error only if the command could not be started or the
-// context was cancelled before the process completed.
+// a nil error when the process exits, whatever the exit code. Returns a
+// non-nil error only if the command could not be started or the context was
+// cancelled before the process completed.
 func Exec(ctx context.Context, stdout, stderr io.Writer, command string, args ...string) (int, error) {
 	return limaGuestExec(ctx, stdout, stderr, command, args...)
 }
@@ -186,12 +182,12 @@ func destroyMachine(ctx context.Context) error {
 
 // Returns the address on this computer where cruxd in the VM is reachable.
 func CruxdAddress() string {
-	return net.JoinHostPort(cruxdHost, strconv.Itoa(speccompute.DefaultPort))
+	return net.JoinHostPort(cruxdHost, strconv.Itoa(agent.DefaultPort))
 }
 
 // Queries the current state of the VM.
 //
-// Maps the Lima instance status string to a local state. If the instance
+// Maps the Lima instance status string to a [State]. If the instance
 // does not exist or cannot be reached, returns [StateNotProvisioned].
 func machineStatus(ctx context.Context) State {
 	switch limaInstanceStatus(ctx) {

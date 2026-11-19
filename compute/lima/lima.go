@@ -32,7 +32,7 @@ const (
 	guestWorkdir = "/"
 )
 
-// Path to the vendored limactl binary.
+// Returns the path to the vendored limactl binary.
 func limactlBin() string {
 	return filepath.Join(dirs.Lima(), limaBinDir, limactlName)
 }
@@ -181,7 +181,7 @@ func ensureLima(ctx context.Context) error {
 // at dest is replaced, and the new install appears only once extraction has
 // fully succeeded, so an interrupted download never leaves a partial install.
 func extractLima(r io.Reader, dest string) error {
-	const description = "cannot install Lima" // Shut the linter up
+	const description = "cannot install Lima"
 	if err := os.RemoveAll(dest); err != nil {
 		return crex.SystemError(description, "failed to remove the previous Lima install").
 			Recovery("Check the permissions of the crux data directory, then try again.").
@@ -229,7 +229,7 @@ func limaGuestExec(ctx context.Context, stdout, stderr io.Writer, command string
 func limaList(ctx context.Context) ([]string, error) {
 	out, err := process.Output(ctx, limactl([]string{"list", "--format={{.Name}}"}, nil, nil, nil))
 	if err != nil {
-		return nil, crex.SystemError("cannot list local instances", "limactl failed to list instances").
+		return nil, crex.SystemError("cannot list local machines", "limactl failed to list its virtual machines").
 			Recovery(recoveryRestartLocalEnvironment).
 			Cause(crex.Wrap(ErrLimaCtl, err)).
 			Err()

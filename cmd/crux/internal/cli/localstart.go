@@ -14,13 +14,13 @@ import (
 // Returns a user error for a failed 'start' when the cause is a known
 // local environment state.
 func localStartError(err error) error {
-	return localError(err, "cannot start local environment", "Run 'crux local start' to start the local environment first.")
+	return localError(err, "cannot start local environment", "Run 'crux local reset' to recreate the local environment.")
 }
 
 // Represents the 'crux local start' command.
 type LocalStartCmd struct{}
 
-// Provisions and starts the local environment.
+// Provisions the local machine if needed and starts it.
 func (c *LocalStartCmd) Run(ctx context.Context) error {
 	slog.Info("starting local environment...")
 
@@ -46,7 +46,7 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 	case compute.StateNotProvisioned:
 		imagePath, err := compute.EnsureMachineImage(ctx, registryURL)
 		if err != nil {
-			return err
+			return localStartError(err)
 		}
 		f, err := os.Open(imagePath)
 		if err != nil {

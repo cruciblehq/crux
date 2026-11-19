@@ -10,7 +10,7 @@ import (
 	"github.com/cruciblehq/spec/manifest"
 )
 
-// Creates a Linux bridge on the host with a deny-all forward chain.
+// Creates a Linux bridge in the VM with a forward chain that drops all traffic.
 //
 // bridge is the interface name (must be at most [InterfaceNameMax] characters).
 // gateway is the first host address in the subnet, assigned to the bridge
@@ -39,29 +39,29 @@ func CreateBridge(ctx context.Context, exec ExecFunc, bridge string, gateway net
 	return nil
 }
 
-// Removes a Linux bridge and its nftables table from the host.
+// Removes a Linux bridge and its nftables table from the VM.
 func RemoveBridge(ctx context.Context, exec ExecFunc, bridge string) error {
 	run(ctx, exec, nftCommand, "delete", "table", nftFamilyBridge, bridge)
 	return run(ctx, exec, ipCommand, linkSubcommand, "delete", bridge)
 }
 
-// Attaches a unit to a bridge by creating a veth pair and network namespace.
+// Attaches a container to a bridge by creating a veth pair and network namespace.
 //
-// Creates a named network namespace for the unit (if one does not already
+// Creates a named network namespace for the container (if one does not already
 // exist), creates a veth pair connecting the namespace to the bridge, and
 // brings up all interfaces.
-func AttachUnit(ctx context.Context, exec ExecFunc, unitID, bridge, veth, peer string) error {
-	run(ctx, exec, ipCommand, netnsSubcommand, "add", unitID)
+func AttachContainer(ctx context.Context, exec ExecFunc, containerID, bridge, veth, peer string) error {
+	run(ctx, exec, ipCommand, netnsSubcommand, "add", containerID)
 
 	if err := run(ctx, exec, ipCommand, linkSubcommand, "add", veth, "type", "veth", "peer", "name", peer); err != nil {
 		return err
 	}
-	if err := run(ctx, exec, ipCommand, linkSubcommand, "set", peer, netnsSubcommand, unitID); err != nil {
+	if err := run(ctx, exec, ipCommand, linkSubcommand, "set", peer, netnsSubcommand, containerID); err != nil {
 		run(ctx, exec, ipCommand, linkSubcommand, "delete", veth)
 		return err
 	}
 	if err := run(ctx, exec, ipCommand, linkSubcommand, "set", veth, "master", bridge); err != nil {
-		nsRun(ctx, exec, unitID, ipCommand, linkSubcommand, "delete", peer)
+		nsRun(ctx, exec, containerID, ipCommand, linkSubcommand, "delete", peer)
 		return err
 	}
 	if err := run(ctx, exec, ipCommand, linkSubcommand, "set", veth, "up"); err != nil {
@@ -69,50 +69,51 @@ func AttachUnit(ctx context.Context, exec ExecFunc, unitID, bridge, veth, peer s
 		return err
 	}
 
-	nsRun(ctx, exec, unitID, ipCommand, linkSubcommand, "set", peer, "up")
-	nsRun(ctx, exec, unitID, ipCommand, linkSubcommand, "set", loopback, "up")
+	nsRun(ctx, exec, containerID, ipCommand, linkSubcommand, "set", peer, "up")
+	nsRun(ctx, exec, containerID, ipCommand, linkSubcommand, "set", loopback, "up")
 
 	return nil
 }
 
-// Installs a deny-all nftables baseline inside a unit's network namespace.
+// Installs an nftables baseline that drops all traffic in a container's
+// network namespace.
 //
 // Creates an inet filter table with input and output chains set to policy drop.
 // Loopback traffic is allowed.
-func InstallBaseline(ctx context.Context, exec ExecFunc, unitID string) {
-	nsRun(ctx, exec, unitID, nftCommand, "add", "table", nftFamilyInet, nftTableFilter)
-	nsRun(ctx, exec, unitID, nftCommand, "add", "chain", nftFamilyInet, nftTableFilter, nftChainInput, "{ type filter hook input priority 0; policy drop; }")
-	nsRun(ctx, exec, unitID, nftCommand, "add", "chain", nftFamilyInet, nftTableFilter, nftChainOutput, "{ type filter hook output priority 0; policy drop; }")
-	nsRun(ctx, exec, unitID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainInput, "iif", loopback, "accept")
-	nsRun(ctx, exec, unitID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainOutput, "oif", loopback, "accept")
+func InstallBaseline(ctx context.Context, exec ExecFunc, containerID string) {
+	nsRun(ctx, exec, containerID, nftCommand, "add", "table", nftFamilyInet, nftTableFilter)
+	nsRun(ctx, exec, containerID, nftCommand, "add", "chain", nftFamilyInet, nftTableFilter, nftChainInput, "{ type filter hook input priority 0; policy drop; }")
+	nsRun(ctx, exec, containerID, nftCommand, "add", "chain", nftFamilyInet, nftTableFilter, nftChainOutput, "{ type filter hook output priority 0; policy drop; }")
+	nsRun(ctx, exec, containerID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainInput, "iif", loopback, "accept")
+	nsRun(ctx, exec, containerID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainOutput, "oif", loopback, "accept")
 }
 
-// Detaches a unit from a bridge by removing the host-side veth.
+// Detaches a container from a bridge by removing its veth in the root namespace.
 //
-// Removing the host-side veth also removes its peer inside the namespace.
-func DetachUnit(ctx context.Context, exec ExecFunc, veth string) error {
+// Removing that veth also removes its peer inside the container's namespace.
+func DetachContainer(ctx context.Context, exec ExecFunc, veth string) error {
 	return run(ctx, exec, ipCommand, linkSubcommand, "delete", veth)
 }
 
-// Replaces all nftables rules inside a unit's network namespace.
+// Replaces all nftables rules inside a container's network namespace.
 //
 // Flushes the input and output chains, re-adds loopback rules, then applies
 // the provided nft argument lists. Each entry in rules is a complete nft
 // command argument list (e.g. ["nft", "add", "rule", "inet", "filter", ...]).
-func ApplyRules(ctx context.Context, exec ExecFunc, unitID string, rules [][]string) {
-	nsRun(ctx, exec, unitID, nftCommand, "flush", "chain", nftFamilyInet, nftTableFilter, nftChainInput)
-	nsRun(ctx, exec, unitID, nftCommand, "flush", "chain", nftFamilyInet, nftTableFilter, nftChainOutput)
+func ApplyRules(ctx context.Context, exec ExecFunc, containerID string, rules [][]string) {
+	nsRun(ctx, exec, containerID, nftCommand, "flush", "chain", nftFamilyInet, nftTableFilter, nftChainInput)
+	nsRun(ctx, exec, containerID, nftCommand, "flush", "chain", nftFamilyInet, nftTableFilter, nftChainOutput)
 
-	nsRun(ctx, exec, unitID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainInput, "iif", loopback, "accept")
-	nsRun(ctx, exec, unitID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainOutput, "oif", loopback, "accept")
+	nsRun(ctx, exec, containerID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainInput, "iif", loopback, "accept")
+	nsRun(ctx, exec, containerID, nftCommand, "add", "rule", nftFamilyInet, nftTableFilter, nftChainOutput, "oif", loopback, "accept")
 
 	for _, args := range rules {
-		cmd := append([]string{ipCommand, netnsSubcommand, execSubcommand, unitID}, args...)
+		cmd := append([]string{ipCommand, netnsSubcommand, execSubcommand, containerID}, args...)
 		run(ctx, exec, cmd[0], cmd[1:]...)
 	}
 }
 
-// Returns the nft arguments of a rule that accepts traffic entering a unit.
+// Returns the nft arguments of a rule that accepts traffic entering a container.
 //
 // proto is a protocol keyword or number from the manifest. The "ip" wildcard
 // or an empty value matches any protocol. port is matched only when it is not
@@ -122,7 +123,7 @@ func InputRule(proto string, port int, peer string) []string {
 	return nftAcceptRule(nftChainInput, "saddr", proto, port, peer)
 }
 
-// Returns the nft arguments of a rule that accepts traffic leaving a unit.
+// Returns the nft arguments of a rule that accepts traffic leaving a container.
 //
 // Takes the same arguments as [InputRule], except that peer is the
 // destination address.
@@ -157,7 +158,7 @@ func hasPorts(proto string) bool {
 	return false
 }
 
-// Lists bridge interface names on the host that match the given prefix.
+// Lists bridge interface names in the VM that match the given prefix.
 func ListBridges(ctx context.Context, exec ExecFunc, prefix string) ([]string, error) {
 	out, err := execOutput(ctx, exec, ipCommand, "-o", linkSubcommand, "show", "type", nftFamilyBridge)
 	if err != nil {
@@ -172,7 +173,10 @@ func ListBridges(ctx context.Context, exec ExecFunc, prefix string) ([]string, e
 	return bridges, nil
 }
 
-// Queries the IPv4 address assigned to an interface on the host.
+// Returns the first IPv4 address of an interface in the VM.
+//
+// The address is in CIDR notation (e.g. "10.0.0.1/24"). Returns an empty
+// string if the interface has no IPv4 address.
 func InterfaceAddress(ctx context.Context, exec ExecFunc, iface string) (string, error) {
 	out, err := execOutput(ctx, exec, ipCommand, "-o", "-4", addrSubcommand, "show", "dev", iface)
 	if err != nil {
@@ -189,7 +193,7 @@ func InterfaceAddress(ctx context.Context, exec ExecFunc, iface string) (string,
 	return "", nil
 }
 
-// Lists host-side veth interfaces attached to a bridge.
+// Lists the veth interfaces in the VM's root namespace attached to a bridge.
 func ListBridgeInterfaces(ctx context.Context, exec ExecFunc, bridge string) ([]string, error) {
 	out, err := execOutput(ctx, exec, ipCommand, "-o", linkSubcommand, "show", "master", bridge)
 	if err != nil {

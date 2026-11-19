@@ -3,8 +3,8 @@
 [![Build](https://github.com/cruciblehq/crux/actions/workflows/build.yml/badge.svg)](https://github.com/cruciblehq/crux/actions/workflows/build.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://cruciblehq.github.io/crux/badges/coverage.json)](https://cruciblehq.github.io/crux/coverage/coverage.html)
 
-Crux is a command-line tool for scaffolding, testing, building, packaging, and
-distributing Crucible resources.
+Crux is a command-line tool for scaffolding, building, packaging, distributing,
+and deploying Crucible resources.
 
 # A Heartfelt Welcoming
 
@@ -71,7 +71,7 @@ Additionally, developers who complete this program will also receive:
 
 - A **permanent 2% revenue share** increase
 - An **additional 3% revenue share** increase while active in Developer Programs
-- An **exclusive recognition badge** for the Pre-Alpha Developer Program
+- An **exclusive recognition badge** for the Alpha Developer Program
 - **Early access** to upcoming Crucible features
 - **Access to exclusive contributor channels** and roadmap discussions
 - **Priority eligibility for future bounties and grants**

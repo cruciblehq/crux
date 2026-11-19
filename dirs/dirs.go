@@ -1,4 +1,4 @@
-// Package dirs locates the directories crux keeps on the host.
+// Package dirs locates the directories crux keeps on the user's computer.
 //
 // This is the only place that names them. All of them follow the XDG base
 // directory layout and live under the user's home, so no other user can

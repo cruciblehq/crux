@@ -25,7 +25,7 @@ type BuildResult struct {
 // specific artifacts. workdir is the manifest directory; the local source
 // paths in copy steps are resolved relative to it for runtime and service
 // builds. env selects the blueprint environment and is ignored by other types.
-// The output directory is created by the caller and guaranteed to be empty.
+// The caller creates the output directory.
 func Build(ctx context.Context, m manifest.Manifest, src hub.Source, workdir, env, output string) (*BuildResult, error) {
 	switch m.Resource.Type {
 	case manifest.TypeRuntime:

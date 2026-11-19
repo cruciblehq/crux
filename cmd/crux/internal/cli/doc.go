@@ -1,22 +1,19 @@
 // Package cli parses arguments and dispatches subcommands for the crux CLI.
 //
-// Provides usage information and examples for each subcommand. Each subcommand
-// has a Run method that is dispatched by Kong after parsing. This includes
-// commands for building and packaging resources (build and pack), running
-// resources locally (start, stop, restart, reset, destroy, exec, and status),
-// moving resources between machines and registries (push, pull, and import),
-// inspecting local state (cache, host, and version), and managing the host
-// environment. Each command resolves its own flags and arguments to absolute
-// values before Run.
+// Kong parses the arguments into [RootCmd] and calls the Run method of the
+// selected subcommand. The subcommands build and package resources (build and
+// pack), move resources between this computer and the registry (push and
+// pull), save remote OCI images as local archives (import), manage the local
+// resource cache (cache), manage the local environment and its blueprint
+// (local), and show version information (version).
 //
-// Global flags (on the root command) apply globally. -C changes the working
-// directory, -q and -v adjust verbosity, and -d enables debug output.
+// The flags on the root command apply to every subcommand. -C changes the
+// working directory and is resolved to an absolute path before Run. -q and -v
+// adjust verbosity, and -d enables debug output.
 //
-// Wiring the parser and dispatching a command:
+// Running the CLI:
 //
-//	var root cli.Root
-//	ctx := kong.Parse(&root)
-//	if err := ctx.Run(); err != nil {
+//	if err := cli.Execute(ctx); err != nil {
 //		log.Fatal(err)
 //	}
 package cli

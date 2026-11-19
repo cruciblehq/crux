@@ -60,7 +60,7 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Widget, dist string) 
 // respected, as they are overridden to use Crucible's custom JSX factory and
 // fragment. For output, although esbuild supports CommonJS, ESM, and IIFE/UMD
 // formats, Crucible supports only ESM output. Other formats are unlikely to be
-// added in the future. The build emits ES2015-compatible code to maintain broad
+// added in the future. The build emits ES2015 code to maintain broad
 // environment support. Currently, crux builds only for web platforms.
 func buildOptions(options *manifest.Widget, dist string) (es.BuildOptions, error) {
 	projectRoot, err := filepath.Abs(filepath.Dir(options.Main))

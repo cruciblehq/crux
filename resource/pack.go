@@ -17,9 +17,9 @@ type PackResult struct {
 
 // Packages a built resource into a distributable archive.
 //
-// Reads the manifest from the build directory and creates a zstd-compressed
-// tar archive containing the manifest and build artifacts. The output
-// extension must be .tar.zst.
+// Archives the build directory, which holds the manifest and the build
+// artifacts, into output. The compression follows the output extension, which
+// must be .tar.zst.
 func Pack(_ context.Context, buildDir, output string) (*PackResult, error) {
 	if err := ensureOutputDir(output); err != nil {
 		return nil, err
@@ -46,11 +46,11 @@ func ensureOutputDir(outputPath string) error {
 
 // Creates the archive from the build directory contents.
 //
-// Archives the build directory as-is. The manifest and build artifacts are
+// Archives the build directory unchanged. The manifest and build artifacts are
 // assumed to already be in their final form. The compression follows the
 // output extension, and the archive appears at outputPath only once it is
 // complete.
-func createArchive(outputPath string, buildDir string) error {
+func createArchive(outputPath, buildDir string) error {
 	const (
 		description = "failed to create package archive"
 		reason      = "could not write the archive to disk"

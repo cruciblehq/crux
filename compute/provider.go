@@ -3,6 +3,8 @@ package compute
 import (
 	"context"
 	"io"
+
+	"github.com/cruciblehq/spec/agent"
 )
 
 // Name of an infrastructure provider, used to look up its [Provider].
@@ -102,8 +104,8 @@ type Provider interface {
 
 	// Opens a session with cruxd on the machine.
 	//
-	// The machine must be running. The returned [Machine] owns its connection
+	// The machine must be running. The returned agent owns its connection
 	// and must be closed when no longer needed. Many sessions can be open
 	// against the same machine at once.
-	Connect(ctx context.Context, id string) (Machine, error)
+	Connect(ctx context.Context, id string) (agent.Agent, error)
 }

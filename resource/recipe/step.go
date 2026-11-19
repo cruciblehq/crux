@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/cruciblehq/crux/compute"
-	speccompute "github.com/cruciblehq/spec/compute"
+	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/archive"
 	"github.com/cruciblehq/utils-go/crex"
@@ -30,12 +30,13 @@ const logStreamStderr = "stderr"
 
 // Executes a single step, dispatching to the appropriate handler.
 //
-// Run steps invoke the command in the live container. Copy steps append a tar
-// layer constructed from host files or extracted from a prior stage. Standalone
-// modifier steps update the persistent stage state and optionally update the
-// image configuration. Platform groups recurse over their children when the
-// target platform matches.
-func (b *Builder) executeStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState, stageImages map[string]speccompute.ImageRef) error {
+// Run steps invoke the command in the live container. Copy steps apply a tar
+// archive of local files, or of files extracted from a prior stage, to the
+// container. Unpack steps extract a local archive into the container.
+// Standalone modifier steps update the persistent stage state and optionally
+// update the image configuration. Platform groups recurse over their children
+// when the target platform matches.
+func (b *Builder) executeStep(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState, stageImages map[string]agent.ImageRef) error {
 	if step.Platform != "" && len(step.Steps) > 0 {
 		return b.executePlatformGroup(ctx, ctr, step, state, stageImages)
 	}
@@ -61,7 +62,7 @@ func (b *Builder) executeStep(ctx context.Context, ctr speccompute.Container, st
 // Group-level modifier fields are applied to the persistent stage state before
 // the children are executed. If the platform does not match the current build
 // target, all children are skipped.
-func (b *Builder) executePlatformGroup(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState, stageImages map[string]speccompute.ImageRef) error {
+func (b *Builder) executePlatformGroup(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState, stageImages map[string]agent.ImageRef) error {
 	if !matchesBuildPlatform(step.Platform) {
 		return nil
 	}
@@ -82,7 +83,7 @@ func (b *Builder) executePlatformGroup(ctx context.Context, ctr speccompute.Cont
 // workdir, and user from the persistent stage state merged with any step-local
 // overrides, then stops the container. Filesystem changes accumulate in the
 // container's writable snapshot.
-func (b *Builder) runStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState) error {
+func (b *Builder) runStep(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState) error {
 	shell := state.shell
 	if step.Shell != "" {
 		shell = step.Shell
@@ -104,15 +105,15 @@ func (b *Builder) runStep(ctx context.Context, ctr speccompute.Container, step *
 	if err := ctr.Start(ctx); err != nil {
 		return err
 	}
-	defer ctr.Stop(context.Background())
+	defer ctr.Stop(context.WithoutCancel(ctx))
 
 	env := maps.Clone(state.env)
 	maps.Copy(env, step.Env)
 	code, err := ctr.Exec(ctx,
-		newStreamWriter(ctx, slog.LevelInfo, logStreamStdout),
-		newStreamWriter(ctx, slog.LevelInfo, logStreamStderr),
+		newStreamWriter(slog.LevelInfo, logStreamStdout),
+		newStreamWriter(slog.LevelInfo, logStreamStderr),
 		step.Run,
-		speccompute.Options{
+		agent.Options{
 			Shell:   shell,
 			Env:     env,
 			Workdir: workdir,
@@ -127,13 +128,13 @@ func (b *Builder) runStep(ctx context.Context, ctr speccompute.Container, step *
 	return nil
 }
 
-// Executes a Copy step by appending a tar layer to the container.
+// Executes a Copy step by applying a tar archive to the container.
 //
-// For local copies the host source path is resolved relative to the manifest
+// For local copies the source path is resolved relative to the manifest
 // directory. For cross-stage copies (src of the form "stageName:/path") the
 // source is extracted from the named stage's committed image. The destination
 // defaults to the current workdir when set, otherwise to the image root.
-func (b *Builder) copyStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState, stageImages map[string]speccompute.ImageRef) error {
+func (b *Builder) copyStep(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState, stageImages map[string]agent.ImageRef) error {
 	src, dest, ok := strings.Cut(step.Copy, " ")
 	if !ok {
 		return crex.Newf(ErrBuild, "malformed copy step %q, expected \"src dest\"", step.Copy)
@@ -163,15 +164,15 @@ func (b *Builder) copyStep(ctx context.Context, ctr speccompute.Container, step 
 	return ctr.Copy(ctx, pr)
 }
 
-// Executes an Unpack step by extracting a host archive into the container.
+// Executes an Unpack step by extracting a local archive into the container.
 //
-// The host source path is resolved relative to the manifest directory and must
-// point to a tar archive, plain or compressed with Gzip or Zstandard. Its
+// The local source path is resolved relative to the manifest directory and
+// must point to a tar archive, plain or compressed with Gzip or Zstandard. Its
 // contents are extracted into the image at the destination, which defaults to
-// the current workdir when set, otherwise to the image root. Unlike a copy, the archive's entries are
-// unpacked rather than stored as a single file, which is how a base filesystem
-// is seeded into a scratch image.
-func (b *Builder) unpackStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState) error {
+// the current workdir when set, otherwise to the image root. Unlike a copy,
+// the archive's entries are unpacked rather than stored as a single file,
+// which is how a base filesystem is seeded into a scratch image.
+func (b *Builder) unpackStep(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState) error {
 	src, dest, ok := strings.Cut(step.Unpack, " ")
 	if !ok {
 		return crex.Newf(ErrBuild, "malformed unpack step %q, expected \"src dest\"", step.Unpack)
@@ -226,14 +227,14 @@ func writeUnpackTar(w io.Writer, archivePath, dest string) error {
 //
 // Extracts srcPath directly from the stage's committed image, rewrites the
 // tar paths to destPath, and copies the result into ctr.
-func (b *Builder) crossStageCopy(ctx context.Context, ctr speccompute.Container, stageName, srcPath, destPath string, stageImages map[string]speccompute.ImageRef) error {
+func (b *Builder) crossStageCopy(ctx context.Context, ctr agent.Container, stageName, srcPath, destPath string, stageImages map[string]agent.ImageRef) error {
 	stageRef, ok := stageImages[stageName]
 	if !ok {
 		return crex.Newf(ErrBuild, "unknown stage %q in cross-stage copy", stageName)
 	}
 
 	if !path.IsAbs(srcPath) {
-		cfg, err := b.runtime.Inspect(ctx, stageRef)
+		cfg, err := b.agent.Inspect(ctx, stageRef)
 		if err != nil {
 			return crex.Wrapf(ErrBuild, err, "get config of stage %q", stageName)
 		}
@@ -244,7 +245,7 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr speccompute.Container,
 		srcPath = path.Join(workdir, srcPath)
 	}
 
-	rc, err := b.runtime.Extract(ctx, stageRef, srcPath)
+	rc, err := b.agent.Extract(ctx, stageRef, srcPath)
 	if err != nil {
 		return crex.Wrapf(ErrBuild, err, "extract %q from stage %q", srcPath, stageName)
 	}
@@ -263,8 +264,9 @@ func (b *Builder) crossStageCopy(ctx context.Context, ctr speccompute.Container,
 //
 // Updates the persistent stage state and, for fields visible in the final
 // image (Env, Workdir, User), updates the image configuration as well. Shell
-// changes are build-time only and not reflected in the image config.
-func (b *Builder) applyModifierStep(ctx context.Context, ctr speccompute.Container, step *manifest.Step, state *stageState) error {
+// changes apply only during the build and are not reflected in the image
+// config.
+func (b *Builder) applyModifierStep(ctx context.Context, ctr agent.Container, step *manifest.Step, state *stageState) error {
 	applyStateModifiers(state, step)
 
 	if step.Workdir == "" && step.User == "" && len(step.Env) == 0 {
@@ -320,7 +322,8 @@ func applyStateModifiers(state *stageState, step *manifest.Step) {
 
 // Whether the current build target platform matches the given filter.
 //
-// Only Linux targets are supported. Non-Linux platforms are silently skipped.
+// Only Linux targets are supported. Steps for other operating systems are
+// silently skipped.
 func matchesBuildPlatform(platform string) bool {
 	// TO DO: compare against the actual target platform from the build context.
 	targetOS, _, _ := strings.Cut(platform, "/")

@@ -11,9 +11,9 @@ import (
 
 // Builds a Crucible runtime resource from its configuration.
 //
-// Drives the shared recipe pipeline against the local machine. A
-// runtime has no entrypoint, so the produced image keeps the entrypoint of its
-// final stage.
+// Drives the shared recipe pipeline against the local machine. A runtime has
+// no entrypoint, so the produced image keeps the entrypoint of its final
+// stage.
 type Builder struct {
 	src     hub.Source // Registry access for pulling base images.
 	workdir string     // Manifest directory, used as the root for resolving copy step sources.
@@ -21,7 +21,7 @@ type Builder struct {
 
 // Returns a new Builder.
 //
-// source provides registry access for pulling base images. workdir is the
+// src provides registry access for pulling base images. workdir is the
 // directory containing the manifest and is the root for resolving copy step
 // sources.
 func NewBuilder(src hub.Source, workdir string) *Builder {
@@ -30,8 +30,8 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 
 // Builds the runtime described by cfg into the output directory.
 //
-// Connects to the local machine and runs the recipe. Returns the build
-// directory on success.
+// Connects to the agent on the local machine and runs the recipe. Returns the
+// build directory on success.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Runtime, output string) (string, error) {
 	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {

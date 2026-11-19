@@ -1,8 +1,8 @@
 // Package hub provides Crux integration with the Crucible Hub registry.
 //
 // The shared wire contracts and validation rules for registry entities live in
-// github.com/cruciblehq/spec/registry. This builds on top of those types
-// with Crux-specific behavior.
+// github.com/cruciblehq/spec/registry. This package builds on those types with
+// behavior specific to crux.
 //
 // Source is the high-level entry point. It applies default registry and
 // namespace values while parsing references, resolves concrete versions,

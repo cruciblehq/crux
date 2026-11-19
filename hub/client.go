@@ -14,9 +14,9 @@ import (
 
 // HTTP client for interacting with the registry.
 //
-// Implements the Registry interface over HTTP, providing a remote client for
-// registry operations. Handles request serialization, response parsing, and
-// error handling according to the Hub API conventions.
+// Implements the [registry.Registry] interface over HTTP, providing a remote
+// client for registry operations. Handles request serialization, response
+// parsing, and error handling according to the Hub API conventions.
 type Client struct {
 	baseURL    string       // Base URL of the registry.
 	httpClient *http.Client // HTTP client used to execute requests.
@@ -411,10 +411,11 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	return req, nil
 }
 
-// Executes an HTTP request and decodes the JSON response into result.
+// Executes an HTTP request and decodes the response body into result.
 //
 // A response outside the 2xx range carries a [registry.Error], which is
-// returned as is. result may be nil when no body is expected.
+// returned as is. If that error cannot be decoded, a system error is returned
+// instead. result may be nil when no body is expected.
 func (c *Client) do(req *http.Request, result any) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

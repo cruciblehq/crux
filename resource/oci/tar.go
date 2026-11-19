@@ -27,12 +27,12 @@ const (
 // Schema version of OCI image manifests and indexes.
 const ociSchemaVersion = 2
 
-// Writes scratch (empty) OCI image.
+// Writes an empty (scratch) OCI image archive for linux/arch to w.
 //
 // The archive contains an OCI layout marker, a minimal config blob with no
 // layers, a manifest referencing the config, and an index referencing the
 // manifest.
-func WriteScratchTar(w io.Writer) error {
+func WriteScratchTar(w io.Writer, arch string) error {
 	tw := tar.NewWriter(w)
 	defer tw.Close()
 
@@ -44,7 +44,7 @@ func WriteScratchTar(w io.Writer) error {
 		return err
 	}
 
-	configDigest, configSize, err := writeScratchConfig(tw)
+	configDigest, configSize, err := writeScratchConfig(tw, arch)
 	if err != nil {
 		return err
 	}
@@ -57,17 +57,19 @@ func WriteScratchTar(w io.Writer) error {
 	return writeScratchIndex(tw, mfstDigest, mfstSize)
 }
 
-// Writes the scratch image config blob and returns its digest and byte length.
+// Writes the scratch image config blob for linux/arch and returns its digest
+// and byte length.
 //
 // Kept as a raw JSON literal to avoid encoding/json emitting "config":{} from
 // the zero-value ImageConfig field in ocispecv1.Image.
-func writeScratchConfig(tw *tar.Writer) (godigest.Digest, int64, error) {
-	config := []byte(`{"architecture":"amd64","os":"linux","rootfs":{"type":"layers","diff_ids":[]}}`)
+func writeScratchConfig(tw *tar.Writer, arch string) (godigest.Digest, int64, error) {
+	config := fmt.Appendf(nil, `{"architecture":%q,"os":"linux","rootfs":{"type":"layers","diff_ids":[]}}`, arch)
 	d, err := writeBlob(tw, config)
 	return d, int64(len(config)), err
 }
 
-// Writes the image manifest blob referencing config and returns its digest and byte length.
+// Writes the image manifest blob referencing config and returns its digest and
+// byte length.
 func writeScratchManifest(tw *tar.Writer, configDigest godigest.Digest, configSize int64) (godigest.Digest, int64, error) {
 	mfst, err := json.Marshal(ocispecv1.Manifest{
 		Versioned: ocispec.Versioned{SchemaVersion: ociSchemaVersion},
@@ -113,7 +115,7 @@ func writeScratchIndex(tw *tar.Writer, mfstDigest godigest.Digest, mfstSize int6
 	return writeTarEntry(tw, ocispecv1.ImageIndexFile, index)
 }
 
-// Writes data as a content-addressed blob under blobs/sha256/<digest> and returns the digest.
+// Writes data as a blob under blobs/sha256/<digest> and returns the digest.
 func writeBlob(tw *tar.Writer, data []byte) (godigest.Digest, error) {
 	d := godigest.FromBytes(data)
 	return d, writeTarEntry(tw, fmt.Sprintf("%s/sha256/%s", ocispecv1.ImageBlobsDir, d.Hex()), data)

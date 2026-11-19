@@ -12,22 +12,21 @@ import (
 // originated from.
 const logStreamKey = "stream"
 
-// Returns an [io.Writer] that routes each newline-delimited line from written
-// bytes to the default slog logger at level.
+// Returns an [io.Writer] that logs each line of the written bytes to the
+// default slog logger at level.
 //
 // stream is attached to every log record as the "stream" attribute and
 // identifies the source (e.g. "stdout", "stderr"). Safe for concurrent use.
-func newStreamWriter(ctx context.Context, level slog.Level, stream string) io.Writer {
-	return &streamWriter{ctx: ctx, level: level, stream: stream}
+func newStreamWriter(level slog.Level, stream string) io.Writer {
+	return &streamWriter{level: level, stream: stream}
 }
 
-// Concrete implementation backed by a line-buffered slog emitter.
+// Writer that logs each complete line it receives as a slog record.
 type streamWriter struct {
-	mu     sync.Mutex
-	buf    []byte
-	ctx    context.Context
-	level  slog.Level
-	stream string
+	mu     sync.Mutex // Guards buf.
+	buf    []byte     // Bytes received after the last complete line.
+	level  slog.Level // Level of each log record.
+	stream string     // Value of the stream attribute.
 }
 
 // Appends p to the internal buffer and emits one log record per complete line.
@@ -49,6 +48,8 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 }
 
 // Emits a single log record. Caller must hold w.mu.
+//
+// [io.Writer] carries no context, so the record gets an empty one.
 func (w *streamWriter) emit(line string) {
-	slog.Log(w.ctx, w.level, line, logStreamKey, w.stream)
+	slog.Log(context.Background(), w.level, line, logStreamKey, w.stream)
 }

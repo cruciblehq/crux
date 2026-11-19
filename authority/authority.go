@@ -37,12 +37,12 @@ const (
 	revocationsFile = "revocations.crl" // DER revocation list.
 )
 
-// Expiry of machine certificates.
+// Expiry of agent certificates.
 //
 // RFC 5280 reserves this date for certificates with no well defined
-// expiration. Machine certificates last for the life of the machine
+// expiration. Agent certificates last for the life of their machine
 // and are withdrawn only through the revocation list.
-var machineNotAfter = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+var agentNotAfter = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 
 // Certificate authority backed by a directory and a key store.
 type Authority struct {
@@ -58,8 +58,8 @@ type Authority struct {
 // first use.
 //
 // The first call creates the root, an empty revocation list, and an issuer.
-// Later calls renew the issuer when a client certificate minted now could
-// outlive it.
+// Later calls renew the issuer when it is missing, when its key cannot be
+// loaded, or when a client certificate signed now could outlive it.
 func Open(dir string, keys pki.KeyStore) (*Authority, error) {
 	if err := os.MkdirAll(dir, file.OwnerDirMode); err != nil {
 		return nil, err
@@ -183,11 +183,11 @@ func (a *Authority) Client() (tls.Certificate, error) {
 	}, nil
 }
 
-// Signs the machine certificate for csr with the root.
+// Signs the agent certificate for csr with the root.
 //
 // The certificate names machine id, is for server authentication, and lasts
 // for the life of the machine. Returns the DER certificate.
-func (a *Authority) SignMachine(csr *x509.CertificateRequest, id trust.MachineID) ([]byte, error) {
+func (a *Authority) SignAgent(csr *x509.CertificateRequest, id trust.MachineID) ([]byte, error) {
 	rootKey, err := a.keys.Load(rootKeyName)
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func (a *Authority) SignMachine(csr *x509.CertificateRequest, id trust.MachineID
 	if !ok {
 		return nil, crex.Newf(trust.ErrInvalidEnrollment, "unexpected request key type %T", csr.PublicKey)
 	}
-	tmpl := pki.LeafTemplate(id.Name(), pki.ValidUntil(machineNotAfter), x509.ExtKeyUsageServerAuth, id.Name())
+	tmpl := pki.LeafTemplate(id.Name(), pki.ValidUntil(agentNotAfter), x509.ExtKeyUsageServerAuth, id.Name())
 	cert, err := pki.Sign(tmpl, a.root, pub, rootKey)
 	if err != nil {
 		return nil, err

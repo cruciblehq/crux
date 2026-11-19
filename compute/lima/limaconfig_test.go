@@ -8,8 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	speccompute "github.com/cruciblehq/spec/compute"
-	"github.com/cruciblehq/spec/trust"
+	"github.com/cruciblehq/spec/agent"
 )
 
 func TestConfigTemplate_ImagePath(t *testing.T) {
@@ -79,11 +78,11 @@ func TestBuildLimaConfig_Defaults(t *testing.T) {
 	if want := fmt.Sprintf("%s/%s%s", guestMachineDir, cruxdBinaryPrefix, limaArch()); cfg.CruxdBinary != want {
 		t.Errorf("CruxdBinary: got %q, want %q", cfg.CruxdBinary, want)
 	}
-	if cfg.CruxdPort != speccompute.DefaultPort {
-		t.Errorf("CruxdPort: got %d, want %d", cfg.CruxdPort, speccompute.DefaultPort)
+	if cfg.CruxdPort != agent.DefaultPort {
+		t.Errorf("CruxdPort: got %d, want %d", cfg.CruxdPort, agent.DefaultPort)
 	}
-	if cfg.EnrollmentPath != trust.EnrollmentPath {
-		t.Errorf("EnrollmentPath: got %q, want %q", cfg.EnrollmentPath, trust.EnrollmentPath)
+	if cfg.EnrollmentPath != guestEnrollmentPath {
+		t.Errorf("EnrollmentPath: got %q, want %q", cfg.EnrollmentPath, guestEnrollmentPath)
 	}
 	if cfg.Enrollment != `{"machine":"abc"}` {
 		t.Errorf("Enrollment: got %q, want %q", cfg.Enrollment, `{"machine":"abc"}`)
