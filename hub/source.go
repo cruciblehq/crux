@@ -39,7 +39,7 @@ func NewSource(registry, namespace string) (Source, error) {
 //
 // Applies the default registry and namespace from [Source] when those
 // components are absent from the reference string.
-func (s Source) Parse(resourceType string, ref string) (*reference.Reference, error) {
+func (s Source) Parse(resourceType, ref string) (*reference.Reference, error) {
 	parsed, err := reference.Parse(ref, resourceType)
 	if err != nil {
 		return nil, err

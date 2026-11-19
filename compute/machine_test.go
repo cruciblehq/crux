@@ -42,7 +42,7 @@ func useStateDirs(t *testing.T) {
 	xdg.Reload()
 }
 
-func startMachine(t *testing.T, enrollment []byte, token []byte) string {
+func startMachine(t *testing.T, enrollment, token []byte) string {
 	t.Helper()
 	var e trust.Enrollment
 	if err := codec.Decode(enrollment, &e, codec.JSON); err != nil {

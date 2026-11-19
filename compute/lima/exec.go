@@ -41,7 +41,7 @@ func execOutput(ctx context.Context, exec ExecFunc, command string, args ...stri
 }
 
 // Runs a command inside a network namespace in the VM.
-func nsRun(ctx context.Context, exec ExecFunc, ns string, command string, args ...string) error {
+func nsRun(ctx context.Context, exec ExecFunc, ns, command string, args ...string) error {
 	nsArgs := append([]string{netnsSubcommand, execSubcommand, ns, command}, args...)
 	return run(ctx, exec, ipCommand, nsArgs...)
 }
