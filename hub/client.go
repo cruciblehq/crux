@@ -278,7 +278,7 @@ func (c *Client) ListVersions(ctx context.Context, namespace, resource string) (
 
 // Uploads a version archive.
 func (c *Client) UploadArchive(ctx context.Context, namespace, resource, version string, archive io.Reader) (*registry.Version, error) {
-	req, err := c.newRequest(ctx, http.MethodPut, registry.ArchivePath(namespace, resource, version), archive)
+	req, err := c.newRequest(ctx, http.MethodPut, registry.ArchivePath(namespace, resource, version), io.NopCloser(archive))
 	if err != nil {
 		return nil, err
 	}
