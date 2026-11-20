@@ -15,7 +15,7 @@ func writeWidgetManifest(t *testing.T, dir string) {
 		Resource: manifest.Resource{Type: manifest.TypeWidget, Name: "ns/w", Version: "1.0.0"},
 		Config:   &manifest.Widget{Main: "index.js"},
 	}
-	if err := manifest.WriteAt(m, dir); err != nil {
+	if err := WriteManifest(dir, m); err != nil {
 		t.Fatalf("write manifest: %v", err)
 	}
 }

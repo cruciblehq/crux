@@ -66,7 +66,7 @@ func Open(dir string, keys pki.KeyStore) (*Authority, error) {
 	}
 	a := &Authority{dir: dir, keys: keys}
 
-	root, err := pki.ReadCertificate(filepath.Join(dir, rootFile))
+	root, err := readCertificate(filepath.Join(dir, rootFile))
 	if errors.Is(err, fs.ErrNotExist) {
 		if err := a.create(); err != nil {
 			return nil, err
@@ -74,36 +74,63 @@ func Open(dir string, keys pki.KeyStore) (*Authority, error) {
 		return a, nil
 	}
 	if err != nil {
-		return nil, crex.Wrap(ErrInvalidState, err)
+		return nil, err
 	}
 	a.root = root
 
-	crlDER, err := os.ReadFile(filepath.Join(dir, revocationsFile))
-	if err != nil {
-		return nil, crex.Wrap(ErrInvalidState, err)
-	}
-	if a.crl, err = trust.ParseRevocations(crlDER, root); err != nil {
+	if a.crl, err = a.loadRevocations(); err != nil {
 		return nil, err
 	}
-
-	issuer, err := pki.ReadCertificate(filepath.Join(dir, issuerFile))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, crex.Wrap(ErrInvalidState, err)
-	}
-	if issuer != nil && time.Now().Add(trust.ClientLifetime).Before(issuer.NotAfter) {
-		if key, err := keys.Load(issuerKeyName); err == nil {
-			a.issuer, a.issuerKey = issuer, key
-			return a, nil
-		}
-	}
-	rootKey, err := keys.Load(rootKeyName)
-	if err != nil {
-		return nil, err
-	}
-	if err := a.renewIssuer(rootKey); err != nil {
+	if err := a.loadIssuer(); err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+// Reads and parses the DER certificate at path.
+//
+// A missing file returns an error that wraps [fs.ErrNotExist].
+func readCertificate(path string) (*x509.Certificate, error) {
+	der, err := os.ReadFile(path)
+	if err != nil {
+		return nil, crex.Wrap(ErrInvalidState, err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, crex.Wrap(ErrInvalidState, err)
+	}
+	return cert, nil
+}
+
+// Reads the saved revocation list and checks that the root signed it.
+func (a *Authority) loadRevocations() (*x509.RevocationList, error) {
+	der, err := os.ReadFile(filepath.Join(a.dir, revocationsFile))
+	if err != nil {
+		return nil, crex.Wrap(ErrInvalidState, err)
+	}
+	return trust.ParseRevocations(der, a.root)
+}
+
+// Loads the saved issuer, or renews it.
+//
+// The issuer is renewed when it is missing, when its key cannot be loaded, or
+// when a client certificate signed now could outlive it.
+func (a *Authority) loadIssuer() error {
+	issuer, err := readCertificate(filepath.Join(a.dir, issuerFile))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if issuer != nil && time.Now().Add(trust.ClientLifetime).Before(issuer.NotAfter) {
+		if key, err := a.keys.Load(issuerKeyName); err == nil {
+			a.issuer, a.issuerKey = issuer, key
+			return nil
+		}
+	}
+	rootKey, err := a.keys.Load(rootKeyName)
+	if err != nil {
+		return err
+	}
+	return a.renewIssuer(rootKey)
 }
 
 // Creates the root, an empty revocation list, and the first issuer.

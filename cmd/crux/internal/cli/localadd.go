@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/cruciblehq/spec/manifest"
@@ -20,18 +19,9 @@ type LocalAddCmd struct{}
 // service entry to the local blueprint. The local ID is derived from the last
 // component of the resource name (e.g. "myns/my-api" becomes "my-api").
 func (c *LocalAddCmd) Run(ctx context.Context) error {
-	man, err := manifest.ReadAt(RootCmd.Context)
+	man, err := readProjectManifest()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
-				Recovery("Run this command from a directory containing a crucible.yaml.").
-				Cause(err).
-				Err()
-		}
-		return crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
-			Recovery("Check that crucible.yaml is present and valid.").
-			Cause(err).
-			Err()
+		return err
 	}
 
 	name := man.Resource.Name

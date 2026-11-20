@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"io"
 
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/hub"
@@ -28,20 +29,20 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 	return &Builder{src: src, workdir: workdir}
 }
 
-// Builds the runtime described by cfg into the output directory.
+// Builds the runtime described by cfg and writes its image to w.
 //
-// Connects to the agent on the local machine and runs the recipe. Returns the
-// build directory on success.
-func (b *Builder) Build(ctx context.Context, cfg *manifest.Runtime, output string) (string, error) {
+// Connects to the agent on the local machine and runs the recipe. The image
+// is an OCI tar archive.
+func (b *Builder) Build(ctx context.Context, cfg *manifest.Runtime, w io.Writer) error {
 	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {
-		return "", err
+		return err
 	}
 	client, err := provider.Connect(ctx, compute.DefaultLocalMachineID())
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer client.Close()
 
-	return recipe.NewBuilder(b.src, b.workdir, client).Build(ctx, &cfg.Recipe, nil, output)
+	return recipe.NewBuilder(b.src, b.workdir, client).Build(ctx, &cfg.Recipe, nil, w)
 }

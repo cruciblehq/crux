@@ -3,8 +3,8 @@ package hub
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
-	"os"
 
 	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/spec/reference"
@@ -14,14 +14,9 @@ import (
 
 // Pushes a resource package to the Hub registry.
 //
-// Verifies the package file exists, resolves the resource identifier, checks
-// that the namespace exists, creates the resource if needed, creates the
-// version, then uploads the archive.
-func push(ctx context.Context, registryURL, name, resourceType, version, packagePath string) error {
-	if _, err := os.Stat(packagePath); err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-
+// Resolves the resource identifier, checks that the namespace exists, creates
+// the resource if needed, creates the version, then uploads archive.
+func push(ctx context.Context, registryURL, name, resourceType, version string, archive io.ReadSeeker) error {
 	id, err := reference.ParseIdentifier(name, resourceType)
 	if err != nil {
 		return crex.Wrap(ErrInvalidIdentifier, err)
@@ -41,7 +36,7 @@ func push(ctx context.Context, registryURL, name, resourceType, version, package
 		return err
 	}
 
-	return uploadPackage(ctx, client, id.Namespace(), id.Name(), version, packagePath)
+	return uploadPackage(ctx, client, id.Namespace(), id.Name(), version, archive)
 }
 
 // Checks that the namespace exists in the registry.
@@ -112,21 +107,15 @@ func createVersion(ctx context.Context, client *Client, namespace, resource, ver
 
 // Uploads the package archive to the registry.
 //
-// Opens the package file and uploads it to the specified resource version in
-// the registry. After a successful upload, updates the local cache.
-func uploadPackage(ctx context.Context, client *Client, namespace, resource, version, packageOutput string) error {
-	archive, err := os.Open(packageOutput)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	defer archive.Close()
-
+// Uploads archive to the specified resource version in the registry. After a
+// successful upload, rewinds archive and adds it to the local cache.
+func uploadPackage(ctx context.Context, client *Client, namespace, resource, version string, archive io.ReadSeeker) error {
 	uploaded, err := client.UploadArchive(ctx, namespace, resource, version, archive)
 	if err != nil {
 		return crex.Wrap(ErrRegistryOperation, err)
 	}
 
-	if err := updateLocalCache(namespace, resource, version, packageOutput, uploaded.Digest); err != nil {
+	if err := updateLocalCache(namespace, resource, version, archive, uploaded.Digest); err != nil {
 		// Cache errors are just logged, since the upload succeeded.
 		slog.Error("failed to update local cache", "error", err)
 	}
@@ -136,21 +125,19 @@ func uploadPackage(ctx context.Context, client *Client, namespace, resource, ver
 
 // Adds the pushed package to the local cache.
 //
-// Stores the archive under the given namespace/resource/version with digest
-// verification, keeping the local cache in sync with the remote so a
-// subsequent pull does not re-download it.
-func updateLocalCache(namespace, resource, version, packagePath string, digest *string) error {
+// Reads archive from its start and stores it under the given
+// namespace/resource/version with digest verification, keeping the local
+// cache in sync with the remote so a subsequent pull does not re-download it.
+func updateLocalCache(namespace, resource, version string, archive io.ReadSeeker, digest *string) error {
+	if _, err := archive.Seek(0, io.SeekStart); err != nil {
+		return crex.Wrap(ErrFileSystemOperation, err)
+	}
+
 	localCache, err := cache.Open()
 	if err != nil {
 		return crex.Wrap(ErrCacheOperation, err)
 	}
 	defer localCache.Close()
-
-	archive, err := os.Open(packagePath)
-	if err != nil {
-		return crex.Wrap(ErrFileSystemOperation, err)
-	}
-	defer archive.Close()
 
 	if digest != nil && *digest != "" {
 		_, err = localCache.PutWithDigest(namespace, resource, version, *digest, archive)

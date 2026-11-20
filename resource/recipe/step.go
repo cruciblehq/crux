@@ -190,33 +190,34 @@ func (b *Builder) unpackStep(ctx context.Context, ctr agent.Container, step *man
 		}
 	}
 
+	srcPath := filepath.Join(b.workdir, src)
+	f, err := os.Open(srcPath)
+	if err != nil {
+		return crex.Wrapf(ErrBuild, err, "open archive %q", srcPath)
+	}
+	defer f.Close()
+
 	pr, pw := io.Pipe()
 	go func() {
-		pw.CloseWithError(writeUnpackTar(pw, filepath.Join(b.workdir, src), dest))
+		pw.CloseWithError(writeUnpackTar(pw, f, dest))
 	}()
 
 	return ctr.Copy(ctx, pr)
 }
 
-// Writes the archive at archivePath to w as an uncompressed tar with its
-// entries moved under dest.
+// Writes the archive in r to w as an uncompressed tar with its entries moved
+// under dest.
 //
 // The archive may be plain tar, Gzip, or Zstandard. The format is found from
 // its leading bytes.
-func writeUnpackTar(w io.Writer, archivePath, dest string) error {
-	f, err := os.Open(archivePath)
-	if err != nil {
-		return crex.Wrapf(ErrBuild, err, "open archive %q", archivePath)
-	}
-	defer f.Close()
-
-	format, r, err := archive.DetectFormat(f)
+func writeUnpackTar(w io.Writer, r io.Reader, dest string) error {
+	format, r, err := archive.DetectFormat(r)
 	if err != nil {
 		return err
 	}
 	dr, err := archive.Decompress(r, format)
 	if err != nil {
-		return crex.Wrapf(ErrBuild, err, "decompress archive %q", archivePath)
+		return crex.Wrapf(ErrBuild, err, "decompress archive")
 	}
 	defer dr.Close()
 

@@ -9,9 +9,11 @@ import (
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 )
+
+// Description of errors from pushing a package.
+const descPushPackage = "cannot push package"
 
 // Represents the 'crux push' command.
 type PushCmd struct {
@@ -32,49 +34,50 @@ func (c *PushCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	man, err := manifest.ReadAt(RootCmd.Context)
+	man, err := readProjectManifest()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
-				Recovery("Run this command from a directory containing a crucible.yaml.").
-				Cause(err).
-				Err()
-		}
-		return crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
-			Recovery("Check that crucible.yaml is present and valid.").
+		return err
+	}
+
+	pkg := resource.PackagePath(RootCmd.Context)
+	archive, err := os.Open(pkg)
+	if err != nil {
+		return crex.SystemError(descPushPackage, "the package archive could not be read from disk").
+			Recoveryf("Run 'crux pack' to create %s, then try again.", pkg).
 			Cause(err).
 			Err()
 	}
+	defer archive.Close()
 
-	if err := resource.Push(ctx, src, *man, manifest.PackagePath(RootCmd.Context)); err != nil {
-		const description = "cannot push package"
-		switch {
-		case errors.Is(err, hub.ErrVersionExists):
-			return crex.UserError(description, "the resource version already exists in the registry").
-				Recovery("Bump resource.version in crucible.yaml, then run 'crux pack' and 'crux push' again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrNamespaceNotFound):
-			return crex.UserError(description, "the target namespace does not exist in the registry").
-				Recovery("Create the namespace in the registry, then try again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrInvalidIdentifier):
-			return crex.UserError(description, "the resource name in crucible.yaml is invalid").
-				Recovery("Use the format 'namespace/resource' in resource.name, then try again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrFileSystemOperation):
-			return crex.SystemError(description, "the package archive could not be read from disk").
-				Recoveryf("Run 'crux pack' to create %s, then try again.", manifest.PackagePath(RootCmd.Context)).
-				Reclassify(err)
-		case errors.Is(err, hub.ErrRegistryOperation):
-			return crex.SystemError(description, "the registry could not accept the package upload").
-				Recovery("Check your network connection and try again.").
-				Reclassify(err)
-		default:
-			return err
-		}
+	if err := resource.Push(ctx, src, *man, archive); err != nil {
+		return pushError(err)
 	}
 
 	slog.Info("package pushed successfully")
 
 	return nil
+}
+
+// Maps a push failure to a user error.
+func pushError(err error) error {
+	switch {
+	case errors.Is(err, hub.ErrVersionExists):
+		return crex.UserError(descPushPackage, "the resource version already exists in the registry").
+			Recovery("Bump resource.version in crucible.yaml, then run 'crux pack' and 'crux push' again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrNamespaceNotFound):
+		return crex.UserError(descPushPackage, "the target namespace does not exist in the registry").
+			Recovery("Create the namespace in the registry, then try again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrInvalidIdentifier):
+		return crex.UserError(descPushPackage, "the resource name in crucible.yaml is invalid").
+			Recovery("Use the format 'namespace/resource' in resource.name, then try again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrRegistryOperation):
+		return crex.SystemError(descPushPackage, "the registry could not accept the package upload").
+			Recovery("Check your network connection and try again.").
+			Reclassify(err)
+	default:
+		return err
+	}
 }

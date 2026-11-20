@@ -20,9 +20,10 @@
 // Callers read the manifest themselves and pass it to each operation:
 //
 //	src, err := hub.NewSource("http://hub.cruciblehq.xyz:8080", "acme")
-//	man, err := manifest.Read("crucible.yaml")
+//	man, err := resource.ReadManifest(".")
 //
-//	result, err := resource.Build(ctx, *man, src, filepath.Dir("crucible.yaml"), "", "build")
-//	packed, err := resource.Pack(ctx, result.Output, "dist/package.tar.zst")
-//	err = resource.Push(ctx, src, *man, packed.Output)
+//	result, err := resource.Build(ctx, *man, src, ".", "", resource.BuildDir("."))
+//	packed, err := resource.Pack(ctx, result.Output, resource.PackagePath("."))
+//	archive, err := os.Open(packed.Output)
+//	err = resource.Push(ctx, src, *man, archive)
 package resource

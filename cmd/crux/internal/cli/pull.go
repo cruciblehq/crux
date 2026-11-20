@@ -55,31 +55,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
-		const description = "cannot pull resource"
-		switch {
-		case errors.Is(err, hub.ErrNoVersions), errors.Is(err, hub.ErrNoMatchingVersion), errors.Is(err, hub.ErrTypeMismatch):
-			return crex.UserError("resource not found", raw).
-				Recovery("Check the resource reference and version, then try again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrNoArchive):
-			return crex.UserError(description, "the requested resource version has no uploaded archive").
-				Recovery("Choose a different version, or republish the resource with an archive.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrResolveVersion):
-			return crex.SystemError(description, "the registry could not resolve the requested resource version").
-				Recovery("Check your network connection and try again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrDownload):
-			return crex.SystemError(description, "the resource archive could not be downloaded from the registry").
-				Recovery("Check your network connection and try again.").
-				Reclassify(err)
-		case errors.Is(err, hub.ErrCacheOperation):
-			return crex.SystemError(description, "the local cache could not store or extract the resource archive").
-				Recovery("Run 'crux cache clear' and try again.").
-				Reclassify(err)
-		default:
-			return err
-		}
+		return pullError(err, raw)
 	}
 
 	slog.Info("resource pulled",
@@ -91,4 +67,33 @@ func (c *PullCmd) Run(ctx context.Context) error {
 	)
 
 	return nil
+}
+
+// Maps a failure to pull the resource referenced by raw to a user error.
+func pullError(err error, raw string) error {
+	const description = "cannot pull resource"
+	switch {
+	case errors.Is(err, hub.ErrNoVersions), errors.Is(err, hub.ErrNoMatchingVersion), errors.Is(err, hub.ErrTypeMismatch):
+		return crex.UserError("resource not found", raw).
+			Recovery("Check the resource reference and version, then try again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrNoArchive):
+		return crex.UserError(description, "the requested resource version has no uploaded archive").
+			Recovery("Choose a different version, or republish the resource with an archive.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrResolveVersion):
+		return crex.SystemError(description, "the registry could not resolve the requested resource version").
+			Recovery("Check your network connection and try again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrDownload):
+		return crex.SystemError(description, "the resource archive could not be downloaded from the registry").
+			Recovery("Check your network connection and try again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrCacheOperation):
+		return crex.SystemError(description, "the local cache could not store or extract the resource archive").
+			Recovery("Run 'crux cache clear' and try again.").
+			Reclassify(err)
+	default:
+		return err
+	}
 }

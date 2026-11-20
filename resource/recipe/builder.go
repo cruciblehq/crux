@@ -2,14 +2,12 @@ package recipe
 
 import (
 	"context"
-	"os"
+	"io"
 
 	"github.com/cruciblehq/crux/hub"
-	"github.com/cruciblehq/crux/resource/oci"
 	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/file"
 )
 
 // Author label recorded in the OCI history of the final exported image.
@@ -38,15 +36,15 @@ func NewBuilder(src hub.Source, workdir string, a agent.Agent) *Builder {
 	}
 }
 
-// Executes a recipe and writes the output image as an OCI tar archive.
+// Executes a recipe and writes the output image to w as an OCI tar archive.
 //
 // Each stage resolves its base image and executes its steps in order. The
-// image produced by the last stage is exported to [manifest.ImagePath]. When
-// set, entrypoint becomes the image entrypoint. Returns the build directory.
-// The recipe must be valid, so it has at least one stage.
-func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, output string) (string, error) {
+// image produced by the last stage is the output. When set, entrypoint
+// becomes the image entrypoint. The recipe must be valid, so it has at least
+// one stage.
+func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint []string, w io.Writer) error {
 	if err := recipe.Validate(); err != nil {
-		return "", err
+		return err
 	}
 
 	stageImages := make(map[string]agent.ImageRef)
@@ -64,16 +62,16 @@ func (b *Builder) Build(ctx context.Context, recipe *manifest.Recipe, entrypoint
 		}
 		ctr, err := b.runStage(ctx, i+1, &recipe.Stages[i], stageImages)
 		if err != nil {
-			return "", err
+			return err
 		}
 		currentCtr = ctr
 	}
 
 	if err := b.setEntrypoint(ctx, currentCtr, entrypoint); err != nil {
-		return "", err
+		return err
 	}
 
-	return b.exportImage(ctx, currentCtr, output)
+	return b.exportImage(ctx, currentCtr, w)
 }
 
 // Sets the image entrypoint on the container before it is committed.
@@ -96,29 +94,14 @@ func (b *Builder) setEntrypoint(ctx context.Context, ctr agent.Container, entryp
 	return nil
 }
 
-// Exports the final image as an OCI tar archive.
-//
-// The image is exported to [manifest.ImagePath] in the output directory.
-// Returns the output directory path on success.
-func (b *Builder) exportImage(ctx context.Context, ctr agent.Container, output string) (string, error) {
-	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
-		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
-	}
-
-	image := manifest.ImagePath(output)
-	f, err := os.OpenFile(image, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, file.DefaultFileMode)
-	if err != nil {
-		return "", crex.Wrap(oci.ErrFileSystemOperation, err)
-	}
-	defer f.Close()
-
+// Commits the container and writes its image to w as an OCI tar archive.
+func (b *Builder) exportImage(ctx context.Context, ctr agent.Container, w io.Writer) error {
 	ref, err := ctr.Commit(ctx, commitAuthorExport)
 	if err != nil {
-		return "", crex.Wrap(ErrBuild, err)
+		return crex.Wrap(ErrBuild, err)
 	}
-	if err := b.agent.Export(ctx, ref, f); err != nil {
-		return "", crex.Wrap(ErrBuild, err)
+	if err := b.agent.Export(ctx, ref, w); err != nil {
+		return crex.Wrap(ErrBuild, err)
 	}
-
-	return output, nil
+	return nil
 }

@@ -3,10 +3,7 @@ package cli
 import (
 	"context"
 	"log/slog"
-	"net/url"
-	"os"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -30,13 +27,6 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 	}
 
 	name := compute.DefaultLocalMachineID()
-	registryURL, err := url.Parse(internal.DefaultRegistryURL)
-	if err != nil {
-		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
-			Cause(err).
-			Err()
-	}
-
 	state, err := p.Status(ctx, name)
 	if err != nil {
 		return localStartError(err)
@@ -44,24 +34,8 @@ func (c *LocalStartCmd) Run(ctx context.Context) error {
 
 	switch state {
 	case compute.StateNotProvisioned:
-		imagePath, err := compute.EnsureMachineImage(ctx, registryURL)
-		if err != nil {
-			return localStartError(err)
-		}
-		f, err := os.Open(imagePath)
-		if err != nil {
-			return crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
-				Recovery("Run 'crux local reset' to download the default image again.").
-				Cause(err).
-				Err()
-		}
-		defer f.Close()
-		imageID, err := p.UploadImage(ctx, f)
-		if err != nil {
-			return localStartError(err)
-		}
-		if _, err := p.Provision(ctx, imageID, compute.ProvisionOptions{}); err != nil {
-			return localStartError(err)
+		if err := provisionLocal(ctx, p, localStartError); err != nil {
+			return err
 		}
 	case compute.StateStopped:
 		if err := p.Start(ctx, name); err != nil {

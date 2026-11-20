@@ -4,12 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
-	"github.com/cruciblehq/crux/resource/blueprint"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -28,7 +28,7 @@ type LocalDeployCmd struct {
 func (c *LocalDeployCmd) Run(ctx context.Context) error {
 	slog.Info("building local deployment plan...")
 
-	bp, err := localBlueprint()
+	m, _, err := openLocalBlueprint()
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	output := manifest.BuildDir(dirs.Local())
+	output := resource.BuildDir(dirs.Local())
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
@@ -50,10 +50,10 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if err := blueprint.NewBuilder(src, c.Environment, manifest.Compute{}).Build(ctx, bp, output); err != nil {
+	if _, err := resource.Build(ctx, *m, src, "", c.Environment, output); err != nil {
 		return err
 	}
 
-	slog.Info("local plan written", "path", manifest.PlanPath(output))
+	slog.Info("local plan written", "path", filepath.Join(output, manifest.PlanFile))
 	return nil
 }

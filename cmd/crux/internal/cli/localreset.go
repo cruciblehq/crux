@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/url"
-	"os"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
-	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Returns a user error for a failed 'reset' when the cause is a known
@@ -31,35 +27,12 @@ func (c *LocalResetCmd) Run(ctx context.Context) error {
 	}
 
 	name := compute.DefaultLocalMachineID()
-	registryURL, err := url.Parse(internal.DefaultRegistryURL)
-	if err != nil {
-		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
-			Cause(err).
-			Err()
-	}
-
 	if err := p.Deprovision(ctx, name); err != nil && !errors.Is(err, compute.ErrMachineNotProvisioned) {
 		return localResetError(err)
 	}
 
-	imagePath, err := compute.EnsureMachineImage(ctx, registryURL)
-	if err != nil {
-		return localResetError(err)
-	}
-	f, err := os.Open(imagePath)
-	if err != nil {
-		return crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
-			Recovery("Check your network connection and try again.").
-			Cause(err).
-			Err()
-	}
-	defer f.Close()
-	imageID, err := p.UploadImage(ctx, f)
-	if err != nil {
-		return localResetError(err)
-	}
-	if _, err := p.Provision(ctx, imageID, compute.ProvisionOptions{}); err != nil {
-		return localResetError(err)
+	if err := provisionLocal(ctx, p, localResetError); err != nil {
+		return err
 	}
 
 	slog.Info("local environment reset complete")

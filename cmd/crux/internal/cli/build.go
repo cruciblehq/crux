@@ -93,21 +93,12 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 		return nil, err
 	}
 
-	man, err := manifest.ReadAt(RootCmd.Context)
+	man, err := readProjectManifest()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
-				Recovery("Run this command from a directory containing a crucible.yaml.").
-				Cause(err).
-				Err()
-		}
-		return nil, crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
-			Recovery("Check that crucible.yaml is present and valid.").
-			Cause(err).
-			Err()
+		return nil, err
 	}
 
-	output := manifest.BuildDir(RootCmd.Context)
+	output := resource.BuildDir(RootCmd.Context)
 	if err := os.MkdirAll(output, file.DefaultDirMode); err != nil {
 		return nil, crex.SystemError("cannot prepare build output", "failed to create the build output directory").
 			Recoveryf("Make sure you have write access to %s, then try again.", output).
@@ -128,4 +119,24 @@ func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.Bui
 	}
 
 	return result, nil
+}
+
+// Reads the manifest of the project in the directory set by -C.
+//
+// Returns a user error when the manifest is missing or cannot be parsed.
+func readProjectManifest() (*manifest.Manifest, error) {
+	man, err := resource.ReadManifest(RootCmd.Context)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, crex.UserError("no manifest found", "no crucible.yaml was found in the current directory").
+			Recovery("Run this command from a directory containing a crucible.yaml.").
+			Cause(err).
+			Err()
+	}
+	if err != nil {
+		return nil, crex.UserError("invalid manifest", "the crucible.yaml could not be read or parsed").
+			Recovery("Check that crucible.yaml is present and valid.").
+			Cause(err).
+			Err()
+	}
+	return man, nil
 }

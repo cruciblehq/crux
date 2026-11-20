@@ -3,11 +3,14 @@ package cli
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 
+	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/dirs"
+	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
@@ -49,33 +52,12 @@ func localBlueprint() (*manifest.Blueprint, error) {
 // of fn; callers should keep fn short and avoid blocking I/O inside it.
 // No write occurs if fn returns an error.
 func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) error) error {
-	const description = "cannot access local state"
-	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
-
 	dir := dirs.Local()
-	if err := os.MkdirAll(dir, file.DefaultDirMode); err != nil {
-		return crex.SystemError(description, "failed to create the local state directory").
-			Recoveryf(recoveryWriteAccess, dir).
-			Cause(err).
-			Err()
-	}
-
-	lf, err := os.OpenFile(filepath.Join(dir, localLockFile), os.O_CREATE|os.O_RDWR, file.OwnerFileMode)
+	unlock, err := lockLocalState(ctx, dir)
 	if err != nil {
-		return crex.SystemError(description, "failed to open the local state lock").
-			Recoveryf(recoveryWriteAccess, dir).
-			Cause(err).
-			Err()
+		return err
 	}
-	defer lf.Close()
-
-	if err := file.LockWithContext(ctx, lf); err != nil {
-		return crex.SystemError(description, "failed to lock the local state").
-			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", filepath.Join(dir, localLockFile)).
-			Cause(err).
-			Err()
-	}
-	defer file.Unlock(lf)
+	defer unlock()
 
 	m, bp, err := openLocalBlueprint()
 	if err != nil {
@@ -86,7 +68,7 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 		return err
 	}
 
-	if err := manifest.WriteAt(m, dir); err != nil {
+	if err := resource.WriteManifest(dir, m); err != nil {
 		return crex.SystemError("cannot update local state", "failed to write the local blueprint").
 			Recoveryf("Make sure you have write access to %s, then try again.", dir).
 			Cause(err).
@@ -95,11 +77,48 @@ func modifyLocalBlueprint(ctx context.Context, fn func(*manifest.Blueprint) erro
 	return nil
 }
 
+// Takes the exclusive lock on the local state in dir, creating dir if needed.
+//
+// Blocks until the lock is free or ctx ends. Returns the function that
+// releases the lock.
+func lockLocalState(ctx context.Context, dir string) (func(), error) {
+	const description = "cannot access local state"
+	const recoveryWriteAccess = "Make sure you have write access to %s, then try again."
+
+	if err := os.MkdirAll(dir, file.DefaultDirMode); err != nil {
+		return nil, crex.SystemError(description, "failed to create the local state directory").
+			Recoveryf(recoveryWriteAccess, dir).
+			Cause(err).
+			Err()
+	}
+
+	path := filepath.Join(dir, localLockFile)
+	lf, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, file.OwnerFileMode)
+	if err != nil {
+		return nil, crex.SystemError(description, "failed to open the local state lock").
+			Recoveryf(recoveryWriteAccess, dir).
+			Cause(err).
+			Err()
+	}
+
+	if err := file.LockWithContext(ctx, lf); err != nil {
+		lf.Close()
+		return nil, crex.SystemError(description, "failed to lock the local state").
+			Recoveryf("Another crux process may be holding the lock at %s; wait for it to finish and try again.", path).
+			Cause(err).
+			Err()
+	}
+	return func() {
+		file.Unlock(lf)
+		lf.Close()
+	}, nil
+}
+
 // Opens the local blueprint from disk, falling back to an empty in-memory
 // blueprint if no blueprint has been written yet.
 func openLocalBlueprint() (*manifest.Manifest, *manifest.Blueprint, error) {
 	dir := dirs.Local()
-	m, err := manifest.ReadAt(dir)
+	m, err := resource.ReadManifest(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			bp := &manifest.Blueprint{}
@@ -150,4 +169,37 @@ func localError(err error, description, notRunning string) error {
 	default:
 		return err
 	}
+}
+
+// Downloads the default machine image if needed and provisions the local
+// machine from it.
+//
+// fail turns provider errors into the user error of the calling command.
+func provisionLocal(ctx context.Context, p compute.Provider, fail func(error) error) error {
+	registryURL, err := url.Parse(internal.DefaultRegistryURL)
+	if err != nil {
+		return crex.ProgrammingError("invalid default registry URL", "the compiled-in default registry URL could not be parsed").
+			Cause(err).
+			Err()
+	}
+	imagePath, err := compute.EnsureMachineImage(ctx, registryURL)
+	if err != nil {
+		return fail(err)
+	}
+	f, err := os.Open(imagePath)
+	if err != nil {
+		return crex.SystemError("cannot access machine image", "the machine image file is missing or unreadable").
+			Recovery("Run the command again to download the machine image.").
+			Cause(err).
+			Err()
+	}
+	defer f.Close()
+	imageID, err := p.UploadImage(ctx, f)
+	if err != nil {
+		return fail(err)
+	}
+	if _, err := p.Provision(ctx, imageID, compute.ProvisionOptions{}); err != nil {
+		return fail(err)
+	}
+	return nil
 }

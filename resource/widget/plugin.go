@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cruciblehq/spec/manifest"
 	es "github.com/evanw/esbuild/pkg/api"
 )
 
@@ -18,6 +17,9 @@ const (
 	// Directory where third-party widget dependencies are resolved from
 	// during esbuild module resolution.
 	dependenciesDirName = "node_modules"
+
+	// File a directory import resolves to.
+	directoryIndexFile = "index.js"
 )
 
 // Internal esbuild plugin that handles module resolution logic via [resolveModule].
@@ -104,7 +106,7 @@ func resolveImport(options es.BuildOptions, args es.OnResolveArgs) (es.OnResolve
 			path = jsPath
 		}
 	} else if info.IsDir() {
-		path = manifest.WidgetMainPath(path)
+		path = filepath.Join(path, directoryIndexFile)
 	}
 
 	return es.OnResolveResult{

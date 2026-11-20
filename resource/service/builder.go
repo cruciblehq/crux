@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"io"
 
 	"github.com/cruciblehq/crux/compute"
 	"github.com/cruciblehq/crux/hub"
@@ -27,20 +28,20 @@ func NewBuilder(src hub.Source, workdir string) *Builder {
 	return &Builder{src: src, workdir: workdir}
 }
 
-// Builds the service described by cfg into the output directory.
+// Builds the service described by cfg and writes its image to w.
 //
 // Connects to the agent on the local machine and runs the recipe with the
-// service entrypoint. Returns the build directory on success.
-func (b *Builder) Build(ctx context.Context, cfg *manifest.Service, output string) (string, error) {
+// service entrypoint. The image is an OCI tar archive.
+func (b *Builder) Build(ctx context.Context, cfg *manifest.Service, w io.Writer) error {
 	provider, err := compute.ProviderFor(compute.Local)
 	if err != nil {
-		return "", err
+		return err
 	}
 	client, err := provider.Connect(ctx, compute.DefaultLocalMachineID())
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer client.Close()
 
-	return recipe.NewBuilder(b.src, b.workdir, client).Build(ctx, &cfg.Recipe, cfg.Entrypoint, output)
+	return recipe.NewBuilder(b.src, b.workdir, client).Build(ctx, &cfg.Recipe, cfg.Entrypoint, w)
 }

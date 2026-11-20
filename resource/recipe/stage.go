@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/cruciblehq/crux/resource/oci"
@@ -62,7 +63,7 @@ func (b *Builder) runStage(ctx context.Context, num int, stage *manifest.Stage, 
 //
 // When stage.From is empty the stage starts from scratch and a minimal empty
 // OCI image is imported. When From is set, the referenced runtime is pulled
-// and its image archive ([manifest.ImagePath]) is imported through the agent.
+// and its image archive ([manifest.ImageFile]) is imported through the agent.
 func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts agent.Options) (agent.Container, error) {
 	if stage.From == "" {
 		return b.importScratch(ctx, opts)
@@ -78,8 +79,7 @@ func (b *Builder) importBase(ctx context.Context, stage *manifest.Stage, opts ag
 		return nil, err
 	}
 
-	imgPath := manifest.ImagePath(result.Extracted)
-	f, err := os.Open(imgPath)
+	f, err := os.Open(filepath.Join(result.Extracted, manifest.ImageFile))
 	if err != nil {
 		return nil, crex.Wrap(oci.ErrFileSystemOperation, err)
 	}

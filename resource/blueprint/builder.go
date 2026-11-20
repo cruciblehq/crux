@@ -2,6 +2,9 @@ package blueprint
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
@@ -34,23 +37,17 @@ func NewBuilder(src hub.Source, env string, compute manifest.Compute) *Builder {
 	return &Builder{src: src, env: env, compute: compute}
 }
 
-// Builds the blueprint described by cfg.
+// Builds the blueprint described by cfg and writes its plan to w.
 //
-// Writes the plan to the output directory ([manifest.PlanPath]). The plan
-// references every service but does not include the service manifests or
-// their runtime configs. The deployer pulls those separately when needed.
-func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, output string) error {
+// The plan references every service but does not include the service
+// manifests or their runtime configs. The deployer pulls those separately
+// when needed.
+func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, w io.Writer) error {
 	p, err := resolvePlan(ctx, cfg, b.env, b.src, b.compute)
 	if err != nil {
 		return err
 	}
-	if err := manifest.WritePlanAt(p, output); err != nil {
-		return crex.SystemError("cannot write deployment plan", "failed to write the deployment plan to the build directory").
-			Recoveryf("Make sure you have write access to %s, then try again.", output).
-			Cause(err).
-			Err()
-	}
-	return nil
+	return manifest.EncodePlan(w, p)
 }
 
 // Produces the deployment plan for a blueprint without writing it to disk.
@@ -235,7 +232,16 @@ func resolveService(ctx context.Context, id string, ref *reference.Reference, sr
 	if err != nil {
 		return nil, errService(id, err)
 	}
-	cfg, err := manifest.ReadAsAt[*manifest.Service](result.Extracted)
+	f, err := os.Open(filepath.Join(result.Extracted, manifest.ManifestFile))
+	if err != nil {
+		return nil, errService(id, err)
+	}
+	defer f.Close()
+	m, err := manifest.Decode(f)
+	if err != nil {
+		return nil, errService(id, err)
+	}
+	cfg, err := manifest.As[*manifest.Service](m)
 	if err != nil {
 		return nil, errService(id, err)
 	}
