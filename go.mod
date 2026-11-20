@@ -3,8 +3,8 @@ module github.com/cruciblehq/crux
 go 1.25.1
 
 require (
-	github.com/cruciblehq/spec v0.0.0-20261116210155-8035bcb3bf40
-	github.com/cruciblehq/utils-go v0.0.0-20261116201206-2752ecb58101
+	github.com/cruciblehq/spec v0.0.0-20261120132532-5419e95750a5
+	github.com/cruciblehq/utils-go v0.0.0-20261120132316-d8af996aee7d
 )
 
 require (
