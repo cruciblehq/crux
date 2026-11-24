@@ -21,6 +21,7 @@ var (
 	ErrDownload            = crex.New("failed to download archive")
 	ErrInvalidIdentifier   = crex.New("invalid resource identifier")
 	ErrNamespaceNotFound   = crex.New("namespace not found")
-	ErrVersionExists       = crex.New("version already exists")
+	ErrVersionPublic       = crex.New("version is public and cannot change")
+	ErrVersionSuperseded   = crex.New("a higher public version has the same major and minor")
 	ErrRegistryOperation   = crex.New("registry operation failed")
 )

@@ -15,7 +15,8 @@ import (
 // Pushes a resource package to the Hub registry.
 //
 // Resolves the resource identifier, checks that the namespace exists, creates
-// the resource if needed, creates the version, then uploads archive.
+// the resource and the version if needed, then uploads archive. Pushing a
+// private version again replaces its archive.
 func push(ctx context.Context, registryURL, name, resourceType, version string, archive io.ReadSeeker) error {
 	id, err := reference.ParseIdentifier(name, resourceType)
 	if err != nil {
@@ -32,7 +33,7 @@ func push(ctx context.Context, registryURL, name, resourceType, version string, 
 		return err
 	}
 
-	if err := createVersion(ctx, client, id.Namespace(), id.Name(), version); err != nil {
+	if err := ensureVersion(ctx, client, id.Namespace(), id.Name(), version); err != nil {
 		return err
 	}
 
@@ -84,33 +85,40 @@ func ensureResource(ctx context.Context, client *Client, namespace, resource, re
 	return nil
 }
 
-// Creates a new version in the registry.
+// Ensures the version exists, creating it if necessary.
 //
-// Attempts to create the specified version for the resource. Returns
-// [ErrVersionExists] if the version already exists.
-func createVersion(ctx context.Context, client *Client, namespace, resource, version string) error {
+// Returns [ErrVersionSuperseded] if a public version with the same major and
+// minor is higher.
+func ensureVersion(ctx context.Context, client *Client, namespace, resource, version string) error {
 	versionInfo := registry.VersionInfo{
 		String: version,
 	}
 
 	_, err := client.CreateVersion(ctx, namespace, resource, versionInfo)
-	if err != nil {
-		var regErr *registry.Error
-		if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists {
-			return crex.Wrap(ErrVersionExists, err)
-		}
+	var regErr *registry.Error
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionExists:
+		return nil
+	case errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionSuperseded:
+		return crex.Wrap(ErrVersionSuperseded, err)
+	default:
 		return crex.Wrap(ErrRegistryOperation, err)
 	}
-
-	return nil
 }
 
 // Uploads the package archive to the registry.
 //
-// Uploads archive to the specified resource version in the registry. After a
-// successful upload, rewinds archive and adds it to the local cache.
+// Uploads archive to the specified resource version in the registry. Returns
+// [ErrVersionPublic] if the version is public. After a successful upload,
+// rewinds archive and adds it to the local cache.
 func uploadPackage(ctx context.Context, client *Client, namespace, resource, version string, archive io.ReadSeeker) error {
 	uploaded, err := client.UploadArchive(ctx, namespace, resource, version, archive)
+	var regErr *registry.Error
+	if errors.As(err, &regErr) && regErr.Code == registry.ErrorCodeVersionPublic {
+		return crex.Wrap(ErrVersionPublic, err)
+	}
 	if err != nil {
 		return crex.Wrap(ErrRegistryOperation, err)
 	}

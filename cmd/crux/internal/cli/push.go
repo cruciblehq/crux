@@ -61,9 +61,13 @@ func (c *PushCmd) Run(ctx context.Context) error {
 // Maps a push failure to a user error.
 func pushError(err error) error {
 	switch {
-	case errors.Is(err, hub.ErrVersionExists):
-		return crex.UserError(descPushPackage, "the resource version already exists in the registry").
+	case errors.Is(err, hub.ErrVersionPublic):
+		return crex.UserError(descPushPackage, "the resource version is public and cannot change").
 			Recovery("Bump resource.version in crucible.yaml, then run 'crux pack' and 'crux push' again.").
+			Reclassify(err)
+	case errors.Is(err, hub.ErrVersionSuperseded):
+		return crex.UserError(descPushPackage, "a higher public version has the same major and minor").
+			Recovery("Set resource.version in crucible.yaml above that version, then run 'crux pack' and 'crux push' again.").
 			Reclassify(err)
 	case errors.Is(err, hub.ErrNamespaceNotFound):
 		return crex.UserError(descPushPackage, "the target namespace does not exist in the registry").

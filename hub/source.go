@@ -59,8 +59,10 @@ func (s Source) Pull(ctx context.Context, ref *reference.Reference) (*PullResult
 
 // Pushes a resource package to the registry.
 //
-// Creates the resource if it does not exist yet, creates the version, then
-// uploads archive. Returns [ErrVersionExists] if the version already exists.
+// Creates the resource and the version if they do not exist yet, then uploads
+// archive. Pushing a private version again replaces its archive. Returns
+// [ErrVersionPublic] if the version is public, or [ErrVersionSuperseded] if a
+// public version with the same major and minor is higher.
 func (s Source) Push(ctx context.Context, name, resourceType, version string, archive io.ReadSeeker) error {
 	return push(ctx, s.Registry, name, resourceType, version, archive)
 }
