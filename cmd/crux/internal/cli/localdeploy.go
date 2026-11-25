@@ -44,7 +44,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	if _, err := resource.Build(ctx, *m, src, "", c.Environment, output); err != nil {
+	if _, err := resource.Build(ctx, *m, src, RootCmd.Context, c.Environment, output); err != nil {
 		return err
 	}
 

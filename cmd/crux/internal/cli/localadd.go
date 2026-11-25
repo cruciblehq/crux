@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/cruciblehq/spec/manifest"
@@ -15,22 +14,19 @@ type LocalAddCmd struct{}
 
 // Registers the service in the current directory with the local blueprint.
 //
-// Reads the manifest from the directory set by -C (defaults to ".") and adds a
-// service entry to the local blueprint. The local ID is derived from the last
-// component of the resource name (e.g. "myns/my-api" becomes "my-api").
+// Reads the manifest from the directory set by -C (defaults to ".") and
+// adds a service entry to the local blueprint that names that directory
+// by its absolute path. The local ID is derived from the last component
+// of the resource name (e.g. "myns/my-api" becomes "my-api").
 func (c *LocalAddCmd) Run(ctx context.Context) error {
 	man, err := readProjectManifest()
 	if err != nil {
 		return err
 	}
 
-	name := man.Resource.Name
 	ref := manifest.Ref{
-		ID:  resourceID(name),
-		Ref: name,
-	}
-	if man.Resource.Version != "" {
-		ref.Ref = fmt.Sprintf("%s %s", name, man.Resource.Version)
+		ID:   resourceID(man.Resource.Name),
+		Path: RootCmd.Context,
 	}
 
 	if err := modifyLocalBlueprint(ctx, func(bp *manifest.Blueprint) error {

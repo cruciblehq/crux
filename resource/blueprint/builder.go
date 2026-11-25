@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/cruciblehq/spec/manifest"
-	"github.com/cruciblehq/spec/reference"
 	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
@@ -20,21 +19,22 @@ const (
 // Builds a Crucible blueprint resource from its configuration.
 type Builder struct {
 	src     registry.Source  // Registry access for resolving service references.
+	dir     string           // Base directory for relative service paths.
 	env     string           // Environment selector for the blueprint.
 	compute manifest.Compute // Compute entry used as the plan's default.
 }
 
 // Returns a new Builder.
 //
-// src provides registry access for resolving service references. env selects
-// the blueprint environment to resolve. compute is the plan's default compute
-// entry. When its type is empty, it defaults to the
-// local provider on localhost.
-func NewBuilder(src registry.Source, env string, compute manifest.Compute) *Builder {
+// src provides registry access for resolving service references. dir is the
+// directory that relative service paths are resolved against. env selects the
+// blueprint environment to resolve. compute is the plan's default compute entry.
+// When its type is empty, it defaults to the local provider on localhost.
+func NewBuilder(src registry.Source, dir, env string, compute manifest.Compute) *Builder {
 	if compute.Type == "" {
 		compute = defaultCompute()
 	}
-	return &Builder{src: src, env: env, compute: compute}
+	return &Builder{src: src, dir: dir, env: env, compute: compute}
 }
 
 // Builds the blueprint described by cfg and writes its plan to w.
@@ -43,7 +43,7 @@ func NewBuilder(src registry.Source, env string, compute manifest.Compute) *Buil
 // manifests or their runtime configs. The deployer pulls those separately
 // when needed.
 func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, w io.Writer) error {
-	p, err := resolvePlan(ctx, cfg, b.env, b.src, b.compute)
+	p, err := resolvePlan(ctx, cfg, b.env, b.src, b.dir, b.compute)
 	if err != nil {
 		return err
 	}
@@ -52,21 +52,21 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, w io.Write
 
 // Produces the deployment plan for a blueprint without writing it to disk.
 //
-// The selected environment is located by envID, then every service is resolved
-// against src: its manifest is pulled, its environment variables are validated,
-// and a deployment entry is emitted. compute becomes the plan's default compute
-// entry, and every service is assigned to a compute entry ([binPack]). Network
-// entries of the infrastructure are derived from the network specs of the
-// containers. Returns the assembled plan, or an error from environment lookup
-// or any service resolution.
-func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src registry.Source, compute manifest.Compute) (*manifest.Plan, error) {
+// The selected environment is located by envID, then every service is resolved.
+// Its manifest is pulled from src, or read from its path resolved against dir.
+// Its environment variables are validated, and a deployment entry is emitted.
+// compute becomes the plan's default entry, and every service is assigned to a
+// compute entry ([binPack]). Network entries of the infrastructure are derived
+// from the network specs of the containers. Returns the assembled plan, or an
+// error from environment lookup or any service resolution.
+func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src registry.Source, dir string, compute manifest.Compute) (*manifest.Plan, error) {
 	env, err := findEnvironment(cfg, envID)
 	if err != nil {
 		return nil, err
 	}
 
 	p := newPlan(cfg, compute)
-	results, err := resolveServices(ctx, cfg.Services, env, src)
+	results, err := resolveServices(ctx, cfg.Services, env, src, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +108,10 @@ func defaultCompute() manifest.Compute {
 }
 
 // Resolves all services in a blueprint against the selected environment.
-func resolveServices(ctx context.Context, services []manifest.Ref, env *manifest.Environment, src registry.Source) ([]serviceResult, error) {
+func resolveServices(ctx context.Context, services []manifest.Ref, env *manifest.Environment, src registry.Source, dir string) ([]serviceResult, error) {
 	results := make([]serviceResult, 0, len(services))
 	for _, service := range services {
-		r, err := planService(ctx, service, env, src)
+		r, err := planService(ctx, service, env, src, dir)
 		if err != nil {
 			return nil, err
 		}
@@ -143,15 +143,10 @@ type serviceResult struct {
 
 // Resolves a single service reference into a serviceResult.
 //
-// Pulls the service manifest, validates the environment variables, and checks
+// Loads the service manifest, validates the environment variables, and checks
 // that the service has an output stage.
-func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src registry.Source) (serviceResult, error) {
-	ref, err := src.Parse(string(manifest.TypeService), service.Ref)
-	if err != nil {
-		return serviceResult{}, errService(service.ID, err)
-	}
-
-	serviceCfg, err := resolveService(ctx, service.ID, ref, src)
+func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src registry.Source, dir string) (serviceResult, error) {
+	target, serviceCfg, err := resolveService(ctx, service, src, dir)
 	if err != nil {
 		return serviceResult{}, err
 	}
@@ -166,7 +161,7 @@ func planService(ctx context.Context, service manifest.Ref, env *manifest.Enviro
 
 	return serviceResult{
 		serviceID: service.ID,
-		target:    ref.String(),
+		target:    target,
 		container: manifest.Container{},
 	}, nil
 }
@@ -226,24 +221,54 @@ func binPack(results []serviceResult, computes map[string]manifest.Compute) map[
 	return assignments
 }
 
-// Pulls a service resource and extracts its manifest config.
-func resolveService(ctx context.Context, id string, ref *reference.Reference, src registry.Source) (*manifest.Service, error) {
+// Loads a service's manifest config and returns it with the service's plan
+// target.
+//
+// A service named by path is read from its directory, resolved against dir
+// when relative. Its target is that absolute directory. A service named by
+// reference is pulled from src. Its target is the parsed reference.
+func resolveService(ctx context.Context, service manifest.Ref, src registry.Source, dir string) (string, *manifest.Service, error) {
+	if service.Path != "" {
+		path := service.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(dir, path)
+		}
+		cfg, err := readService(service.ID, path)
+		if err != nil {
+			return "", nil, err
+		}
+		return path, cfg, nil
+	}
+
+	ref, err := src.Parse(string(manifest.TypeService), service.Ref)
+	if err != nil {
+		return "", nil, errService(service.ID, err)
+	}
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
-		return nil, errService(id, err)
+		return "", nil, errService(service.ID, err)
 	}
-	f, err := os.Open(filepath.Join(result.Extracted, manifest.ManifestFile))
+	cfg, err := readService(service.ID, result.Extracted)
 	if err != nil {
-		return nil, errService(id, err)
+		return "", nil, err
+	}
+	return ref.String(), cfg, nil
+}
+
+// Decodes the service manifest held in dir for the service with the given id.
+func readService(id, dir string) (*manifest.Service, error) {
+	f, err := os.Open(filepath.Join(dir, manifest.ManifestFile))
+	if err != nil {
+		return nil, errServiceAt(id, dir, err)
 	}
 	defer f.Close()
 	m, err := manifest.Decode(f)
 	if err != nil {
-		return nil, errService(id, err)
+		return nil, errServiceAt(id, dir, err)
 	}
 	cfg, err := manifest.As[*manifest.Service](m)
 	if err != nil {
-		return nil, errService(id, err)
+		return nil, errServiceAt(id, dir, err)
 	}
 	return cfg, nil
 }

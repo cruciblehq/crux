@@ -8,8 +8,8 @@ github.com/alecthomas/repr v0.5.2 h1:SU73FTI9D1P5UNtvseffFSGmdNci/O6RsqzeXJtP0Qs
 github.com/alecthomas/repr v0.5.2/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=
 github.com/containerd/stargz-snapshotter/estargz v0.16.3 h1:7evrXtoh1mSbGj/pfRccTampEyKpjpOnS3CyiV1Ebr8=
 github.com/containerd/stargz-snapshotter/estargz v0.16.3/go.mod h1:uyr4BfYfOj3G9WBVE8cOlQmXAbPN9VEQpBBeJIuOipU=
-github.com/cruciblehq/spec v0.0.0-20261125183510-f2b43a35e756 h1:xUxftkABk8Zyoe+E3d5oRgtJ0/0KfMHkX8xE/75oBco=
-github.com/cruciblehq/spec v0.0.0-20261125183510-f2b43a35e756/go.mod h1:5h03NUDQcg81SEuA/Om4zjFK8WCIKeqq6D2yNW8Ou28=
+github.com/cruciblehq/spec v0.0.0-20261125200424-61bb1ce52ce4 h1:0Zzcm7g4J1gxz+hdv6WpOTTyPxq38pC0V/lr1tF1hCo=
+github.com/cruciblehq/spec v0.0.0-20261125200424-61bb1ce52ce4/go.mod h1:R0RbMdK3cl0dc68zPYG6t4XdMZ9koTD/+P9GLRdDAkY=
 github.com/cruciblehq/utils-go v0.0.0-20261125183600-ea62fb1fb4a9 h1:cbxx0qPA4sopI2MvC5yx7ILNQPKiIgBLke7DKBnUwXA=
 github.com/cruciblehq/utils-go v0.0.0-20261125183600-ea62fb1fb4a9/go.mod h1:o1/d5/TOuxjMuimpjfBefvWvKwNRq5PbVS6tqRjYzoo=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -69,6 +69,7 @@ golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.42.0 h1:omrd2nAlyT5ESRdCLYdm3+fMfNFE/+Rf4bDIQImRJeo=
 golang.org/x/sys v0.42.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/term v0.40.0 h1:36e4zGLqU4yhjlmxEaagx2KuYbJq3EwY8K943ZsHcvg=
+golang.org/x/term v0.40.0/go.mod h1:w2P8uVp06p2iyKKuvXIm7N/y0UCRt3UfJTfZ7oOpglM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=

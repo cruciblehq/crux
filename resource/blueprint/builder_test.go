@@ -1,12 +1,93 @@
 package blueprint
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/registry"
 )
+
+const serviceManifest = `version: 0
+resource:
+  type: service
+  name: ns/api
+  version: 1.0.0
+entrypoint: ["/bin/api"]
+stages:
+  - name: service
+    from: ns/base 1.0.0
+    steps:
+      - run: "true"
+`
+
+func writeServiceManifest(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, manifest.ManifestFile), []byte(serviceManifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Points at a registry that does not exist, so any registry call fails.
+func unreachableSource(t *testing.T) registry.Source {
+	t.Helper()
+	src, err := registry.NewSource("http://127.0.0.1:1", "ns", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return src
+}
+
+func TestResolvePlanPathService(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "api")
+	writeServiceManifest(t, dir)
+	cfg := &manifest.Blueprint{Services: []manifest.Ref{{ID: "api", Path: dir}}}
+
+	p, err := resolvePlan(context.Background(), cfg, "dev", unreachableSource(t), "/elsewhere", defaultCompute())
+	if err != nil {
+		t.Fatalf("resolvePlan: %v", err)
+	}
+	if p.Services["api"] != dir {
+		t.Errorf("Services[api] = %q, want %q", p.Services["api"], dir)
+	}
+	if len(p.Deployments) != 1 || p.Deployments[0].Service != "api" {
+		t.Errorf("Deployments = %+v, want one deployment of api", p.Deployments)
+	}
+}
+
+func TestResolvePlanRelativePath(t *testing.T) {
+	base := t.TempDir()
+	writeServiceManifest(t, filepath.Join(base, "services", "api"))
+	cfg := &manifest.Blueprint{Services: []manifest.Ref{{ID: "api", Path: "services/api"}}}
+
+	p, err := resolvePlan(context.Background(), cfg, "dev", unreachableSource(t), base, defaultCompute())
+	if err != nil {
+		t.Fatalf("resolvePlan: %v", err)
+	}
+	want := filepath.Join(base, "services", "api")
+	if p.Services["api"] != want {
+		t.Errorf("Services[api] = %q, want %q", p.Services["api"], want)
+	}
+}
+
+func TestResolvePlanPathWithoutManifest(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &manifest.Blueprint{Services: []manifest.Ref{{ID: "api", Path: dir}}}
+
+	_, err := resolvePlan(context.Background(), cfg, "dev", unreachableSource(t), "/elsewhere", defaultCompute())
+	if !errors.Is(err, ErrBuildPlan) {
+		t.Fatalf("resolvePlan = %v, want ErrBuildPlan", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("resolvePlan = %v, want os.ErrNotExist", err)
+	}
+}
 
 func TestNewBuilder(t *testing.T) {
 	src, err := registry.NewSource("http://reg", "ns", "/cache")
@@ -14,12 +95,15 @@ func TestNewBuilder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b := NewBuilder(src, "prod", manifest.Compute{})
+	b := NewBuilder(src, "/work", "prod", manifest.Compute{})
 	if b == nil {
 		t.Fatal("NewBuilder returned nil")
 	}
 	if b.src != src {
 		t.Errorf("src = %+v, want %+v", b.src, src)
+	}
+	if b.dir != "/work" {
+		t.Errorf("dir = %q, want /work", b.dir)
 	}
 	if b.env != "prod" {
 		t.Errorf("env = %q, want prod", b.env)
@@ -35,7 +119,7 @@ func TestNewBuilder(t *testing.T) {
 		t.Errorf("compute host = %q, want %q", localCfg.Host, localComputeHost)
 	}
 
-	custom := NewBuilder(src, "prod", manifest.Compute{Type: manifest.ComputeTypeLocal, Config: &manifest.ComputeLocal{Host: "example.com"}})
+	custom := NewBuilder(src, "/work", "prod", manifest.Compute{Type: manifest.ComputeTypeLocal, Config: &manifest.ComputeLocal{Host: "example.com"}})
 	customCfg, ok := custom.compute.Config.(*manifest.ComputeLocal)
 	if !ok {
 		t.Fatalf("custom compute.Config = %T, want *manifest.ComputeLocal", custom.compute.Config)

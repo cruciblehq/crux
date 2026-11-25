@@ -27,7 +27,8 @@ type BuildResult struct {
 // writes the resolved manifest to the output directory alongside any type
 // specific artifacts. workdir is the manifest directory; the local source
 // paths in copy steps are resolved relative to it for runtime and service
-// builds. env selects the blueprint environment and is ignored by other types.
+// builds, and relative service paths for blueprint builds. env selects the
+// blueprint environment and is ignored by other types.
 // The caller creates the output directory.
 func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdir, env, output string) (*BuildResult, error) {
 	switch m.Resource.Type {
@@ -38,7 +39,7 @@ func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdi
 	case manifest.TypeWidget:
 		return buildWidget(ctx, &m, output)
 	case manifest.TypeBlueprint:
-		return buildBlueprint(ctx, &m, src, env, output)
+		return buildBlueprint(ctx, &m, src, workdir, env, output)
 	default:
 		return nil, crex.Newf(ErrUnsupportedType, "resource type %q is not supported", m.Resource.Type)
 	}
@@ -87,13 +88,13 @@ func buildWidget(ctx context.Context, m *manifest.Manifest, output string) (*Bui
 }
 
 // Builds a blueprint resource and writes its plan and manifest to output.
-func buildBlueprint(ctx context.Context, m *manifest.Manifest, src registry.Source, env, output string) (*BuildResult, error) {
+func buildBlueprint(ctx context.Context, m *manifest.Manifest, src registry.Source, workdir, env, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Blueprint](m)
 	if err != nil {
 		return nil, err
 	}
 	err = writeArtifact(output, manifest.PlanFile, func(w io.Writer) error {
-		return blueprint.NewBuilder(src, env, manifest.Compute{}).Build(ctx, cfg, w)
+		return blueprint.NewBuilder(src, workdir, env, manifest.Compute{}).Build(ctx, cfg, w)
 	})
 	if err != nil {
 		return nil, err
