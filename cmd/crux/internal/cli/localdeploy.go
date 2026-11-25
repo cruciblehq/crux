@@ -6,9 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/dirs"
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
@@ -17,7 +15,7 @@ import (
 
 // Represents the 'crux local deploy' command.
 type LocalDeployCmd struct {
-	Registry    string `help:"Hub registry URL for fetching resources (default: http://hub.cruciblehq.xyz:8080)."`
+	Hub         string `help:"Hub to fetch resources from (default: the one set with 'crux hub use')."`
 	Environment string `short:"e" help:"Blueprint environment to deploy." default:""`
 }
 
@@ -33,11 +31,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	registryURL := c.Registry
-	if registryURL == "" {
-		registryURL = internal.DefaultRegistryURL
-	}
-	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
+	src, err := openHubSource(c.Hub)
 	if err != nil {
 		return err
 	}

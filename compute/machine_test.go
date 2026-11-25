@@ -21,8 +21,6 @@ import (
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/httpx"
-	"github.com/cruciblehq/utils-go/pki"
-	"github.com/zalando/go-keyring"
 )
 
 type fakeMachine struct {
@@ -35,7 +33,6 @@ type fakeMachine struct {
 
 func useStateDirs(t *testing.T) {
 	t.Helper()
-	keyring.MockInit()
 	t.Cleanup(xdg.Reload)
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
@@ -53,7 +50,7 @@ func startMachine(t *testing.T, enrollment, token []byte) string {
 		t.Fatal(err)
 	}
 	pub, key, _ := ed25519.GenerateKey(rand.Reader)
-	self, err := pki.Sign(pki.LeafTemplate(e.Machine.Name(), pki.ValidFor(time.Hour), x509.ExtKeyUsageServerAuth), nil, pub, key)
+	self, err := trust.Sign(trust.LeafTemplate(e.Machine.Name(), trust.ValidFor(time.Hour), x509.ExtKeyUsageServerAuth), nil, pub, key)
 	if err != nil {
 		t.Fatal(err)
 	}

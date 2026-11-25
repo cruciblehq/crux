@@ -29,11 +29,11 @@ type PullResult struct {
 // Pulls a resource from the registry and extracts it locally.
 //
 // Opens the local cache, resolves the version through the registry (applying
-// any channel or version constraint in ref), then returns a cached result if
-// the stored digest matches, or downloads and stores the archive otherwise.
-// The archive is extracted before returning. Extracted in the result points
-// to the extraction root.
-func pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
+// the version constraint in ref), then returns a cached result if the stored
+// digest matches, or downloads and stores the archive otherwise. The archive
+// is extracted before returning. Extracted in the result points to the
+// extraction root. A non-empty credential is sent to the registry.
+func pull(ctx context.Context, ref *reference.Reference, credential string) (*PullResult, error) {
 	localCache, err := cache.Open()
 	if err != nil {
 		return nil, crex.Wrap(ErrCacheOperation, err)
@@ -41,7 +41,7 @@ func pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
 	defer localCache.Close()
 
 	registryURL := ref.Registry()
-	client := NewClient(registryURL, nil)
+	client := NewClient(registryURL, credential, nil)
 
 	ver, err := ResolveVersion(ctx, client, ref)
 	if err != nil {

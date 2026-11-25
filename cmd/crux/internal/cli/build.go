@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
@@ -18,7 +17,7 @@ import (
 // Represents the 'crux build' command.
 type BuildCmd struct {
 	Watch       bool   `short:"w" help:"Watch for changes and rebuild automatically."`
-	Registry    string `help:"Hub registry URL for fetching resources (default: http://hub.cruciblehq.xyz:8080)."`
+	Hub         string `help:"Hub to fetch resources from (default: the one set with 'crux hub use')."`
 	Environment string `short:"e" help:"Blueprint environment to build against." default:""`
 }
 
@@ -27,13 +26,13 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	slog.Info("building resource...", "watch", c.Watch)
 
-	registryURL := c.Registry
-	if registryURL == "" {
-		registryURL = internal.DefaultRegistryURL
+	src, err := openHubSource(c.Hub)
+	if err != nil {
+		return err
 	}
 
 	// Build first (don't wait for changes)
-	result, err := c.build(ctx, registryURL)
+	result, err := c.build(ctx, src)
 	if err != nil {
 		return err
 	}
@@ -43,7 +42,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 	// Watch mode
 	if c.Watch {
 		slog.Info("watching for changes (CTRL+C to exit)...")
-		return c.watchAndRebuild(ctx, registryURL)
+		return c.watchAndRebuild(ctx, src)
 	}
 
 	return nil
@@ -54,7 +53,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 // Sets up a recursive file watcher on the current directory, listening for any
 // changes. When a file change is detected, it triggers a rebuild. The function
 // continues to watch for changes until the provided context is canceled.
-func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) error {
+func (c *BuildCmd) watchAndRebuild(ctx context.Context, src hub.Source) error {
 	callback := func(we *watch.Event) error {
 
 		// Check for cancellation
@@ -64,7 +63,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 
 		slog.Info("change detected, rebuilding...", "file", we.Path)
 
-		if _, err := c.build(ctx, registryURL); err != nil {
+		if _, err := c.build(ctx, src); err != nil {
 			crex.LogError(slog.Default(), err)
 			return nil
 		}
@@ -87,12 +86,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, registryURL string) erro
 }
 
 // Reads the manifest, creates the output directory, and builds the resource.
-func (c *BuildCmd) build(ctx context.Context, registryURL string) (*resource.BuildResult, error) {
-	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *BuildCmd) build(ctx context.Context, src hub.Source) (*resource.BuildResult, error) {
 	man, err := readProjectManifest()
 	if err != nil {
 		return nil, err

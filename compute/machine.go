@@ -15,12 +15,8 @@ import (
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/codec"
 	"github.com/cruciblehq/utils-go/crex"
-	"github.com/cruciblehq/utils-go/pki/keychain"
 	"github.com/cruciblehq/utils-go/retry"
 )
-
-// Keychain service under which crux keeps its private keys.
-const keychainService = "crux"
 
 // Machine readiness timing.
 const (
@@ -29,9 +25,10 @@ const (
 	machineTryTimeout   = 5 * time.Second  // Longest wait for one readiness attempt.
 )
 
-// Opens crux's certificate authority, with its private keys in the OS keychain.
+// Opens crux's certificate authority, with its private keys in the secrets
+// directory.
 func openAuthority() (*authority.Authority, error) {
-	return authority.Open(dirs.Trust(), keychain.New(keychainService))
+	return authority.Open(dirs.Trust(), dirs.Secrets())
 }
 
 // Creates the record for a new machine and returns its enrollment data.

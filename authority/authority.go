@@ -1,7 +1,6 @@
 package authority
 
 import (
-	"crypto"
 	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
@@ -14,13 +13,12 @@ import (
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
-	"github.com/cruciblehq/utils-go/pki"
 )
 
-// Names of the private keys in the key store.
+// Files in the key directory.
 const (
-	rootKeyName   = "root"   // Root private key.
-	issuerKeyName = "issuer" // Issuer private key.
+	rootKeyName   = "ca-root.key"   // Root private key.
+	issuerKeyName = "ca-issuer.key" // Issuer private key.
 )
 
 // Common names of the certificates crux issues.
@@ -44,27 +42,28 @@ const (
 // and are withdrawn only through the revocation list.
 var agentNotAfter = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 
-// Certificate authority backed by a directory and a key store.
+// Certificate authority backed by a directory of public files and a directory
+// of private keys.
 type Authority struct {
 	dir       string               // Directory of the public files.
-	keys      pki.KeyStore         // Store holding the root and issuer keys.
+	keyDir    string               // Directory holding the root and issuer keys.
 	root      *x509.Certificate    // Root certificate.
 	issuer    *x509.Certificate    // Current issuer certificate.
-	issuerKey crypto.Signer        // Current issuer key.
+	issuerKey ed25519.PrivateKey   // Current issuer key.
 	crl       *x509.RevocationList // Current revocation list.
 }
 
-// Opens the authority in dir with its private keys in keys, creating it on
+// Opens the authority in dir with its private keys in keyDir, creating it on
 // first use.
 //
 // The first call creates the root, an empty revocation list, and an issuer.
 // Later calls renew the issuer when it is missing, when its key cannot be
 // loaded, or when a client certificate signed now could outlive it.
-func Open(dir string, keys pki.KeyStore) (*Authority, error) {
+func Open(dir, keyDir string) (*Authority, error) {
 	if err := os.MkdirAll(dir, file.OwnerDirMode); err != nil {
 		return nil, err
 	}
-	a := &Authority{dir: dir, keys: keys}
+	a := &Authority{dir: dir, keyDir: keyDir}
 
 	root, err := readCertificate(filepath.Join(dir, rootFile))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -111,6 +110,29 @@ func (a *Authority) loadRevocations() (*x509.RevocationList, error) {
 	return trust.ParseRevocations(der, a.root)
 }
 
+// Reads the private key named name from the key directory.
+//
+// A missing file returns an error that wraps [fs.ErrNotExist].
+func (a *Authority) loadKey(name string) (ed25519.PrivateKey, error) {
+	der, err := os.ReadFile(filepath.Join(a.keyDir, name))
+	if err != nil {
+		return nil, err
+	}
+	return trust.DecodeKey(der)
+}
+
+// Writes key to the key directory under name, replacing any previous key.
+func (a *Authority) storeKey(name string, key ed25519.PrivateKey) error {
+	der, err := trust.EncodeKey(key)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(a.keyDir, file.OwnerDirMode); err != nil {
+		return err
+	}
+	return file.WriteFile(filepath.Join(a.keyDir, name), der, file.OwnerFileMode)
+}
+
 // Loads the saved issuer, or renews it.
 //
 // The issuer is renewed when it is missing, when its key cannot be loaded, or
@@ -121,12 +143,12 @@ func (a *Authority) loadIssuer() error {
 		return err
 	}
 	if issuer != nil && time.Now().Add(trust.ClientLifetime).Before(issuer.NotAfter) {
-		if key, err := a.keys.Load(issuerKeyName); err == nil {
+		if key, err := a.loadKey(issuerKeyName); err == nil {
 			a.issuer, a.issuerKey = issuer, key
 			return nil
 		}
 	}
-	rootKey, err := a.keys.Load(rootKeyName)
+	rootKey, err := a.loadKey(rootKeyName)
 	if err != nil {
 		return err
 	}
@@ -139,11 +161,11 @@ func (a *Authority) create() error {
 	if err != nil {
 		return err
 	}
-	root, err := pki.Sign(pki.AuthorityTemplate(rootName, pki.ValidFor(trust.RootLifetime), false), nil, pub, key)
+	root, err := trust.Sign(trust.AuthorityTemplate(rootName, trust.ValidFor(trust.RootLifetime), false), nil, pub, key)
 	if err != nil {
 		return err
 	}
-	if err := a.keys.Store(rootKeyName, key); err != nil {
+	if err := a.storeKey(rootKeyName, key); err != nil {
 		return err
 	}
 	if err := file.WriteFile(filepath.Join(a.dir, rootFile), root.Raw, file.OwnerFileMode); err != nil {
@@ -151,7 +173,7 @@ func (a *Authority) create() error {
 	}
 	a.root = root
 
-	crl, err := pki.SignRevocationList(1, pki.ValidFor(trust.IssuerLifetime), nil, root, key)
+	crl, err := trust.SignRevocationList(1, trust.ValidFor(trust.IssuerLifetime), nil, root, key)
 	if err != nil {
 		return err
 	}
@@ -164,16 +186,16 @@ func (a *Authority) create() error {
 }
 
 // Creates a new issuer signed by the root.
-func (a *Authority) renewIssuer(rootKey crypto.Signer) error {
+func (a *Authority) renewIssuer(rootKey ed25519.PrivateKey) error {
 	pub, key, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		return err
 	}
-	issuer, err := pki.Sign(pki.AuthorityTemplate(issuerName, pki.ValidFor(trust.IssuerLifetime), true), a.root, pub, rootKey)
+	issuer, err := trust.Sign(trust.AuthorityTemplate(issuerName, trust.ValidFor(trust.IssuerLifetime), true), a.root, pub, rootKey)
 	if err != nil {
 		return err
 	}
-	if err := a.keys.Store(issuerKeyName, key); err != nil {
+	if err := a.storeKey(issuerKeyName, key); err != nil {
 		return err
 	}
 	if err := file.WriteFile(filepath.Join(a.dir, issuerFile), issuer.Raw, file.OwnerFileMode); err != nil {
@@ -199,7 +221,7 @@ func (a *Authority) Client() (tls.Certificate, error) {
 	if err != nil {
 		return tls.Certificate{}, err
 	}
-	leaf, err := pki.Sign(pki.LeafTemplate(clientName, pki.ValidFor(trust.ClientLifetime), x509.ExtKeyUsageClientAuth), a.issuer, pub, a.issuerKey)
+	leaf, err := trust.Sign(trust.LeafTemplate(clientName, trust.ValidFor(trust.ClientLifetime), x509.ExtKeyUsageClientAuth), a.issuer, pub, a.issuerKey)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -215,7 +237,7 @@ func (a *Authority) Client() (tls.Certificate, error) {
 // The certificate names machine id, is for server authentication, and lasts
 // for the life of the machine. Returns the DER certificate.
 func (a *Authority) SignAgent(csr *x509.CertificateRequest, id trust.MachineID) ([]byte, error) {
-	rootKey, err := a.keys.Load(rootKeyName)
+	rootKey, err := a.loadKey(rootKeyName)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +245,8 @@ func (a *Authority) SignAgent(csr *x509.CertificateRequest, id trust.MachineID) 
 	if !ok {
 		return nil, crex.Newf(trust.ErrInvalidEnrollment, "unexpected request key type %T", csr.PublicKey)
 	}
-	tmpl := pki.LeafTemplate(id.Name(), pki.ValidUntil(agentNotAfter), x509.ExtKeyUsageServerAuth, id.Name())
-	cert, err := pki.Sign(tmpl, a.root, pub, rootKey)
+	tmpl := trust.LeafTemplate(id.Name(), trust.ValidUntil(agentNotAfter), x509.ExtKeyUsageServerAuth, id.Name())
+	cert, err := trust.Sign(tmpl, a.root, pub, rootKey)
 	if err != nil {
 		return nil, err
 	}

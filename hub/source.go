@@ -14,8 +14,9 @@ import (
 // the corresponding default is applied by [Source.Parse] before the reference
 // is passed to any pull or push operation.
 type Source struct {
-	Registry  string // Default registry URL.
-	Namespace string // Default namespace.
+	Registry   string // Default registry URL.
+	Namespace  string // Default namespace.
+	Credential string // Credential for Registry; empty for none.
 }
 
 // Creates a new [Source] with the given registry and namespace.
@@ -53,8 +54,13 @@ func (s Source) Parse(resourceType, ref string) (*reference.Reference, error) {
 // Checks the local cache first. Only downloads on cache miss or if the cached
 // version is invalid or its digest does not match. Returns a [PullResult]
 // containing the local extraction directory, digest, and version metadata.
+// The credential is sent only when ref points at the source's registry.
 func (s Source) Pull(ctx context.Context, ref *reference.Reference) (*PullResult, error) {
-	return pull(ctx, ref)
+	credential := ""
+	if ref.Registry() == s.Registry {
+		credential = s.Credential
+	}
+	return pull(ctx, ref, credential)
 }
 
 // Pushes a resource package to the registry.
@@ -64,5 +70,5 @@ func (s Source) Pull(ctx context.Context, ref *reference.Reference) (*PullResult
 // [ErrVersionPublic] if the version is public, or [ErrVersionSuperseded] if a
 // public version with the same major and minor is higher.
 func (s Source) Push(ctx context.Context, name, resourceType, version string, archive io.ReadSeeker) error {
-	return push(ctx, s.Registry, name, resourceType, version, archive)
+	return push(ctx, s.Registry, s.Credential, name, resourceType, version, archive)
 }

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/cruciblehq/crux/cache"
@@ -61,37 +60,30 @@ func removeReference(c *cache.Cache, src hub.Source, resType manifest.ResourceTy
 			Err()
 	}
 
-	if ref.IsVersionBased() {
-		return removeVersion(c, ref)
-	}
-
-	return removeAllVersions(c, ref)
+	return removeMatchingVersions(c, ref)
 }
 
-// Removes a specific version from the cache.
-func removeVersion(c *cache.Cache, ref *reference.Reference) error {
-	_, err := c.Get(ref.Namespace(), ref.Name(), ref.Version().String())
-	if errors.Is(err, cache.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return c.Delete(ref.Namespace(), ref.Name(), ref.Version().String())
-}
-
-// Removes all versions of a resource from the cache.
-func removeAllVersions(c *cache.Cache, ref *reference.Reference) error {
+// Removes the cached versions of a resource that the reference's version
+// constraint matches.
+func removeMatchingVersions(c *cache.Cache, ref *reference.Reference) error {
 	entries, err := c.List()
 	if err != nil {
 		return err
 	}
 
 	for _, entry := range entries {
-		if entry.Namespace == ref.Namespace() && entry.Resource == ref.Name() {
-			if err := c.Delete(entry.Namespace, entry.Resource, entry.String); err != nil {
-				return err
-			}
+		if entry.Namespace != ref.Namespace() || entry.Resource != ref.Name() {
+			continue
+		}
+		matches, err := ref.Version().Matches(entry.String)
+		if err != nil {
+			return err
+		}
+		if !matches {
+			continue
+		}
+		if err := c.Delete(entry.Namespace, entry.Resource, entry.String); err != nil {
+			return err
 		}
 	}
 

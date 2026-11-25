@@ -3,6 +3,7 @@ package hub
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -19,18 +20,20 @@ import (
 // parsing, and error handling according to the Hub API conventions.
 type Client struct {
 	baseURL    string       // Base URL of the registry.
+	credential string       // Credential sent as a bearer token; empty for none.
 	httpClient *http.Client // HTTP client used to execute requests.
 }
 
 // Creates a new registry client.
 //
-// The base URL should point to the registry. http.DefaultClient is used if
+// The base URL should point to the registry. A non-empty credential is sent
+// with every request as a bearer token. http.DefaultClient is used if
 // httpClient is nil. Returns a new Client instance.
-func NewClient(baseURL string, httpClient *http.Client) *Client {
+func NewClient(baseURL, credential string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &Client{baseURL: baseURL, httpClient: httpClient}
+	return &Client{baseURL: baseURL, credential: credential, httpClient: httpClient}
 }
 
 // Creates a new namespace.
@@ -135,7 +138,7 @@ func (c *Client) CreateResource(ctx context.Context, namespace string, info regi
 	return &resource, nil
 }
 
-// Retrieves resource metadata with version and channel summaries.
+// Retrieves resource metadata with version summaries.
 func (c *Client) ReadResource(ctx context.Context, namespace, resource string) (*registry.Resource, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, registry.ResourcePath(namespace, resource), nil)
 	if err != nil {
@@ -321,92 +324,14 @@ func (c *Client) DownloadArchive(ctx context.Context, namespace, resource, versi
 	return resp.Body, nil
 }
 
-// Creates a new channel.
-func (c *Client) CreateChannel(ctx context.Context, namespace, resource string, info registry.ChannelInfo) (*registry.Channel, error) {
-	body, err := codec.Encode(info, registry.BodyFormat)
-	if err != nil {
-		return nil, crex.Wrap(ErrRequestEncode, err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPost, registry.ChannelListPath(namespace, resource), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeChannelInfo.With(registry.BodyFormat))
-	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
-
-	var channel registry.Channel
-	if err := c.do(req, &channel); err != nil {
-		return nil, err
-	}
-	return &channel, nil
-}
-
-// Retrieves channel metadata with full version details.
-func (c *Client) ReadChannel(ctx context.Context, namespace, resource, channel string) (*registry.Channel, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, registry.ChannelPath(namespace, resource, channel), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
-
-	var ch registry.Channel
-	if err := c.do(req, &ch); err != nil {
-		return nil, err
-	}
-	return &ch, nil
-}
-
-// Updates a channel's mutable metadata.
-func (c *Client) UpdateChannel(ctx context.Context, namespace, resource, channel string, info registry.ChannelInfo) (*registry.Channel, error) {
-	body, err := codec.Encode(info, registry.BodyFormat)
-	if err != nil {
-		return nil, crex.Wrap(ErrRequestEncode, err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPut, registry.ChannelPath(namespace, resource, channel), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(httpx.HeaderContentType, registry.MediaTypeChannelInfo.With(registry.BodyFormat))
-	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannel.With(registry.BodyFormat))
-
-	var ch registry.Channel
-	if err := c.do(req, &ch); err != nil {
-		return nil, err
-	}
-	return &ch, nil
-}
-
-// Permanently deletes a channel.
-func (c *Client) DeleteChannel(ctx context.Context, namespace, resource, channel string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, registry.ChannelPath(namespace, resource, channel), nil)
-	if err != nil {
-		return err
-	}
-	return c.do(req, nil)
-}
-
-// Lists all channels for a resource.
-func (c *Client) ListChannels(ctx context.Context, namespace, resource string) (*registry.ChannelList, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, registry.ChannelListPath(namespace, resource), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(httpx.HeaderAccept, registry.MediaTypeChannelList.With(registry.BodyFormat))
-
-	var list registry.ChannelList
-	if err := c.do(req, &list); err != nil {
-		return nil, err
-	}
-	return &list, nil
-}
-
 // Creates an HTTP request with the given method, path, and body.
 func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	req, err := httpx.NewRequest(ctx, method, c.baseURL, path, nil, body)
 	if err != nil {
 		return nil, crex.Wrap(ErrHTTPRequest, err)
+	}
+	if c.credential != "" {
+		req.Header.Set(httpx.HeaderAuthorization, fmt.Sprintf("%s %s", httpx.AuthSchemeBearer, c.credential))
 	}
 	return req, nil
 }

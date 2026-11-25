@@ -12,18 +12,14 @@ import (
 // Resolves a reference to a specific version with full metadata.
 //
 // First checks that the resource has the type of the reference, and returns
-// [ErrTypeMismatch] if not. For channel-based references, follows the channel
-// to get the version. For version-constrained references, lists all versions
-// and finds the highest matching version. Returns the full [registry.Version]
-// with digest and archive details.
+// [ErrTypeMismatch] if not. Then lists all versions and finds the highest
+// version that satisfies the version constraint. Returns the full
+// [registry.Version] with digest and archive details.
 func ResolveVersion(ctx context.Context, client *Client, ref *reference.Reference) (*registry.Version, error) {
 	if err := validateResourceType(ctx, client, ref); err != nil {
 		return nil, err
 	}
 
-	if ref.IsChannelBased() {
-		return resolveChannel(ctx, client, ref)
-	}
 	return resolveVersionConstraint(ctx, client, ref)
 }
 
@@ -38,15 +34,6 @@ func validateResourceType(ctx context.Context, client *Client, ref *reference.Re
 		return ErrTypeMismatch
 	}
 	return nil
-}
-
-// Resolves a channel reference to its current version.
-func resolveChannel(ctx context.Context, client *Client, ref *reference.Reference) (*registry.Version, error) {
-	channel, err := client.ReadChannel(ctx, ref.Namespace(), ref.Name(), *ref.Channel())
-	if err != nil {
-		return nil, err
-	}
-	return &channel.Version, nil
 }
 
 // Resolves a version constraint to the highest matching version.

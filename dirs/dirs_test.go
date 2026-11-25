@@ -20,6 +20,8 @@ func TestDirs(t *testing.T) {
 		{"Temp", Temp(), filepath.Join(xdg.CacheHome, "crux", "tmp")},
 		{"Trust", Trust(), filepath.Join(xdg.DataHome, "crux", "trust")},
 		{"Machines", Machines(), filepath.Join(xdg.DataHome, "crux", "machines")},
+		{"Secrets", Secrets(), filepath.Join(xdg.DataHome, "crux", "secrets")},
+		{"Config", Config(), filepath.Join(xdg.ConfigHome, "crux")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

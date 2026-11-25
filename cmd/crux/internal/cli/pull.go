@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cruciblehq/crux/cmd/crux/internal"
 	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/utils-go/crex"
@@ -14,18 +13,13 @@ import (
 
 // Represents the 'crux pull' command.
 type PullCmd struct {
-	Registry  string   `help:"Hub registry URL (default: http://hub.cruciblehq.xyz:8080)."`
+	Hub       string   `help:"Hub to pull from (default: the one set with 'crux hub use')."`
 	Type      string   `arg:"" help:"Resource type (e.g., widget, service)."`
 	Reference []string `arg:"" help:"Resource reference (e.g., crucible/login 1.0.0)."`
 }
 
 // Executes the pull command.
 func (c *PullCmd) Run(ctx context.Context) error {
-	registryURL := c.Registry
-	if registryURL == "" {
-		registryURL = internal.DefaultRegistryURL
-	}
-
 	resType, err := manifest.ParseResourceType(c.Type)
 	if err != nil {
 		return crex.UserError("invalid resource type", c.Type).
@@ -33,7 +27,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	src, err := hub.NewSource(registryURL, internal.DefaultNamespace)
+	src, err := openHubSource(c.Hub)
 	if err != nil {
 		return err
 	}
@@ -42,7 +36,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 
 	slog.Info("pulling resource...",
 		"reference", raw,
-		"registry", registryURL,
+		"registry", src.Registry,
 	)
 
 	ref, err := src.Parse(string(resType), raw)

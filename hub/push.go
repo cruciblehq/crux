@@ -17,13 +17,13 @@ import (
 // Resolves the resource identifier, checks that the namespace exists, creates
 // the resource and the version if needed, then uploads archive. Pushing a
 // private version again replaces its archive.
-func push(ctx context.Context, registryURL, name, resourceType, version string, archive io.ReadSeeker) error {
+func push(ctx context.Context, registryURL, credential, name, resourceType, version string, archive io.ReadSeeker) error {
 	id, err := reference.ParseIdentifier(name, resourceType)
 	if err != nil {
 		return crex.Wrap(ErrInvalidIdentifier, err)
 	}
 
-	client := NewClient(registryURL, nil)
+	client := NewClient(registryURL, credential, nil)
 
 	if err := verifyNamespace(ctx, client, id.Namespace()); err != nil {
 		return err

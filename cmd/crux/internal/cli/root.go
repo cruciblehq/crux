@@ -25,6 +25,7 @@ var RootCmd struct {
 	Pull    PullCmd    `cmd:"" help:"Pull a resource from the registry to local cache."`
 	Import  ImportCmd  `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
 	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
+	Hub     HubCmd     `cmd:"" help:"Manage the hubs crux pushes to and pulls from."`
 	Local   LocalCmd   `cmd:"" help:"Manage the local environment."`
 	Version VersionCmd `cmd:"" help:"Show version information."`
 }

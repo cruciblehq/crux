@@ -195,7 +195,7 @@ func extractLima(r io.Reader, dest string) error {
 			Err()
 	}
 
-	if _, err := os.Stat(limactlBin()); err != nil {
+	if _, err := os.Stat(filepath.Join(dest, limaBinDir, limactlName)); err != nil {
 		return crex.SystemError(description, "the Lima archive did not contain limactl").
 			Recovery("If the problem persists, report it to the Crucible team.").
 			Cause(crex.Newf(ErrLimaDownload, "limactl not found in archive")).

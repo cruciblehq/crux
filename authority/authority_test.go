@@ -5,28 +5,28 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/cruciblehq/spec/trust"
 	"github.com/cruciblehq/utils-go/file"
-	"github.com/cruciblehq/utils-go/pki"
 )
 
-func openTest(t *testing.T) (*Authority, string, pki.KeyStore) {
+func openTest(t *testing.T) (*Authority, string, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "trust")
-	keys := pki.NewDirKeyStore(filepath.Join(t.TempDir(), "keys"))
-	a, err := Open(dir, keys)
+	keyDir := filepath.Join(t.TempDir(), "keys")
+	a, err := Open(dir, keyDir)
 	if err != nil {
 		t.Fatalf("Open() = %v, want nil", err)
 	}
-	return a, dir, keys
+	return a, dir, keyDir
 }
 
 func TestOpenCreates(t *testing.T) {
-	a, dir, keys := openTest(t)
+	a, dir, _ := openTest(t)
 
 	if !a.Root().IsCA {
 		t.Error("Root().IsCA = false, want true")
@@ -46,8 +46,8 @@ func TestOpenCreates(t *testing.T) {
 			t.Errorf("%s mode = %v, want %v", name, info.Mode().Perm(), file.OwnerFileMode)
 		}
 	}
-	if _, err := keys.Load(rootKeyName); err != nil {
-		t.Errorf("root key not in key store: %v", err)
+	if _, err := a.loadKey(rootKeyName); err != nil {
+		t.Errorf("root key not in key directory: %v", err)
 	}
 }
 
@@ -90,8 +90,8 @@ func TestOpenMissingRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Open(dir, pki.NewDirKeyStore(t.TempDir())); !errors.Is(err, pki.ErrKeyNotFound) {
-		t.Errorf("Open() = %v, want %v", err, pki.ErrKeyNotFound)
+	if _, err := Open(dir, t.TempDir()); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Open() = %v, want %v", err, fs.ErrNotExist)
 	}
 }
 

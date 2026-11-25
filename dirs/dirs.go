@@ -22,7 +22,13 @@ const (
 	tempName     = "tmp"      // Temporary staging files.
 	trustName    = "trust"    // Certificate authority certificates and revocation list.
 	machinesName = "machines" // Machine identifiers and enrollment tokens.
+	secretsName  = "secrets"  // Private keys and credentials.
 )
+
+// Returns the directory for settings the user configures.
+func Config() string {
+	return filepath.Join(xdg.ConfigHome, app)
+}
 
 // Returns the directory for data crux keeps across runs.
 func data() string {
@@ -56,7 +62,7 @@ func Registry() string {
 
 // Returns the directory for the certificate authority's public files.
 //
-// The private keys are kept in the OS keychain, not here.
+// The private keys are kept in [Secrets], not here.
 func Trust() string {
 	return filepath.Join(data(), trustName)
 }
@@ -64,6 +70,13 @@ func Trust() string {
 // Returns the directory for machine records.
 func Machines() string {
 	return filepath.Join(data(), machinesName)
+}
+
+// Returns the directory for private keys and credentials.
+//
+// The directory and its files are readable only by the user.
+func Secrets() string {
+	return filepath.Join(data(), secretsName)
 }
 
 // Returns the directory for temporary files.
