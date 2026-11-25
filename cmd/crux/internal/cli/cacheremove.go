@@ -4,11 +4,12 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cruciblehq/crux/cache"
 	"github.com/cruciblehq/crux/cmd/crux/internal"
-	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/spec/registry/cache"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -29,12 +30,12 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 			Err()
 	}
 
-	src, err := hub.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace)
+	src, err := registry.NewSource(internal.DefaultRegistryURL, internal.DefaultNamespace, dirs.Registry())
 	if err != nil {
 		return err
 	}
 
-	localCache, err := cache.Open()
+	localCache, err := cache.Open(dirs.Registry())
 	if err != nil {
 		return err
 	}
@@ -52,7 +53,7 @@ func (c *CacheRemoveCmd) Run(_ context.Context) error {
 }
 
 // Removes cache entries matching a reference.
-func removeReference(c *cache.Cache, src hub.Source, resType manifest.ResourceType, refStr string) error {
+func removeReference(c *cache.Cache, src registry.Source, resType manifest.ResourceType, refStr string) error {
 	ref, err := src.Parse(string(resType), refStr)
 	if err != nil {
 		return crex.UserError("invalid reference", err.Error()).

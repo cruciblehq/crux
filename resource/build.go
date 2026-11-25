@@ -5,12 +5,12 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource/blueprint"
 	"github.com/cruciblehq/crux/resource/runtime"
 	"github.com/cruciblehq/crux/resource/service"
 	"github.com/cruciblehq/crux/resource/widget"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 )
@@ -29,7 +29,7 @@ type BuildResult struct {
 // paths in copy steps are resolved relative to it for runtime and service
 // builds. env selects the blueprint environment and is ignored by other types.
 // The caller creates the output directory.
-func Build(ctx context.Context, m manifest.Manifest, src hub.Source, workdir, env, output string) (*BuildResult, error) {
+func Build(ctx context.Context, m manifest.Manifest, src registry.Source, workdir, env, output string) (*BuildResult, error) {
 	switch m.Resource.Type {
 	case manifest.TypeRuntime:
 		return buildRuntime(ctx, &m, src, workdir, output)
@@ -45,7 +45,7 @@ func Build(ctx context.Context, m manifest.Manifest, src hub.Source, workdir, en
 }
 
 // Builds a runtime resource and writes its image and manifest to output.
-func buildRuntime(ctx context.Context, m *manifest.Manifest, src hub.Source, workdir, output string) (*BuildResult, error) {
+func buildRuntime(ctx context.Context, m *manifest.Manifest, src registry.Source, workdir, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Runtime](m)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func buildRuntime(ctx context.Context, m *manifest.Manifest, src hub.Source, wor
 }
 
 // Builds a service resource and writes its image and manifest to output.
-func buildService(ctx context.Context, m *manifest.Manifest, src hub.Source, workdir, output string) (*BuildResult, error) {
+func buildService(ctx context.Context, m *manifest.Manifest, src registry.Source, workdir, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Service](m)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func buildWidget(ctx context.Context, m *manifest.Manifest, output string) (*Bui
 }
 
 // Builds a blueprint resource and writes its plan and manifest to output.
-func buildBlueprint(ctx context.Context, m *manifest.Manifest, src hub.Source, env, output string) (*BuildResult, error) {
+func buildBlueprint(ctx context.Context, m *manifest.Manifest, src registry.Source, env, output string) (*BuildResult, error) {
 	cfg, err := manifest.As[*manifest.Blueprint](m)
 	if err != nil {
 		return nil, err

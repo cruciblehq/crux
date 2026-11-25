@@ -104,18 +104,26 @@ func buildLimaConfig(imagePath string, enrollment []byte) limaConfig {
 //
 // The configuration is generated with [buildLimaConfig] and rendered using
 // [limaConfigTemplate]. The file is written to disk so it can be read by
-// limactl when provisioning the VM, and is readable only by the user. If the
-// file already exists it will be overwritten. Returns the path to the file
-// that was generated.
+// limactl when provisioning the VM. The file and the Lima home holding it are
+// readable only by the user, because Lima keeps copies of the configuration,
+// with the enrollment token, in that home. If the file already exists it will
+// be overwritten. Returns the path to the file that was generated.
 func generateLimaConfig(imagePath string, enrollment []byte) (string, error) {
 	const description = "cannot configure local environment"
 
 	data := buildLimaConfig(imagePath, enrollment)
 
 	configPath := limaConfigPath()
-	if err := os.MkdirAll(filepath.Dir(configPath), file.DefaultDirMode); err != nil {
+	home := filepath.Dir(configPath)
+	if err := os.MkdirAll(home, file.OwnerDirMode); err != nil {
 		return "", crex.SystemError(description, "failed to create the configuration directory").
-			Recoveryf("Make sure you have write access to %s, then try again.", filepath.Dir(configPath)).
+			Recoveryf("Make sure you have write access to %s, then try again.", home).
+			Cause(crex.Wrap(ErrMachineConfig, err)).
+			Err()
+	}
+	if err := os.Chmod(home, file.OwnerDirMode); err != nil {
+		return "", crex.SystemError(description, "failed to restrict access to the configuration directory").
+			Recoveryf("Make sure you own %s, then try again.", home).
 			Cause(crex.Wrap(ErrMachineConfig, err)).
 			Err()
 	}

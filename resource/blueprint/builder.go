@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
 	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -19,7 +19,7 @@ const (
 
 // Builds a Crucible blueprint resource from its configuration.
 type Builder struct {
-	src     hub.Source       // Registry access for resolving service references.
+	src     registry.Source  // Registry access for resolving service references.
 	env     string           // Environment selector for the blueprint.
 	compute manifest.Compute // Compute entry used as the plan's default.
 }
@@ -30,7 +30,7 @@ type Builder struct {
 // the blueprint environment to resolve. compute is the plan's default compute
 // entry. When its type is empty, it defaults to the
 // local provider on localhost.
-func NewBuilder(src hub.Source, env string, compute manifest.Compute) *Builder {
+func NewBuilder(src registry.Source, env string, compute manifest.Compute) *Builder {
 	if compute.Type == "" {
 		compute = defaultCompute()
 	}
@@ -59,7 +59,7 @@ func (b *Builder) Build(ctx context.Context, cfg *manifest.Blueprint, w io.Write
 // entries of the infrastructure are derived from the network specs of the
 // containers. Returns the assembled plan, or an error from environment lookup
 // or any service resolution.
-func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src hub.Source, compute manifest.Compute) (*manifest.Plan, error) {
+func resolvePlan(ctx context.Context, cfg *manifest.Blueprint, envID string, src registry.Source, compute manifest.Compute) (*manifest.Plan, error) {
 	env, err := findEnvironment(cfg, envID)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func defaultCompute() manifest.Compute {
 }
 
 // Resolves all services in a blueprint against the selected environment.
-func resolveServices(ctx context.Context, services []manifest.Ref, env *manifest.Environment, src hub.Source) ([]serviceResult, error) {
+func resolveServices(ctx context.Context, services []manifest.Ref, env *manifest.Environment, src registry.Source) ([]serviceResult, error) {
 	results := make([]serviceResult, 0, len(services))
 	for _, service := range services {
 		r, err := planService(ctx, service, env, src)
@@ -145,7 +145,7 @@ type serviceResult struct {
 //
 // Pulls the service manifest, validates the environment variables, and checks
 // that the service has an output stage.
-func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src hub.Source) (serviceResult, error) {
+func planService(ctx context.Context, service manifest.Ref, env *manifest.Environment, src registry.Source) (serviceResult, error) {
 	ref, err := src.Parse(string(manifest.TypeService), service.Ref)
 	if err != nil {
 		return serviceResult{}, errService(service.ID, err)
@@ -227,7 +227,7 @@ func binPack(results []serviceResult, computes map[string]manifest.Compute) map[
 }
 
 // Pulls a service resource and extracts its manifest config.
-func resolveService(ctx context.Context, id string, ref *reference.Reference, src hub.Source) (*manifest.Service, error) {
+func resolveService(ctx context.Context, id string, ref *reference.Reference, src registry.Source) (*manifest.Service, error) {
 	result, err := src.Pull(ctx, ref)
 	if err != nil {
 		return nil, errService(id, err)

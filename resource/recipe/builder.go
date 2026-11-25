@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/agent"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -18,9 +18,9 @@ const commitAuthorExport = "export"
 // Drives the stage pipeline: imports base images and executes each step in
 // order. The final image is exported as an OCI tar archive.
 type Builder struct {
-	src     hub.Source  // Registry access for pulling base images.
-	workdir string      // Manifest directory.
-	agent   agent.Agent // Agent on the machine that runs the build.
+	src     registry.Source // Registry access for pulling base images.
+	workdir string          // Manifest directory.
+	agent   agent.Agent     // Agent on the machine that runs the build.
 }
 
 // Returns a new Builder.
@@ -28,7 +28,7 @@ type Builder struct {
 // src provides registry access for pulling base images. workdir is the
 // directory containing the manifest and is the root for resolving copy step
 // sources. a is the open agent on the machine that runs the build.
-func NewBuilder(src hub.Source, workdir string, a agent.Agent) *Builder {
+func NewBuilder(src registry.Source, workdir string, a agent.Agent) *Builder {
 	return &Builder{
 		src:     src,
 		workdir: workdir,

@@ -10,9 +10,10 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/cruciblehq/crux/cache"
-	"github.com/cruciblehq/crux/hub"
+	"github.com/cruciblehq/crux/dirs"
 	"github.com/cruciblehq/spec/reference"
+	"github.com/cruciblehq/spec/registry"
+	"github.com/cruciblehq/spec/registry/cache"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -71,8 +72,8 @@ func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 			Err()
 	}
 
-	registry := registryURL.String()
-	src, err := hub.NewSource(registry, machineNamespace)
+	registryAddr := registryURL.String()
+	src, err := registry.NewSource(registryAddr, machineNamespace, dirs.Registry())
 	if err != nil {
 		return crex.SystemError(description, "the registry source could not be initialized").
 			Recovery("Check your network connection and try again.").
@@ -80,7 +81,7 @@ func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 			Err()
 	}
 
-	id := reference.NewIdentifier(machineType, registry, machineNamespace, machineName)
+	id := reference.NewIdentifier(machineType, registryAddr, machineNamespace, machineName)
 	ref, err := reference.New(id, machineVersion, nil)
 	if err != nil {
 		return crex.SystemError(description, "the machine image reference is invalid").
@@ -104,7 +105,7 @@ func fetchMachineImage(ctx context.Context, registryURL *url.URL) error {
 // found, returns [ErrMachineImageMissing]. It's up to the caller to decide
 // whether to attempt a fetch from the registry.
 func cachedMachineImagePath() (string, error) {
-	c, err := cache.Open()
+	c, err := cache.Open(dirs.Registry())
 	if err != nil {
 		return "", err
 	}

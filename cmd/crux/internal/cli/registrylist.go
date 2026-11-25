@@ -5,21 +5,21 @@ import (
 	"fmt"
 )
 
-// Represents the 'crux hub list' command.
-type HubListCmd struct {
+// Represents the 'crux registry list' command.
+type RegistryListCmd struct {
 }
 
-// Prints each hub with its URL, marking the default and hubs without a
+// Prints each registry with its URL, marking the default and registries without a
 // credential.
-func (c *HubListCmd) Run(_ context.Context) error {
-	cfg, err := loadHubConfig()
+func (c *RegistryListCmd) Run(_ context.Context) error {
+	cfg, err := loadRegistryConfig()
 	if err != nil {
 		return err
 	}
 
 	defaultName := cfg.defaultName()
 	for _, e := range cfg.all() {
-		credential, err := hubCredential(e.Name)
+		credential, err := registryCredential(e.Name)
 		if err != nil {
 			return err
 		}

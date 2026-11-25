@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 	"github.com/cruciblehq/utils-go/file"
 	"github.com/cruciblehq/utils-go/watch"
@@ -17,7 +17,7 @@ import (
 // Represents the 'crux build' command.
 type BuildCmd struct {
 	Watch       bool   `short:"w" help:"Watch for changes and rebuild automatically."`
-	Hub         string `help:"Hub to fetch resources from (default: the one set with 'crux hub use')."`
+	Registry    string `help:"Registry to fetch resources from (default: the one set with 'crux registry use')."`
 	Environment string `short:"e" help:"Blueprint environment to build against." default:""`
 }
 
@@ -26,7 +26,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 
 	slog.Info("building resource...", "watch", c.Watch)
 
-	src, err := openHubSource(c.Hub)
+	src, err := openRegistrySource(c.Registry)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (c *BuildCmd) Run(ctx context.Context) error {
 // Sets up a recursive file watcher on the current directory, listening for any
 // changes. When a file change is detected, it triggers a rebuild. The function
 // continues to watch for changes until the provided context is canceled.
-func (c *BuildCmd) watchAndRebuild(ctx context.Context, src hub.Source) error {
+func (c *BuildCmd) watchAndRebuild(ctx context.Context, src registry.Source) error {
 	callback := func(we *watch.Event) error {
 
 		// Check for cancellation
@@ -86,7 +86,7 @@ func (c *BuildCmd) watchAndRebuild(ctx context.Context, src hub.Source) error {
 }
 
 // Reads the manifest, creates the output directory, and builds the resource.
-func (c *BuildCmd) build(ctx context.Context, src hub.Source) (*resource.BuildResult, error) {
+func (c *BuildCmd) build(ctx context.Context, src registry.Source) (*resource.BuildResult, error) {
 	man, err := readProjectManifest()
 	if err != nil {
 		return nil, err

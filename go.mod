@@ -3,8 +3,8 @@ module github.com/cruciblehq/crux
 go 1.25.1
 
 require (
-	github.com/cruciblehq/spec v0.0.0-20261124184255-190b774eb9b7
-	github.com/cruciblehq/utils-go v0.0.0-20261120132316-d8af996aee7d
+	github.com/cruciblehq/spec v0.0.0-20261125183510-f2b43a35e756
+	github.com/cruciblehq/utils-go v0.0.0-20261125183600-ea62fb1fb4a9
 )
 
 require (
@@ -12,14 +12,13 @@ require (
 	github.com/alecthomas/kong v1.14.0
 	github.com/evanw/esbuild v0.27.2
 	github.com/google/go-containerregistry v0.20.3
-	github.com/klauspost/compress v1.18.4
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 )
 
 require (
 	github.com/stretchr/testify v1.11.1 // indirect
-	golang.org/x/term v0.37.0
+	golang.org/x/term v0.40.0
 )
 
 require (
@@ -31,6 +30,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/crux/resource"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
@@ -16,12 +16,12 @@ const descPushPackage = "cannot push package"
 
 // Represents the 'crux push' command.
 type PushCmd struct {
-	Hub string `help:"Hub to push to (default: the one set with 'crux hub use')."`
+	Registry string `help:"Registry to push to (default: the one set with 'crux registry use')."`
 }
 
 // Executes the push command.
 func (c *PushCmd) Run(ctx context.Context) error {
-	src, err := openHubSource(c.Hub)
+	src, err := openRegistrySource(c.Registry)
 	if err != nil {
 		return err
 	}
@@ -55,23 +55,23 @@ func (c *PushCmd) Run(ctx context.Context) error {
 // Maps a push failure to a user error.
 func pushError(err error) error {
 	switch {
-	case errors.Is(err, hub.ErrVersionPublic):
+	case errors.Is(err, registry.ErrVersionPublic):
 		return crex.UserError(descPushPackage, "the resource version is public and cannot change").
 			Recovery("Bump resource.version in crucible.yaml, then run 'crux pack' and 'crux push' again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrVersionSuperseded):
+	case errors.Is(err, registry.ErrVersionSuperseded):
 		return crex.UserError(descPushPackage, "a higher public version has the same major and minor").
 			Recovery("Set resource.version in crucible.yaml above that version, then run 'crux pack' and 'crux push' again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrNamespaceNotFound):
-		return crex.UserError(descPushPackage, "the target namespace does not exist in the registry").
-			Recovery("Create the namespace in the registry, then try again.").
+	case errors.Is(err, registry.ErrNamespaceNotFound):
+		return crex.UserError(descPushPackage, "the target namespace does not exist on the registry").
+			Recovery("Create the namespace on the registry, then try again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrInvalidIdentifier):
+	case errors.Is(err, registry.ErrInvalidIdentifier):
 		return crex.UserError(descPushPackage, "the resource name in crucible.yaml is invalid").
 			Recovery("Use the format 'namespace/resource' in resource.name, then try again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrRegistryOperation):
+	case errors.Is(err, registry.ErrRegistryOperation):
 		return crex.SystemError(descPushPackage, "the registry could not accept the package upload").
 			Recovery("Check your network connection and try again.").
 			Reclassify(err)

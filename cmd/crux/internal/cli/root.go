@@ -18,16 +18,16 @@ var RootCmd struct {
 	Verbose bool   `short:"v" help:"Enable verbose output."`
 	Debug   bool   `short:"d" help:"Enable debug output."`
 
-	Init    InitCmd    `cmd:"" help:"Scaffold a new resource in the working directory."`
-	Build   BuildCmd   `cmd:"" help:"Build and bundle Crucible resources."`
-	Pack    PackCmd    `cmd:"" help:"Package a built resource for distribution."`
-	Push    PushCmd    `cmd:"" help:"Push a resource package to the registry."`
-	Pull    PullCmd    `cmd:"" help:"Pull a resource from the registry to local cache."`
-	Import  ImportCmd  `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
-	Cache   CacheCmd   `cmd:"" help:"Manage the local resource cache."`
-	Hub     HubCmd     `cmd:"" help:"Manage the hubs crux pushes to and pulls from."`
-	Local   LocalCmd   `cmd:"" help:"Manage the local environment."`
-	Version VersionCmd `cmd:"" help:"Show version information."`
+	Init     InitCmd     `cmd:"" help:"Scaffold a new resource in the working directory."`
+	Build    BuildCmd    `cmd:"" help:"Build and bundle Crucible resources."`
+	Pack     PackCmd     `cmd:"" help:"Package a built resource for distribution."`
+	Push     PushCmd     `cmd:"" help:"Push a resource package to a registry."`
+	Pull     PullCmd     `cmd:"" help:"Pull a resource from a registry into the local cache."`
+	Import   ImportCmd   `cmd:"" help:"Pull a remote OCI image and save it as a local archive."`
+	Cache    CacheCmd    `cmd:"" help:"Manage the local resource cache."`
+	Registry RegistryCmd `cmd:"" help:"Manage the registries crux pushes to and pulls from."`
+	Local    LocalCmd    `cmd:"" help:"Manage the local environment."`
+	Version  VersionCmd  `cmd:"" help:"Show version information."`
 }
 
 // Parses arguments and runs the CLI.

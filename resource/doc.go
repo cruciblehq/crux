@@ -19,7 +19,7 @@
 //
 // Callers read the manifest themselves and pass it to each operation:
 //
-//	src, err := hub.NewSource("http://hub.cruciblehq.xyz:8080", "acme")
+//	src, err := registry.NewSource("http://hub.cruciblehq.xyz:8080", "acme", dirs.Registry())
 //	man, err := resource.ReadManifest(".")
 //
 //	result, err := resource.Build(ctx, *man, src, ".", "", resource.BuildDir("."))

@@ -3,7 +3,7 @@ package compute
 import "github.com/cruciblehq/utils-go/crex"
 
 // Provider registered under each name.
-var registry = map[ProviderName]Provider{
+var providers = map[ProviderName]Provider{
 	Local: localProvider{},
 }
 
@@ -11,7 +11,7 @@ var registry = map[ProviderName]Provider{
 //
 // Returns [ErrUnknownProvider] if no provider has that name.
 func ProviderFor(name ProviderName) (Provider, error) {
-	p, ok := registry[name]
+	p, ok := providers[name]
 	if !ok {
 		return nil, crex.ProgrammingErrorf("unknown compute provider", "no provider is registered as %q", name).
 			Cause(ErrUnknownProvider).

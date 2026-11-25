@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cruciblehq/crux/cache"
+	"github.com/cruciblehq/crux/dirs"
+	"github.com/cruciblehq/spec/registry/cache"
 )
 
 // Represents the 'crux cache list' command.
@@ -14,7 +15,7 @@ type CacheListCmd struct {
 
 // Executes the cache list command.
 func (c *CacheListCmd) Run(_ context.Context) error {
-	localCache, err := cache.Open()
+	localCache, err := cache.Open(dirs.Registry())
 	if err != nil {
 		return err
 	}

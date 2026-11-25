@@ -15,7 +15,7 @@ import (
 
 // Represents the 'crux local deploy' command.
 type LocalDeployCmd struct {
-	Hub         string `help:"Hub to fetch resources from (default: the one set with 'crux hub use')."`
+	Registry    string `help:"Registry to fetch resources from (default: the one set with 'crux registry use')."`
 	Environment string `short:"e" help:"Blueprint environment to deploy." default:""`
 }
 
@@ -31,7 +31,7 @@ func (c *LocalDeployCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	src, err := openHubSource(c.Hub)
+	src, err := openRegistrySource(c.Registry)
 	if err != nil {
 		return err
 	}

@@ -6,14 +6,14 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cruciblehq/crux/hub"
 	"github.com/cruciblehq/spec/manifest"
+	"github.com/cruciblehq/spec/registry"
 	"github.com/cruciblehq/utils-go/crex"
 )
 
 // Represents the 'crux pull' command.
 type PullCmd struct {
-	Hub       string   `help:"Hub to pull from (default: the one set with 'crux hub use')."`
+	Registry  string   `help:"Registry to pull from (default: Crucible's official Hub or the one set with 'crux registry use')."`
 	Type      string   `arg:"" help:"Resource type (e.g., widget, service)."`
 	Reference []string `arg:"" help:"Resource reference (e.g., crucible/login 1.0.0)."`
 }
@@ -27,7 +27,7 @@ func (c *PullCmd) Run(ctx context.Context) error {
 			Err()
 	}
 
-	src, err := openHubSource(c.Hub)
+	src, err := openRegistrySource(c.Registry)
 	if err != nil {
 		return err
 	}
@@ -67,23 +67,23 @@ func (c *PullCmd) Run(ctx context.Context) error {
 func pullError(err error, raw string) error {
 	const description = "cannot pull resource"
 	switch {
-	case errors.Is(err, hub.ErrNoVersions), errors.Is(err, hub.ErrNoMatchingVersion), errors.Is(err, hub.ErrTypeMismatch):
+	case errors.Is(err, registry.ErrNoVersions), errors.Is(err, registry.ErrNoMatchingVersion), errors.Is(err, registry.ErrTypeMismatch):
 		return crex.UserError("resource not found", raw).
 			Recovery("Check the resource reference and version, then try again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrNoArchive):
+	case errors.Is(err, registry.ErrNoArchive):
 		return crex.UserError(description, "the requested resource version has no uploaded archive").
 			Recovery("Choose a different version, or republish the resource with an archive.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrResolveVersion):
+	case errors.Is(err, registry.ErrResolveVersion):
 		return crex.SystemError(description, "the registry could not resolve the requested resource version").
 			Recovery("Check your network connection and try again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrDownload):
+	case errors.Is(err, registry.ErrDownload):
 		return crex.SystemError(description, "the resource archive could not be downloaded from the registry").
 			Recovery("Check your network connection and try again.").
 			Reclassify(err)
-	case errors.Is(err, hub.ErrCacheOperation):
+	case errors.Is(err, registry.ErrCacheOperation):
 		return crex.SystemError(description, "the local cache could not store or extract the resource archive").
 			Recovery("Run 'crux cache clear' and try again.").
 			Reclassify(err)
